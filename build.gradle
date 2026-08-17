@@ -282,7 +282,6 @@ def macLauncher(def platform) {
 
 packageTask('linux64') {
     deb('linux64', 'amd64')
-    rpm('linux64', 'x86_64')
 }
 
 packageTask('any') {
