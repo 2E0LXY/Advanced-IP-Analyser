@@ -171,7 +171,7 @@ public class CommandsMenuActions {
 		public void handleEvent(Event event) {
 			if (event.type == SWT.KeyDown) {
 				// if this is not Ctrl+C or nothing is selected, then simply do nothing
-				if ((event.keyCode != 'c' && event.stateMask != SWT.MOD1) || resultTable.getSelectionIndex() < 0)
+				if (!isCopyShortcut(event) || resultTable.getSelectionIndex() < 0)
 					return;
 			}
 			else {
@@ -181,6 +181,10 @@ public class CommandsMenuActions {
 			var clipboard = new Clipboard(event.display);
 			clipboard.setContents(new Object[] {resultTable.getItem(resultTable.getSelectionIndex()).getText()}, new Transfer[] {TextTransfer.getInstance()});
 			clipboard.dispose();
+		}
+
+		static boolean isCopyShortcut(Event event) {
+			return (event.keyCode == 'c' || event.keyCode == 'C') && (event.stateMask & SWT.MOD1) != 0;
 		}
 	}
 	

@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.LinkedHashSet;
 
 /** Sends the standard Wake-on-LAN magic packet for a discovered MAC address. */
 public class WakeOnLan {
@@ -16,10 +18,21 @@ public class WakeOnLan {
 
 	public void wake(String macAddress) throws IOException {
 		var payload = createMagicPacket(macAddress);
-		var broadcast = InetAddress.getByName("255.255.255.255");
+		var broadcasts = new LinkedHashSet<InetAddress>();
+		var interfaces = NetworkInterface.networkInterfaces();
+		for (var networkInterface : interfaces.toList()) {
+			if (!networkInterface.isUp() || networkInterface.isLoopback()) continue;
+			for (var interfaceAddress : networkInterface.getInterfaceAddresses()) {
+				if (interfaceAddress.getBroadcast() != null)
+					broadcasts.add(interfaceAddress.getBroadcast());
+			}
+		}
+		if (broadcasts.isEmpty()) broadcasts.add(InetAddress.getByName("255.255.255.255"));
+
 		try (var socket = new DatagramSocket()) {
 			socket.setBroadcast(true);
-			socket.send(new DatagramPacket(payload, payload.length, broadcast, DEFAULT_PORT));
+			for (var broadcast : broadcasts)
+				socket.send(new DatagramPacket(payload, payload.length, broadcast, DEFAULT_PORT));
 		}
 	}
 

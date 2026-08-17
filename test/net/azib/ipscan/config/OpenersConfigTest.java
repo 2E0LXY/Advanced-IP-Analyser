@@ -75,11 +75,28 @@ public class OpenersConfigTest {
 	@Test
 	public void testLoad() throws Exception {
 		preferences.put(PREFERENCE_NAME, "aa###aaa@@@1@@@###bb###bbb@@@1@@@");
+		preferences.remove("openersDefaultsVersion");
 		var config = new OpenersConfig(preferences);
 
 		assertEquals("aaa", config.getOpener("aa").execString);
 		assertEquals("bbb", config.getOpener("bb").execString);
-		assertEquals(2, config.size());
+		assertNotNull(config.getOpener(Labels.getInstance().get("opener.https")));
+		assertTrue(config.size() >= 3);
+	}
+
+	@Test
+	public void migratesNewDefaultsOnlyOnce() {
+		preferences.put(PREFERENCE_NAME, "custom###custom-command@@@0@@@");
+		preferences.remove("openersDefaultsVersion");
+
+		var migrated = new OpenersConfig(preferences);
+		var migratedSize = migrated.size();
+		migrated.store();
+		var reloaded = new OpenersConfig(preferences);
+
+		assertNotNull(reloaded.getOpener("custom"));
+		assertNotNull(reloaded.getOpener(Labels.getInstance().get("opener.https")));
+		assertEquals(migratedSize, reloaded.size());
 	}
 	
 	@Test @SuppressWarnings("unchecked")

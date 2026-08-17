@@ -17,9 +17,9 @@
     <categories>
         <category>Network</category>
     </categories>
-    <url type="homepage">https://angryip.org/</url>
+    <url type="homepage">https://github.com/2E0LXY/Advanced-IP-Analyser</url>
     <url type="bugtracker">https://github.com/2E0LXY/Advanced-IP-Analyser/issues</url>
-    <url type="faq">https://angryip.org/faq/</url>
+    <url type="faq">https://github.com/2E0LXY/Advanced-IP-Analyser/blob/main/docs/DEBIAN13.md</url>
     <screenshots>
         <screenshot type="default">
             <image>https://angryip.org/screenshots/ipscan-ubuntu.png</image>

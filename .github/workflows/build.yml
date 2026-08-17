@@ -28,6 +28,14 @@ jobs:
         env:
           RELEASE_VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
 
+      - name: Validate Debian package
+        run: |
+          package="$(find build/libs -maxdepth 1 -name '*.deb' -print -quit)"
+          test -n "$package"
+          dpkg-deb --info "$package"
+          dpkg-deb --contents "$package" > package-contents.txt
+          grep -q './usr/share/doc/advanced-ip-analyser/copyright' package-contents.txt
+
       - uses: actions/upload-artifact@v4
         with:
           name: advanced-ip-analyser-debian-13

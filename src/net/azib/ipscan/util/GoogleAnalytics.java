@@ -1,17 +1,11 @@
 package net.azib.ipscan.util;
 
-import net.azib.ipscan.config.Version;
 import org.eclipse.swt.SWTError;
 import org.eclipse.swt.SWTException;
 
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLEncoder;
 import java.util.logging.Logger;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.logging.Level.FINE;
-import static net.azib.ipscan.config.Config.getConfig;
 
 /**
  * Utility class to send statistics to Google Analytics (GA4).
@@ -23,54 +17,8 @@ public class GoogleAnalytics {
 	}
 
 	public void report(String type, String content) {
-		try {
-			var config = getConfig();
-			if (!config.allowReports) return;
-			var url = new URL("https://www.google-analytics.com/mp/collect?measurement_id=" + Version.GA_ID + "&api_secret=" + Version.GA_SECRET);
-			var conn = (HttpURLConnection) url.openConnection();
-			conn.setRequestMethod("POST");
-			conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-			conn.setRequestProperty("User-Agent", "Mozilla/5.0 (ipscan/" + Version.getVersion() + " " + System.getProperty("os.name") + " " + System.getProperty("os.version") + "; Java " + System.getProperty("java.version") + ")");
-			conn.setDoOutput(true);
-
-			var payload = new StringBuilder();
-			payload.append("{");
-			payload.append("\"client_id\":\"").append(config.getGaClientId()).append("\",");
-			payload.append("\"non_personalized_ads\":true,");
-			payload.append("\"events\":[{");
-			payload.append("\"name\":\"").append(type).append("\",");
-			payload.append("\"params\":{");
-			payload.append("\"app_version\":\"").append(Version.getVersion()).append("\",");
-			payload.append("\"app_name\":\"ipscan\",");
-			payload.append("\"language\":\"").append(config.getLocale()).append("\",");
-			payload.append("\"screen_resolution\":\"").append(config.forGUI().mainWindowSize[0]).append("x").append(config.forGUI().mainWindowSize[1]).append("\",");
-			payload.append("\"os_info\":\"").append(System.getProperty("os.name")).append(" ").append(System.getProperty("os.version")).append(" ").append(System.getProperty("os.arch")).append("\",");
-			payload.append("\"java_info\":\"").append("Java ").append(System.getProperty("java.version")).append("\"");
-
-			content = content.replace("\"", "\\\"");
-			if ("exception".equals(type)) {
-				payload.append(",\"exception_description\":\"").append(content).append("\"");
-			} else {
-				payload.append(",\"page_title\":\"").append(content).append("\"");
-				payload.append(",\"page_location\":\"").append("https://angryip.org/app/").append(URLEncoder.encode(content, UTF_8)).append("\"");
-			}
-
-			payload.append("}}]");
-			payload.append("}");
-
-			try (var os = conn.getOutputStream()) {
-				os.write(payload.toString().getBytes(UTF_8));
-			}
-
-			try (var is = conn.getInputStream()) {
-				is.readAllBytes();
-			}
-
-			conn.disconnect();
-		}
-		catch (Exception e) {
-			Logger.getLogger(getClass().getName()).log(FINE, "Failed to report", e);
-		}
+		// Advanced IP Analyser never sends telemetry or exception details over the network.
+		Logger.getLogger(getClass().getName()).log(FINE, () -> "Telemetry disabled: " + type);
 	}
 
 	public void report(Throwable e) {

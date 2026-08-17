@@ -1,7 +1,6 @@
 package net.azib.ipscan.config;
 
 import java.util.Locale;
-import java.util.Random;
 import java.util.prefs.Preferences;
 
 /**
@@ -13,7 +12,6 @@ import java.util.prefs.Preferences;
 public final class Config {
 	private Preferences preferences;
 	public String language;
-	public String gaClientId;
 	public boolean allowReports;
 
 	/** easily accessible scanner configuration */
@@ -32,15 +30,8 @@ public final class Config {
 		favoritesConfig = new FavoritesConfig(preferences);
 		openersConfig = new OpenersConfig(preferences);
 		language = preferences.get("language", "system");
-		gaClientId = preferences.get("gaClientId", null);
-		if (gaClientId == null) {
-			var random = new Random();
-			var firstPart = 1000000000L + (long)(random.nextDouble() * 9000000000L);
-			var secondPart = 1000000000L + (long)(random.nextDouble() * 9000000000L);
-			gaClientId = firstPart + "." + secondPart;
-			preferences.put("gaClientId", gaClientId);
-		}
-		allowReports = preferences.getBoolean("allowReports", true);
+		// Network telemetry is disabled by default in Advanced IP Analyser.
+		allowReports = preferences.getBoolean("allowReports", false);
 	}
 
 	private static class ConfigHolder {
@@ -105,7 +96,4 @@ public final class Config {
 		return Locale.forLanguageTag(locale.replace('_', '-'));
 	}
 
-	public String getGaClientId() {
-		return gaClientId;
-	}
 }

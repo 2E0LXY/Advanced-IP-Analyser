@@ -110,7 +110,7 @@ def packageTask(String platform, Closure doMore) {
                'Title': 'Advanced IP Analyser',
                'Version': version,
                'Build-Date': java.time.LocalDate.now().toString(),
-               'URL': 'https://angryip.org/'
+               'URL': 'https://github.com/2E0LXY/Advanced-IP-Analyser'
 
             if (platform != "any") {
                 def swtJar = configurations[platform].files.find { file ->

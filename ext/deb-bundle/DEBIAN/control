@@ -4,7 +4,8 @@ Version: VERSION
 Priority: optional
 Architecture: ARCH
 Installed-Size: 1940
-Depends: java-runtime (>= 21)
+Depends: java-runtime (>= 21), libgtk-3-0t64
+Recommends: freerdp3-x11, gvfs-backends, iputils-ping, iputils-tracepath, openssh-client, telnet, whois
 Maintainer: Advanced IP Analyser contributors <2E0LXY@users.noreply.github.com>
 License: GPL-2
 Conflicts: ipscan

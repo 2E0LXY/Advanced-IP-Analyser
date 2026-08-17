@@ -14,30 +14,27 @@ import java.util.logging.Level;
 public class Version {
 	public static final String NAME = "Advanced IP Analyser";
 	
-	public static final String COPYLEFT = "© 2025 Anton Keks and contributors";
+	public static final String COPYLEFT = "© 2026 Anton Keks and Advanced IP Analyser contributors";
 	
-	public static final String OWN_HOST = "angryip.org";
+	public static final String OWN_HOST = "github.com";
 
-	public static final String WEBSITE = "https://" + OWN_HOST;
+	public static final String WEBSITE = "https://github.com/2E0LXY/Advanced-IP-Analyser";
 
-	public static final String FAQ_URL = WEBSITE + "/faq/";
+	public static final String FAQ_URL = WEBSITE + "/blob/main/docs/DEBIAN13.md";
 
-	public static final String PRIVACY_URL = WEBSITE + "/about/privacy.html";
+	public static final String PRIVACY_URL = WEBSITE + "/blob/main/PRIVACY.md";
 
 	public static final String FULL_LICENSE_URL = "https://www.gnu.org/licenses/gpl-2.0.html";
 
-	public static final String PLUGINS_URL = WEBSITE + "/contribute/plugins.html";
+	public static final String PLUGINS_URL = WEBSITE + "/blob/main/docs/ADVANCED_IP_SCANNER_REPLICA.md";
 	
-	public static final String DOWNLOAD_URL = WEBSITE + "/download/";
+	public static final String DOWNLOAD_URL = WEBSITE + "/releases/latest";
 
-	public static final String ISSUES_URL = WEBSITE + "/issues/";
+	public static final String ISSUES_URL = WEBSITE + "/issues";
 
-	public static final String IP_LOCATE_URL = WEBSITE + "/iplocate";
+	public static final String IP_LOCATE_URL = "https://ipinfo.io/";
 
-	public static final String LATEST_VERSION_URL = WEBSITE + "/ipscan/IPSCAN.VERSION";
-
-	public static final String GA_ID = "G-2F94QVQFGE";
-	public static final String GA_SECRET = "KzBPI2oaSAWo1v5X5TIG8Q";
+	public static final String LATEST_VERSION_URL = "https://raw.githubusercontent.com/2E0LXY/Advanced-IP-Analyser/main/VERSION";
 
 	private static String version;
 	private static String buildDate;

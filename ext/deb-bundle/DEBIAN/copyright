@@ -1,10 +1,11 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: ipscan
-Upstream-Contact: Anton Keks <support@azib.net>
-Source: https://github.com/angryip/ipscan
+Upstream-Name: Advanced IP Analyser
+Upstream-Contact: Advanced IP Analyser contributors <2E0LXY@users.noreply.github.com>
+Source: https://github.com/2E0LXY/Advanced-IP-Analyser
 
 Files: *
-Copyright: 2005-2022 Anton Keks & contributors
+Copyright: 2005-2026 Anton Keks and contributors
+           2026 Advanced IP Analyser contributors
 License: GPL-2+
 
 License: GPL-2+

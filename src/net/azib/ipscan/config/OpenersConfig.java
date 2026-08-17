@@ -17,27 +17,43 @@ import java.util.prefs.Preferences;
 public class OpenersConfig extends NamedListConfig {
 	
 	static final Logger LOG = LoggerFactory.getLogger();
+	private static final String PREFERENCE_DEFAULTS_VERSION = "openersDefaultsVersion";
+	private static final int DEFAULTS_VERSION = 1;
 
 	public OpenersConfig(Preferences preferences) {
 		super(preferences, "openers");
-		
+
+		var labels = Labels.getInstance();
 		if (size() == 0) {
-			var labels = Labels.getInstance();
 			// add default openers
 			if (Platform.WINDOWS) add(labels.get("opener.netbios"), new Opener("\\\\${fetcher.ip}", false, null));
 			add(labels.get("opener.web"), new Opener("http://${fetcher.hostname}/", false, null));			
-			add(labels.get("opener.https"), new Opener("https://${fetcher.hostname}/", false, null));
 			add(labels.get("opener.ftp"), new Opener("ftp://${fetcher.hostname}/", false, null));
 			if (!Platform.WINDOWS) add(labels.get("opener.telnet"), new Opener("telnet ${fetcher.ip}", true, null));
 			add(labels.get("opener.ping"), new Opener("ping ${fetcher.ip}", true, null));
 			add(labels.get("opener.traceroute"), new Opener((Platform.WINDOWS ? "tracert" : Platform.LINUX ? "tracepath" : "traceroute") + " ${fetcher.ip}", true, null));
 			if (!Platform.WINDOWS) add(labels.get("opener.ssh"), new Opener("ssh ${fetcher.ip}", true, null));
-			if (Platform.LINUX) add(labels.get("opener.rdp"), new Opener("xfreerdp3 /v:${fetcher.ip}", false, null));
-			if (Platform.LINUX) add(labels.get("opener.smb"), new Opener("smb://${fetcher.ip}/", false, null));
 			if (!Platform.WINDOWS) add(labels.get("opener.whois"), new Opener("whois ${fetcher.ip}", true, null));
-			add(labels.get("opener.geolocate"), new Opener(Version.IP_LOCATE_URL + "?ip=${fetcher.ip}", false, null));
+			add(labels.get("opener.geolocate"), new Opener(Version.IP_LOCATE_URL + "${fetcher.ip}", false, null));
 			add(labels.get("opener.email"), new Opener("mailto:somebody@example.com?subject=${fetcher.ip} (${fetcher.hostname})", true, null));
 		}
+
+		migrateDefaults(labels);
+	}
+
+	private void migrateDefaults(Labels labels) {
+		if (preferences.getInt(PREFERENCE_DEFAULTS_VERSION, 0) >= DEFAULTS_VERSION) return;
+
+		addIfMissing(labels.get("opener.https"), new Opener("https://${fetcher.hostname}/", false, null));
+		if (Platform.LINUX) {
+			addIfMissing(labels.get("opener.rdp"), new Opener("xfreerdp3 /v:${fetcher.ip}", false, null));
+			addIfMissing(labels.get("opener.smb"), new Opener("smb://${fetcher.ip}/", false, null));
+		}
+		preferences.putInt(PREFERENCE_DEFAULTS_VERSION, DEFAULTS_VERSION);
+	}
+
+	private void addIfMissing(String name, Opener opener) {
+		if (get(name) == null) add(name, opener);
 	}
 	
 	Object serializeValue(String value) {
