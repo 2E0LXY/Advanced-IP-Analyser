@@ -23,6 +23,8 @@ public class CommandsMenu extends AbstractMenu {
 		initMenuItem(this, "menu.commands.copy", Platform.MAC_OS ? "⌘C" : "Ctrl+C", /* this is not a global key binding */ null, actions.copyIP);
 		initMenuItem(this, "menu.commands.copyDetails", null, null, actions.copyIPDetails);
 		initMenuItem(this, null, null, null, null);
+		initMenuItem(this, "menu.commands.wake", null, null, actions.wakeSelected, true);
+		initMenuItem(this, null, null, null, null);
 
 		var openersMenuItem = new MenuItem(this, SWT.CASCADE);
 		openersMenuItem.setText(Labels.getLabel(openersMenu.getId()));

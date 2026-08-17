@@ -38,7 +38,7 @@ public class OpenerLauncher {
 		var openerString = prepareOpenerStringForItem(opener.execString, selectedItem);
 		
 		// check for URLs
-		if (openerString.startsWith("http:") || openerString.startsWith("https:") || openerString.startsWith("ftp:") || openerString.startsWith("mailto:") || openerString.startsWith("\\\\")) {
+		if (openerString.startsWith("http:") || openerString.startsWith("https:") || openerString.startsWith("ftp:") || openerString.startsWith("smb:") || openerString.startsWith("mailto:") || openerString.startsWith("\\\\")) {
 			BrowserLauncher.openURL(openerString);
 		}
 		else {

@@ -8,6 +8,7 @@ package net.azib.ipscan.gui.actions;
 import net.azib.ipscan.config.Labels;
 import net.azib.ipscan.config.OpenersConfig;
 import net.azib.ipscan.core.UserErrorException;
+import net.azib.ipscan.core.net.WakeOnLan;
 import net.azib.ipscan.core.state.ScanningState;
 import net.azib.ipscan.core.state.StateMachine;
 import net.azib.ipscan.fetchers.FetcherRegistry;
@@ -36,19 +37,49 @@ public class CommandsMenuActions {
 	public Rescan rescan;
 	public CopyIP copyIP;
 	public CopyIPDetails copyIPDetails;
+	public WakeSelected wakeSelected;
 	public ShowOpenersMenu showOpenersMenu;
 	public EditOpeners editOpeners;
 	public SelectOpener selectOpener;
 
-	public CommandsMenuActions(Details details, Delete delete, Rescan rescan, CopyIP copyIP, CopyIPDetails copyIPDetails, ShowOpenersMenu showOpenersMenu, EditOpeners editOpeners, SelectOpener selectOpener) {
+	public CommandsMenuActions(Details details, Delete delete, Rescan rescan, CopyIP copyIP, CopyIPDetails copyIPDetails, WakeSelected wakeSelected, ShowOpenersMenu showOpenersMenu, EditOpeners editOpeners, SelectOpener selectOpener) {
 		this.details = details;
 		this.delete = delete;
 		this.rescan = rescan;
 		this.copyIP = copyIP;
 		this.copyIPDetails = copyIPDetails;
+		this.wakeSelected = wakeSelected;
 		this.showOpenersMenu = showOpenersMenu;
 		this.editOpeners = editOpeners;
 		this.selectOpener = selectOpener;
+	}
+
+	/** Sends Wake-on-LAN packets to all selected results that have a MAC address. */
+	public static final class WakeSelected implements Listener {
+		private final ResultTable resultTable;
+		private final WakeOnLan wakeOnLan;
+
+		public WakeSelected(ResultTable resultTable, WakeOnLan wakeOnLan) {
+			this.resultTable = resultTable;
+			this.wakeOnLan = wakeOnLan;
+		}
+
+		public void handleEvent(Event event) {
+			checkSelection(resultTable);
+			var woken = 0;
+			for (var index : resultTable.getSelectionIndices()) {
+				var mac = resultTable.getScanningResults().getResult(index).getMac();
+				if (mac == null || mac.isBlank()) continue;
+				try {
+					wakeOnLan.wake(mac);
+					woken++;
+				}
+				catch (Exception e) {
+					throw new UserErrorException("wol.failed", e);
+				}
+			}
+			if (woken == 0) throw new UserErrorException("wol.noMac");
+		}
 	}
 
 	/**

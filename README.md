@@ -1,4 +1,15 @@
-# Angry IP Scanner
+# Advanced IP Analyser
+
+Advanced IP Analyser is a Debian 13 network discovery and remote-access desktop
+application built on the Angry IP Scanner codebase. The current development plan,
+feature comparison, and architecture notes are in
+[`docs/ADVANCED_IP_SCANNER_REPLICA.md`](docs/ADVANCED_IP_SCANNER_REPLICA.md).
+
+The first Debian milestone adds native Wake-on-LAN plus HTTPS, SMB, SSH, and
+FreeRDP host actions. See [`docs/DEBIAN13.md`](docs/DEBIAN13.md) for build and
+runtime requirements.
+
+## Upstream project
 
 This is the source code of Angry IP Scanner, licensed with GPL v2. [Official site](https://angryip.org/)
 
