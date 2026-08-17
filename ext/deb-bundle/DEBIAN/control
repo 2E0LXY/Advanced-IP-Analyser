@@ -1,15 +1,17 @@
-Package: ipscan
+Package: advanced-ip-analyser
 Section: net
 Version: VERSION
 Priority: optional
 Architecture: ARCH
 Installed-Size: 1940
 Depends: java-runtime (>= 21)
-Maintainer: Anton Keks <anton@azib.net>
+Maintainer: Advanced IP Analyser contributors <2E0LXY@users.noreply.github.com>
 License: GPL-2
-Description: Angry IP Scanner - fast and friendly IP Scanner
- Angry IP Scanner is a cross-platform network scanner written in Java.
+Conflicts: ipscan
+Replaces: ipscan
+Homepage: https://github.com/2E0LXY/Advanced-IP-Analyser
+Description: Advanced IP Analyser - Debian network scanner
+ Advanced IP Analyser is a Debian-focused network scanner written in Java.
  It can scan IP-based networks in any range, scan ports, and resolve
- other information.
- The program provides an easy to use GUI interface and is very extensible,
- see https://angryip.org/ for more information.
+ host and service information. It also provides Wake-on-LAN and configurable
+ actions for opening SSH, RDP, HTTP, HTTPS, FTP, and SMB services.

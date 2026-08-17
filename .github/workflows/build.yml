@@ -1,99 +1,40 @@
-name: CI
+name: Debian 13 CI and release
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: write
 
 jobs:
-  linux:
-    runs-on: ubuntu-22.04
+  debian:
+    runs-on: ubuntu-24.04
+    container: debian:trixie-slim
 
     steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-    - uses: actions/setup-java@v3
-      with:
-        java-version: '21'
-        distribution: 'liberica'
-        cache: 'gradle'
-    - name: Build & Test
-      run: xvfb-run -a ./gradlew --info test linux
-    - name: Extract CHANGELOG
-      run: sed '/^$/q' CHANGELOG > build/libs/README
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install --yes --no-install-recommends \
+            ca-certificates fakeroot git libgtk-3-0t64 openjdk-21-jdk rpm unzip xauth xvfb
 
-    - uses: actions/upload-artifact@v4
-      with:
-        name: Linux binaries
-        path: build/libs
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Release (if tag)
-      uses: softprops/action-gh-release@v2
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-        draft: true
-        body_path: build/libs/README
-        files: build/libs/*
+      - name: Test and build Debian package
+        run: xvfb-run -a ./gradlew --no-daemon test linux64
 
-  mac:
-    runs-on: macos-15
+      - uses: actions/upload-artifact@v4
+        with:
+          name: advanced-ip-analyser-debian-13
+          path: build/libs/*.deb
 
-    steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-    - uses: actions/setup-java@v3
-      with:
-        java-version: '21'
-        distribution: 'liberica'
-        architecture: aarch64
-        cache: 'gradle'
-    - uses: actions/setup-java@v3
-      with:
-        java-version: '21'
-        distribution: 'liberica'
-        architecture: x64
-
-    - run: ./gradlew test macX86 --info
-    - run: JLINK_OPTS="--module-path $JAVA_HOME_21_AARCH64/jmods" ./gradlew macArm64 --info
-
-      env:
-        APPLE_USER: ${{ secrets.APPLE_USER }}
-        APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-
-    - uses: actions/upload-artifact@v4
-      with:
-        name: macOS binaries
-        path: build/libs
-
-    - name: Add to release (if tag)
-      uses: softprops/action-gh-release@v2
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-        draft: true
-        files: build/libs/*.zip
-
-  windows:
-    runs-on: windows-2022
-
-    steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-    - uses: actions/setup-java@v3
-      with:
-        java-version: '21'
-        distribution: 'liberica'
-        architecture: x64
-        cache: 'gradle'
-    - run: ./gradlew test win-installer --info
-
-    - uses: actions/upload-artifact@v4
-      with:
-        name: Windows binaries
-        path: build/libs
-
-    - name: Add to release (if tag)
-      uses: softprops/action-gh-release@v2
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-        draft: true
-        files: build/libs/*.exe
+      - name: Publish tagged release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          draft: false
+          generate_release_notes: true
+          files: build/libs/*.deb

@@ -101,11 +101,11 @@ def packageTask(String platform, Closure doMore) {
     return tasks.create(platform, Jar) {
         dependsOn = ['classes']
         manifest {
-           attributes 'Implementation-Title': 'Angry IP Scanner',
+           attributes 'Implementation-Title': 'Advanced IP Analyser',
                'Implementation-Version': version,
                'Main-Class': 'net.azib.ipscan.Main',
                'Class-Path': platform == "any" ? "/usr/share/java/swt4.jar /usr/lib/eclipse/swt.jar ./" : "./",
-               'Title': 'Angry IP Scanner',
+               'Title': 'Advanced IP Analyser',
                'Version': version,
                'Build-Date': java.time.LocalDate.now().toString(),
                'URL': 'https://angryip.org/'

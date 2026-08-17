@@ -3,7 +3,7 @@
     <id>net.azib.ipscan.desktop</id>
     <metadata_license>CC0-1.0</metadata_license>
     <project_license>GPL-2.0+</project_license>
-    <name>Angry IP Scanner</name>
+    <name>Advanced IP Analyser</name>
     <summary>Fast and friendly network scanner</summary>
     <icon type="remote" width="128" height="128">https://angryip.org/images/icon.png</icon>
     <launchable type="desktop-id">net.azib.ipscan.desktop</launchable>
@@ -11,14 +11,14 @@
         <name>Anton Keks and contributors</name>
     </developer>
     <description>
-        <p>Angry IP Scanner (or simply ipscan) is an open-source and cross-platform network scanner designed to be fast and simple to use. It scans IP addresses and ports as well as has many other features.</p>
+        <p>Advanced IP Analyser is an open-source Debian network scanner and remote-access launcher built on Angry IP Scanner. It discovers IP addresses, ports, host information, and local device MAC addresses.</p>
         <p>It is widely used by network administrators and just curious users around the world, including large and small enterprises, banks, and government agencies.</p>
     </description>
     <categories>
         <category>Network</category>
     </categories>
     <url type="homepage">https://angryip.org/</url>
-    <url type="bugtracker">https://github.com/angryip/ipscan/issues</url>
+    <url type="bugtracker">https://github.com/2E0LXY/Advanced-IP-Analyser/issues</url>
     <url type="faq">https://angryip.org/faq/</url>
     <screenshots>
         <screenshot type="default">

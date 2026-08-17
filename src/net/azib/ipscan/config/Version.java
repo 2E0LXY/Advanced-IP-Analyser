@@ -12,7 +12,7 @@ import java.util.logging.Level;
  * @author Anton Keks
  */
 public class Version {
-	public static final String NAME = "Angry IP Scanner";
+	public static final String NAME = "Advanced IP Analyser";
 	
 	public static final String COPYLEFT = "© 2025 Anton Keks and contributors";
 	
