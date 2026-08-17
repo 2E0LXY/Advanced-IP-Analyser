@@ -16,8 +16,6 @@ public class Version {
 	
 	public static final String COPYLEFT = "© 2026 Anton Keks and Advanced IP Analyser contributors";
 	
-	public static final String OWN_HOST = "github.com";
-
 	public static final String WEBSITE = "https://github.com/2E0LXY/Advanced-IP-Analyser";
 
 	public static final String FAQ_URL = WEBSITE + "/blob/main/docs/DEBIAN13.md";

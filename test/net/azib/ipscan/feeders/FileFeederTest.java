@@ -1,6 +1,7 @@
 package net.azib.ipscan.feeders;
 
 import net.azib.ipscan.config.LabelsTest;
+import net.azib.ipscan.config.Version;
 import org.junit.Test;
 
 import java.io.File;
@@ -31,7 +32,7 @@ public class FileFeederTest {
 
 	@Test
 	public void simpleHostnames() throws FeederException {
-		var reader = new StringReader("angryip.org, hello.xyz.com www.google.ee");
+		var reader = new StringReader(Version.WEBSITE + ", hello.xyz.com www.google.ee");
 		var fileFeeder = new FileFeeder(reader);
 		assertTrue(fileFeeder.hasNext());
 		assertEquals("hello.xyz.com", fileFeeder.next().getAddress().getHostName());

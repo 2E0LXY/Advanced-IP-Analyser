@@ -93,11 +93,12 @@ public class FileFeeder extends AbstractFeeder {
 			String fileLine;
 			while (!(fileLine = readLines(fileReader, 20)).isEmpty()) {
 				var lineTime = System.currentTimeMillis();
-				var matcher = HOSTNAME_REGEX.matcher(fileLine);
+				// Exported files contain the project URL; remove that exact URL without
+				// suppressing other hosts on a shared service such as github.com.
+				var matcher = HOSTNAME_REGEX.matcher(fileLine.replace(Version.WEBSITE, ""));
 				while (matcher.find()) {
 					try {
 						var host = matcher.group();
-						if (host.equals(Version.OWN_HOST)) continue;
 						var subject = foundHosts.get(host);
 						if (subject == null) {
 							var address = InetAddress.getByName(host);
