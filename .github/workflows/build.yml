@@ -25,6 +25,8 @@ jobs:
 
       - name: Test and build Debian package
         run: xvfb-run -a ./gradlew --no-daemon test linux64
+        env:
+          RELEASE_VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
 
       - uses: actions/upload-artifact@v4
         with:

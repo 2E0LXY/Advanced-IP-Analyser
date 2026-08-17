@@ -27,8 +27,9 @@ String exec(def line, String dir = ".", boolean failOnError = true) {
     }
 }
 
-// Keep untagged CI builds valid Debian versions; release builds use the exact tag.
-version = exec("git describe --tags", ".", false) ?: "0.1.0-dev"
+// CI passes the ref name explicitly for release builds because annotated tags
+// are not guaranteed to be available to git-describe inside a job container.
+version = System.getenv("RELEASE_VERSION") ?: exec("git describe --tags", ".", false) ?: "0.1.0-dev"
 
 java.sourceCompatibility = java.targetCompatibility = 21
 
