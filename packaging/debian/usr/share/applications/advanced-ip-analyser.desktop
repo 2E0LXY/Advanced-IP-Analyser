@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Advanced IP Analyser
+Comment=Discover and inventory authorized network hosts
+Exec=advanced-ip-analyser-gui
+Icon=network-workgroup
+Terminal=false
+Categories=Network;System;
+Keywords=network;scanner;inventory;wake-on-lan;
+

@@ -1,0 +1,14 @@
+Package: advanced-ip-analyser
+Version: 0.1.0
+Section: net
+Priority: optional
+Architecture: all
+Maintainer: Daren Loxley <24845841+2E0LXY@users.noreply.github.com>
+Depends: python3 (>= 3.11), python3-tk, iputils-ping, iproute2
+Recommends: xdg-utils, openssh-client, freerdp3-x11, gvfs-backends
+Installed-Size: 100
+Homepage: https://github.com/2E0LXY/Advanced-IP-Analyser
+Description: Debian network inventory and remote access utility
+ Advanced IP Analyser discovers reachable hosts, identifies common TCP
+ services, exports inventories, and provides Wake-on-LAN functionality.
+

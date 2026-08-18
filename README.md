@@ -27,6 +27,17 @@ The CLI works without Tk:
 .venv/bin/advanced-ip-analyser wake AA:BB:CC:DD:EE:FF
 ```
 
+## Debian package
+
+Download `advanced-ip-analyser_0.1.0_all.deb` from the GitHub Release and install
+it with:
+
+```sh
+sudo apt install ./advanced-ip-analyser_0.1.0_all.deb
+```
+
+Maintainers can reproduce the package locally with `./packaging/build-deb.sh`.
+
 Targets are limited to 65,536 addresses per invocation. The scanner checks a
 small, explicit set of common service ports and does not attempt authentication,
 exploitation, or remote power operations.
