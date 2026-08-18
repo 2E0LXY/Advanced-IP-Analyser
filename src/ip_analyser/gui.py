@@ -7,7 +7,7 @@ import ipaddress
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from .actions import open_service, wake
+from .actions import open_service, preferred_web_service, service_url, wake
 from .config import parse_ports
 from .models import Host
 from .network import current_ipv4_subnet
@@ -80,6 +80,7 @@ class Application(tk.Tk):
             self.table.column(column, width=width, anchor="w")
         self.table.pack(fill="both", expand=True, padx=12)
         self.table.bind("<<TreeviewSelect>>", self._show_web_links)
+        self.table.bind("<Double-1>", self._open_row_web_service)
 
         self.links = ttk.Frame(self, padding=(12, 8, 12, 0))
         self.links.pack(fill="x")
@@ -93,6 +94,7 @@ class Application(tk.Tk):
         self.status.pack(side="left")
         self.progress = ttk.Progressbar(footer, mode="determinate", length=220)
         self.progress.pack(side="right")
+        ttk.Label(footer, text="© 2026 Daren Loxley (2E0LXY)").pack(side="right", padx=18)
 
     def start_scan(self) -> None:
         try:
@@ -153,7 +155,7 @@ class Application(tk.Tk):
             self.after(50, self._drain_events)
 
     def _insert_host(self, host: Host) -> None:
-        web_services = [f"{service}://{host.address}" if service in {"http", "https"} else service
+        web_services = [service_url(service, host.address) if service in {"http", "https"} else service
                         for service in host.services]
         item = self.table.insert("", "end", values=(host.address, "Up", host.hostname,
             host.latency_ms or "", host.mac, host.manufacturer, ", ".join(web_services)))
@@ -268,11 +270,23 @@ class Application(tk.Tk):
             return
         for service in ("http", "https"):
             if service in host.services:
-                url = f"{service}://{host.address}"
+                url = service_url(service, host.address)
                 link = tk.Label(self.link_area, text=url, fg="#0969da", cursor="hand2", underline=True)
                 link.pack(side="left", padx=(0, 12))
                 link.bind("<Button-1>", lambda _click, selected_service=service, address=host.address:
                           open_service(selected_service, address))
+
+    def _open_row_web_service(self, event) -> None:
+        item = self.table.identify_row(event.y)
+        host = self.hosts_by_item.get(item)
+        if not host:
+            return
+        service = preferred_web_service(host.services)
+        if service:
+            open_service(service, host.address)
+            self.status.configure(text=f"Opened {service_url(service, host.address)}")
+        else:
+            self.status.configure(text=f"{host.address} has no discovered HTTP or HTTPS service")
 
     def _sort_column(self, column: str) -> None:
         descending = not self.sort_descending.get(column, True)
