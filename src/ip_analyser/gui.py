@@ -86,18 +86,19 @@ class Application(tk.Tk):
                 event = self.events.get_nowait()
                 if event[0] == "host":
                     _, done, total, host = event
-                    web_services = [f"{service}://{host.address}" if service in {"http", "https"} else service
-                                    for service in host.services]
-                    item = self.table.insert("", "end", values=(host.address, "Up" if host.reachable else "Down",
-                        host.hostname, host.latency_ms or "", host.mac, host.manufacturer, ", ".join(web_services)))
-                    self.hosts_by_item[item] = host
+                    if host.reachable:
+                        web_services = [f"{service}://{host.address}" if service in {"http", "https"} else service
+                                        for service in host.services]
+                        item = self.table.insert("", "end", values=(host.address, "Up",
+                            host.hostname, host.latency_ms or "", host.mac, host.manufacturer, ", ".join(web_services)))
+                        self.hosts_by_item[item] = host
                     self.progress.configure(value=done)
                     self.status.configure(text=f"Scanned {done} of {total}")
                 elif event[0] == "done":
-                    self.results = event[1]
+                    scanned = event[1]
+                    self.results = [host for host in scanned if host.reachable]
                     self.scan_button.configure(state="normal")
-                    alive = sum(host.reachable for host in self.results)
-                    self.status.configure(text=f"Finished: {alive} reachable of {len(self.results)} addresses")
+                    self.status.configure(text=f"Finished: {len(self.results)} reachable of {len(scanned)} addresses")
                     return
                 else:
                     self.scan_button.configure(state="normal")
