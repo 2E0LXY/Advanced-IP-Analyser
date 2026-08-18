@@ -21,3 +21,4 @@ class StorageTests(unittest.TestCase):
             export(path, [Host("192.0.2.1", hostname="<script>")])
             self.assertNotIn("<script>", path.read_text())
             self.assertIn("&lt;script&gt;", path.read_text())
+            self.assertIn("Manufacturer", path.read_text())

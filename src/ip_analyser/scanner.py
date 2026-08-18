@@ -5,6 +5,7 @@ import ipaddress
 import socket
 import subprocess
 import time
+import threading
 from collections.abc import Callable, Iterable
 
 from .models import Host
@@ -21,16 +22,22 @@ class Scanner:
         self.ports = ports or DEFAULT_PORTS
         self.vendors = vendors or MacVendorLookup()
 
-    def scan(self, targets: Iterable[str], progress: Callable[[int, int, Host], None] | None = None) -> list[Host]:
+    def scan(self, targets: Iterable[str], progress: Callable[[int, int, Host], None] | None = None,
+             cancel: threading.Event | None = None) -> list[Host]:
         addresses = list(targets)
         results: list[Host] = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.workers) as pool:
-            futures = {pool.submit(self.inspect, address): address for address in addresses}
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=self.workers)
+        futures = {pool.submit(self.inspect, address): address for address in addresses}
+        try:
             for done, future in enumerate(concurrent.futures.as_completed(futures), 1):
+                if cancel and cancel.is_set():
+                    break
                 host = future.result()
                 results.append(host)
                 if progress:
                     progress(done, len(addresses), host)
+        finally:
+            pool.shutdown(wait=not (cancel and cancel.is_set()), cancel_futures=True)
         return sorted(results, key=lambda host: (ipaddress.ip_address(host.address).version,
                                                   int(ipaddress.ip_address(host.address))))
 

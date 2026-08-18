@@ -29,11 +29,11 @@ The CLI works without Tk:
 
 ## Debian package
 
-Download `advanced-ip-analyser_0.1.2_all.deb` from the GitHub Release and install
+Download `advanced-ip-analyser_0.2.0_all.deb` from the GitHub Release and install
 it with:
 
 ```sh
-sudo apt install ./advanced-ip-analyser_0.1.2_all.deb
+sudo apt install ./advanced-ip-analyser_0.2.0_all.deb
 ```
 
 Maintainers can reproduce the package locally with `./packaging/build-deb.sh`.
@@ -51,6 +51,12 @@ exploitation, or remote power operations.
 - Clickable HTTP and HTTPS links for selected hosts
 - Ascending and descending sorting from every results-table heading
 - Reachable-host-only table and exports; down addresses remain progress-only
+- Live filtering across addresses, names, MACs, manufacturers, and services
+- Custom TCP port ranges, timeout, and concurrency controls
+- Current-interface IPv4 subnet shortcut
+- Cancellable scans with partial-result retention
+- Persistent device favorites stored under the user's configuration directory
+- Copy-IP, selection-aware export, and confirmed Wake-on-LAN actions
 - CSV, JSON, and escaped HTML export
 - Versioned local favorites storage API
 - Wake-on-LAN
