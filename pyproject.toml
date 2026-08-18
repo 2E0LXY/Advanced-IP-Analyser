@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "advanced-ip-analyser"
+version = "0.1.0"
+description = "An original Debian network inventory and host access utility"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "GPL-3.0-or-later"}
+authors = [{name = "2E0LXY"}]
+classifiers = ["Environment :: X11 Applications", "Programming Language :: Python :: 3"]
+
+[project.scripts]
+advanced-ip-analyser = "ip_analyser.cli:main"
+advanced-ip-analyser-gui = "ip_analyser.gui:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
