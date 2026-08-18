@@ -8,15 +8,18 @@ import time
 from collections.abc import Callable, Iterable
 
 from .models import Host
+from .vendors import MacVendorLookup
 
 DEFAULT_PORTS = {21: "ftp", 22: "ssh", 53: "dns", 80: "http", 139: "netbios", 443: "https", 445: "smb", 3389: "rdp"}
 
 
 class Scanner:
-    def __init__(self, timeout: float = 0.35, workers: int = 64, ports: dict[int, str] | None = None):
+    def __init__(self, timeout: float = 0.35, workers: int = 64, ports: dict[int, str] | None = None,
+                 vendors: MacVendorLookup | None = None):
         self.timeout = max(0.05, timeout)
         self.workers = min(512, max(1, workers))
         self.ports = ports or DEFAULT_PORTS
+        self.vendors = vendors or MacVendorLookup()
 
     def scan(self, targets: Iterable[str], progress: Callable[[int, int, Host], None] | None = None) -> list[Host]:
         addresses = list(targets)
@@ -42,8 +45,9 @@ class Scanner:
                 hostname = socket.gethostbyaddr(address)[0]
             except (socket.herror, socket.gaierror, TimeoutError):
                 pass
+        mac = self._neighbour_mac(address)
         return Host(address=address, reachable=reachable, hostname=hostname, latency_ms=latency,
-                    mac=self._neighbour_mac(address), services=services)
+                    mac=mac, manufacturer=self.vendors.lookup(mac) if mac else "", services=services)
 
     def _port_open(self, address: str, port: int) -> bool:
         try:

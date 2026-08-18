@@ -29,11 +29,11 @@ The CLI works without Tk:
 
 ## Debian package
 
-Download `advanced-ip-analyser_0.1.0_all.deb` from the GitHub Release and install
+Download `advanced-ip-analyser_0.1.1_all.deb` from the GitHub Release and install
 it with:
 
 ```sh
-sudo apt install ./advanced-ip-analyser_0.1.0_all.deb
+sudo apt install ./advanced-ip-analyser_0.1.1_all.deb
 ```
 
 Maintainers can reproduce the package locally with `./packaging/build-deb.sh`.
@@ -47,6 +47,9 @@ exploitation, or remote power operations.
 - IPv4/IPv6 single addresses, CIDRs, and inclusive ranges
 - Concurrent reachability and common-service checks
 - Reverse DNS and local neighbour-table MAC lookup
+- Offline MAC manufacturer lookup from Debian's IEEE or Nmap OUI database
+- Clickable HTTP and HTTPS links for selected hosts
+- Ascending and descending sorting from every results-table heading
 - CSV, JSON, and escaped HTML export
 - Versioned local favorites storage API
 - Wake-on-LAN

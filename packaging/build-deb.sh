@@ -17,4 +17,4 @@ chmod 0755 "$package_root/DEBIAN"
 find "$package_root" -type d -exec chmod 0755 {} +
 find "$package_root" -type f ! -path '*/usr/bin/*' -exec chmod 0644 {} +
 
-fakeroot dpkg-deb --build --root-owner-group "$package_root" "$output_dir/advanced-ip-analyser_0.1.0_all.deb"
+fakeroot dpkg-deb --build --root-owner-group "$package_root" "$output_dir/advanced-ip-analyser_0.1.1_all.deb"

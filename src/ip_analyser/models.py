@@ -11,6 +11,7 @@ class Host:
     hostname: str = ""
     latency_ms: float | None = None
     mac: str = ""
+    manufacturer: str = ""
     services: list[str] = field(default_factory=list)
     seen_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     note: str = ""
