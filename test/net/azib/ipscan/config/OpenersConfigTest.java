@@ -91,7 +91,6 @@ public class OpenersConfigTest {
 
 		var migrated = new OpenersConfig(preferences);
 		var migratedSize = migrated.size();
-		migrated.store();
 		var reloaded = new OpenersConfig(preferences);
 
 		assertNotNull(reloaded.getOpener("custom"));

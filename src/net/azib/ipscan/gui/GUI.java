@@ -5,7 +5,6 @@ import net.azib.ipscan.config.LoggerFactory;
 import net.azib.ipscan.config.Version;
 import net.azib.ipscan.core.UserErrorException;
 import net.azib.ipscan.di.Injector;
-import net.azib.ipscan.util.GoogleAnalytics;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.SWTError;
 import org.eclipse.swt.SWTException;
@@ -34,11 +33,9 @@ public class GUI implements AutoCloseable {
 		catch (SWTError e) {
 			if (e.getMessage().contains("gtk_init_check")) {
 				System.err.println(e.toString() + ": probably you are running as `root` and/or don't have access to the X Server. Please run as normal user or with sudo.");
-				new GoogleAnalytics().report(e);
 			}
 			else if (e.getMessage().contains("Invalid thread access")) {
 				System.err.println(e.toString() + ": you need to start Java with -XstartOnFirstThread on a Mac");
-				new GoogleAnalytics().report(e);
 			}
 			else throw e;
 		}
@@ -64,8 +61,6 @@ public class GUI implements AutoCloseable {
 				showMessage(e instanceof UserErrorException ? SWT.ICON_WARNING : SWT.ICON_ERROR,
 					getLabel(e instanceof UserErrorException ? "text.userError" : "text.error"), localizedMessage);
 
-				if (!(e instanceof UserErrorException) || e.getCause() != null)
-					new GoogleAnalytics().report(e);
 			}
 		}
 	}

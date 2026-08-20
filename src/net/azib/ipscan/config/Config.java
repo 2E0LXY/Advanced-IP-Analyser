@@ -12,7 +12,6 @@ import java.util.prefs.Preferences;
 public final class Config {
 	private Preferences preferences;
 	public String language;
-	public boolean allowReports;
 
 	/** easily accessible scanner configuration */
 	private ScannerConfig scannerConfig;
@@ -30,8 +29,6 @@ public final class Config {
 		favoritesConfig = new FavoritesConfig(preferences);
 		openersConfig = new OpenersConfig(preferences);
 		language = preferences.get("language", "system");
-		// Network telemetry is disabled by default in Advanced IP Analyser.
-		allowReports = preferences.getBoolean("allowReports", false);
 	}
 
 	private static class ConfigHolder {
@@ -44,7 +41,6 @@ public final class Config {
 
 	public void store() {
 		preferences.put("language", language);
-		preferences.putBoolean("allowReports", allowReports);
 		scannerConfig.store();
 		guiConfig.store();
 		favoritesConfig.store();

@@ -1,6 +1,7 @@
 package net.azib.ipscan.gui.actions;
 
 import net.azib.ipscan.config.Labels;
+import net.azib.ipscan.config.Platform;
 import net.azib.ipscan.core.ScanningResultList;
 import net.azib.ipscan.core.UserErrorException;
 import net.azib.ipscan.core.values.InetAddressHolder;
@@ -15,9 +16,11 @@ import org.junit.Test;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.file.Files;
 import java.util.Collections;
 
 import static org.junit.Assert.*;
+import static org.junit.Assume.assumeTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -27,6 +30,18 @@ import static org.mockito.Mockito.when;
  * @author Anton Keks
  */
 public class OpenerLauncherTest {
+	@Test
+	public void shellQuotingKeepsRemoteValuesAsData() throws Exception {
+		assumeTrue(Platform.LINUX);
+		var directory = Files.createTempDirectory("opener-security-");
+		var marker = directory.resolve("executed");
+		var payload = "$(touch " + marker + ")'; echo unsafe";
+		var process = new ProcessBuilder("sh", "-c", "printf %s " + OpenerLauncher.quoteForPosixShell(payload)).start();
+
+		assertEquals(0, process.waitFor());
+		assertEquals(payload, new String(process.getInputStream().readAllBytes()));
+		assertFalse(Files.exists(marker));
+	}
 
 	@Test
 	public void testReplaceValues() throws UnknownHostException {
@@ -52,6 +67,15 @@ public class OpenerLauncherTest {
 		assertEquals("HOSTNAME$$$127.0.0.1xxx${}", ol.prepareOpenerStringForItem("${fetcher.hostname}$$$${fetcher.ip}xxx${}", 0));
 		assertEquals("http://127.0.0.1:80/www", ol.prepareOpenerStringForItem("http://${fetcher.ip}:80/www", 0));
 		assertEquals(result.getValues().get(2) + ", xx", ol.prepareOpenerStringForItem("${fetcher.ping}, xx", 0));
+
+		result.setValue(3, "cost=$5\\server");
+		assertEquals("cost=$5\\server", ol.prepareOpenerStringForItem("${fetcher.comment}", 0));
+		assertEquals("'echo' 'cost=$5\\server'", ol.prepareShellCommandForItem("echo ${fetcher.comment}", 0));
+		assertArrayEquals(new String[] {"viewer", "--name=cost=$5\\server"}, ol.prepareCommandForItem("viewer --name=${fetcher.comment}", 0));
+		result.setValue(3, "$(touch /tmp/opener-injection)'; echo unsafe");
+		assertEquals("'echo' '$(touch /tmp/opener-injection)'\"'\"'; echo unsafe'", ol.prepareShellCommandForItem("echo ${fetcher.comment}", 0));
+		assertEquals("'echo' '$(touch /tmp/opener-injection)'\"'\"'; echo unsafe'", ol.prepareShellCommandForItem("echo \"${fetcher.comment}\"", 0));
+		result.setValue(3, null);
 				
 		try {
 			ol.prepareOpenerStringForItem("${noSuchFetcher}", 0);

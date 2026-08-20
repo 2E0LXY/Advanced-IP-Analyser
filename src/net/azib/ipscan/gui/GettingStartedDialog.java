@@ -8,14 +8,12 @@ import org.eclipse.swt.widgets.*;
 import java.util.ArrayList;
 import java.util.List;
 
-import static net.azib.ipscan.config.Config.getConfig;
 import static net.azib.ipscan.config.Labels.getLabel;
 
 public class GettingStartedDialog extends AbstractModalDialog {
 	private int activePage;
 	private List<String> texts = new ArrayList<>();
 	private Text gettingStartedText;
-	private Button allowReports;
 	private Button closeButton;
 	private Button nextButton;
 
@@ -49,12 +47,6 @@ public class GettingStartedDialog extends AbstractModalDialog {
 		}		
 		iconLabel.pack();
 		var leftBound = iconLabel.getBounds().width + 20;
-
-		allowReports = new Button(shell, SWT.CHECK);
-		allowReports.setText(getLabel("preferences.allowReports"));
-		allowReports.pack();
-		allowReports.setSelection(getConfig().allowReports);
-		allowReports.addListener(SWT.Selection, e -> getConfig().allowReports = allowReports.getSelection());
 
 		closeButton = new Button(shell, SWT.NONE);
 		closeButton.setText(getLabel("button.close"));
@@ -93,7 +85,6 @@ public class GettingStartedDialog extends AbstractModalDialog {
 
 	private void layoutControls(int leftBound) {
 		positionButtons(nextButton, closeButton);
-		allowReports.setBounds(leftBound, nextButton.getBounds().y, allowReports.getSize().x, nextButton.getBounds().height);
 		gettingStartedText.setBounds(leftBound, 10, shell.getClientArea().width - leftBound - 10, closeButton.getLocation().y - 20);
 	}
 	

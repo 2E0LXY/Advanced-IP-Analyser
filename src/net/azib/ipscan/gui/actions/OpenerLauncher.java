@@ -15,9 +15,11 @@ import net.azib.ipscan.fetchers.HostnameFetcher;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.StringTokenizer;
+import java.util.function.Function;
 import java.util.regex.Pattern;
+
+import static java.util.Arrays.stream;
+import static java.util.stream.Collectors.joining;
 
 /**
  * OpenerLauncher
@@ -35,35 +37,45 @@ public class OpenerLauncher {
 	}
 
 	public void launch(Opener opener, int selectedItem) {
-		var openerString = prepareOpenerStringForItem(opener.execString, selectedItem);
-		
 		// check for URLs
-		if (openerString.startsWith("http:") || openerString.startsWith("https:") || openerString.startsWith("ftp:") || openerString.startsWith("smb:") || openerString.startsWith("mailto:") || openerString.startsWith("\\\\")) {
+		if (isUrl(opener.execString)) {
+			var openerString = prepareOpenerStringForItem(opener.execString, selectedItem);
 			BrowserLauncher.openURL(openerString);
 		}
 		else {
 			// run a process here
 			try {
 				if (opener.inTerminal) {
+					var openerString = Platform.LINUX ? prepareShellCommandForItem(opener.execString, selectedItem) : prepareOpenerStringForItem(opener.execString, selectedItem);
 					TerminalLauncher.launchInTerminal(openerString, opener.workingDir);
 				}
 				else {
-					if (Platform.LINUX) {
-						// let shell interpret quoting and other stuff
-						Runtime.getRuntime().exec(new String[] {"sh", "-c", openerString}, null, opener.workingDir);
-					}
-					else {
-						Runtime.getRuntime().exec(splitCommand(openerString), null, opener.workingDir);
-					}
+					Runtime.getRuntime().exec(prepareCommandForItem(opener.execString, selectedItem), null, opener.workingDir);
 				}
 			}
 			catch (UserErrorException e) {
 				throw e;
 			}
 			catch (Exception e) {
-				throw new UserErrorException("opener.failed", openerString);
+				throw new UserErrorException("opener.failed", opener.execString);
 			}
 		}
+	}
+
+	private static boolean isUrl(String openerString) {
+		return openerString.startsWith("http:") || openerString.startsWith("https:") || openerString.startsWith("ftp:") || openerString.startsWith("smb:") || openerString.startsWith("mailto:") || openerString.startsWith("\\\\");
+	}
+
+	String[] prepareCommandForItem(String command, int selectedItem) {
+		return stream(splitCommand(command)).map(argument -> prepareOpenerStringForItem(argument, selectedItem)).toArray(String[]::new);
+	}
+
+	String prepareShellCommandForItem(String command, int selectedItem) {
+		return stream(prepareCommandForItem(command, selectedItem)).map(OpenerLauncher::quoteForPosixShell).collect(joining(" "));
+	}
+
+	static String quoteForPosixShell(String value) {
+		return "'" + value.replace("'", "'\"'\"'") + "'";
 	}
 
 	/**
@@ -72,29 +84,31 @@ public class OpenerLauncher {
 	 * This implementation supports quoting.
 	 */
 	static String[] splitCommand(String command) {
-		var tokenizer = new StringTokenizer(command);
 		List<String> result = new ArrayList<>();
-		while (tokenizer.hasMoreTokens()) {
-			var token = tokenizer.nextToken(" \t");
-			
-			try {
-				if (token.startsWith("\"")) {
-					token = token.substring(1) + tokenizer.nextToken("\"");
-					tokenizer.nextToken(" \t");
-				}
-				else
-				if (token.startsWith("'")) {
-					token = token.substring(1) + tokenizer.nextToken("'");
-					tokenizer.nextToken(" \t");
+		var token = new StringBuilder();
+		char quote = 0;
+		var quotePosition = -1;
+		for (var i = 0; i < command.length(); i++) {
+			var character = command.charAt(i);
+			if (quote != 0) {
+				if (character == quote) quote = 0;
+				else token.append(character);
+			}
+			else if (character == '\'' || character == '"') {
+				quote = character;
+				quotePosition = token.length();
+			}
+			else if (Character.isWhitespace(character)) {
+				if (!token.isEmpty()) {
+					result.add(token.toString());
+					token.setLength(0);
 				}
 			}
-			catch (NoSuchElementException e) {
-				// probably the end of the command reached
-			}
-			
-			result.add(token);
+			else token.append(character);
 		}
-		return result.toArray(new String[result.size()]);
+		if (quote != 0) token.insert(quotePosition, quote);
+		if (!token.isEmpty()) result.add(token.toString());
+		return result.toArray(String[]::new);
 	}
 
 	/**
@@ -104,6 +118,10 @@ public class OpenerLauncher {
 	 * @return opener string with values replaced
 	 */
 	String prepareOpenerStringForItem(String openerString, int selectedItem) {
+		return prepareOpenerStringForItem(openerString, selectedItem, Function.identity());
+	}
+
+	private String prepareOpenerStringForItem(String openerString, int selectedItem, Function<String, String> replacementTransform) {
 		var paramsPattern = Pattern.compile("\\$\\{(.+?)\\}");
 		var matcher = paramsPattern.matcher(openerString);
 		var sb = new StringBuilder(64);
@@ -117,7 +135,7 @@ public class OpenerLauncher {
 				throw new UserErrorException("opener.nullFetcherValue", fetcherId);					
 			}
 			
-			matcher.appendReplacement(sb, scannedValue.toString());
+			matcher.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(replacementTransform.apply(scannedValue.toString())));
 		}
 		matcher.appendTail(sb);
 		return sb.toString();

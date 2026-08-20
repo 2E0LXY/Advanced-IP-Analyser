@@ -49,6 +49,7 @@ public class OpenersConfig extends NamedListConfig {
 			addIfMissing(labels.get("opener.rdp"), new Opener("xfreerdp3 /v:${fetcher.ip}", false, null));
 			addIfMissing(labels.get("opener.smb"), new Opener("smb://${fetcher.ip}/", false, null));
 		}
+		store();
 		preferences.putInt(PREFERENCE_DEFAULTS_VERSION, DEFAULTS_VERSION);
 	}
 

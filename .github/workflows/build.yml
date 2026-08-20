@@ -23,6 +23,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Test Debian launcher
+        run: sh test/scripts/ipscan-launcher-test.sh
+
       - name: Test and build Debian package
         run: xvfb-run -a ./gradlew --no-daemon test linux64
         env:

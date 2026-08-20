@@ -94,6 +94,7 @@ public class HelpMenuActions {
 	}
 	
 	public static final class CheckVersion implements Listener {
+		private static final int CONNECTION_TIMEOUT_MILLIS = 5_000;
 		private final StatusBar statusBar;
 		
 		public CheckVersion(StatusBar statusBar) {
@@ -113,6 +114,8 @@ public class HelpMenuActions {
 				try {
 					var url = new URL(Version.LATEST_VERSION_URL);
 					var conn = url.openConnection();
+					conn.setConnectTimeout(CONNECTION_TIMEOUT_MILLIS);
+					conn.setReadTimeout(CONNECTION_TIMEOUT_MILLIS);
 					try (var reader = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
 						var latestVersion = reader.readLine();
 						latestVersion = latestVersion.substring(latestVersion.indexOf(' ') + 1);
@@ -147,7 +150,9 @@ public class HelpMenuActions {
 					});
 				}
 			};
-			new Thread(checkVersionCode).start();
+			var thread = new Thread(checkVersionCode, "version-check");
+			thread.setDaemon(true);
+			thread.start();
 		}
 	}
 }
