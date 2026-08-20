@@ -2,7 +2,8 @@ advanced-ip-analyser (1.0.0) stable; urgency=medium
 
   * Add persistent device inventory with secure import and XML, CSV, and HTML
     export.
-  * Add service discovery, last-seen tracking, scan profiles, and subnet shortcuts.
+  * Add service discovery, last-seen tracking, scan profiles, and subnet
+    shortcuts.
   * Add key-based SSH remote shutdown, reboot, and cancellation actions.
   * Harden external command launching and Debian startup behavior.
 

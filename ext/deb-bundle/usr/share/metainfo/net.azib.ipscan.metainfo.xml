@@ -7,9 +7,6 @@
     <summary>Fast and friendly network scanner</summary>
     <icon type="stock">net.azib.ipscan</icon>
     <launchable type="desktop-id">net.azib.ipscan.desktop</launchable>
-    <developer id="io.github.2E0LXY">
-        <name>Advanced IP Analyser contributors</name>
-    </developer>
     <description>
         <p>Advanced IP Analyser is an open-source Debian network scanner and remote-access launcher built on Angry IP Scanner. It discovers IP addresses, ports, host information, and local device MAC addresses.</p>
         <p>It is widely used by network administrators and just curious users around the world, including large and small enterprises, banks, and government agencies.</p>

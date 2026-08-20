@@ -7,6 +7,6 @@ Exec=/usr/bin/ipscan
 Terminal=false
 Type=Application
 Icon=net.azib.ipscan
-Categories=Application;Network;
+Categories=Network;
 StartupWMClass=Advanced IP Analyser
 StartupNotify=true
