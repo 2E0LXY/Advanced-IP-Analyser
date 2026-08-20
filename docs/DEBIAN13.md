@@ -8,10 +8,18 @@ sudo apt install openjdk-21-jdk fakeroot libgtk-3-0t64 xvfb xauth appstream desk
 xvfb-run -a ./gradlew --no-daemon test linux64
 ```
 
-The package is written to `build/libs` and includes a minimized Java 21 runtime.
+The package is written to `build/libs` and uses Debian's managed OpenJDK 21 runtime.
 Install it with `sudo apt install ./build/libs/Advanced-IP-Analyser_*_amd64.deb`.
 For a development build without creating an OS package, run `./gradlew current`
 and execute the resulting JAR with Java 21.
+
+## Automatic updates
+
+When a newer GitHub release tag is available, the Update button pulses in the
+main window. Selecting it downloads the release package and checksum, verifies
+the exact `.deb`, and asks for Debian desktop authorization before installation.
+The application restarts after `dpkg` succeeds; cancellation or failure leaves
+the running version untouched.
 
 Optional desktop integrations used by host actions:
 

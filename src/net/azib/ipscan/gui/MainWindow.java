@@ -14,6 +14,7 @@ import net.azib.ipscan.core.state.StateMachine;
 import net.azib.ipscan.core.state.StateMachine.Transition;
 import net.azib.ipscan.core.state.StateTransitionListener;
 import net.azib.ipscan.gui.actions.StartStopScanningAction;
+import net.azib.ipscan.gui.actions.HelpMenuActions;
 import net.azib.ipscan.gui.actions.ToolsActions;
 import net.azib.ipscan.gui.feeders.ControlsArea;
 import net.azib.ipscan.gui.feeders.FeederArea;
@@ -60,6 +61,7 @@ public class MainWindow {
 					  ResultsTabs resultsTabs, ResultTable resultTable, FavoritesTable favoritesTable, StatusBar statusBar, ResultsContextMenu resultsContextMenu,
 					  FeederGUIRegistry feederGUIRegistry, final StateMachine stateMachine,
 					  ToolsActions.Preferences preferencesListener, ToolsActions.ChooseFetchers chooseFetchersListener,
+					  HelpMenuActions.CheckVersion checkVersion,
 					  MainMenu menuBar /* don't delete: initiates main menu creation */
 	) {
 		this.shell = shell;
@@ -68,7 +70,7 @@ public class MainWindow {
 
 		initShell(shell);
 		initFeederArea(feederArea, feederGUIRegistry);
-		initControlsArea(controlsArea, feederSelectionCombo, startStopButton, startStopScanningAction, preferencesListener, chooseFetchersListener);
+		initControlsArea(controlsArea, feederSelectionCombo, startStopButton, startStopScanningAction, preferencesListener, chooseFetchersListener, checkVersion);
 		initTableAndStatusBar(resultsTabs, resultTable, resultsContextMenu, statusBar);
 
 		// after all controls are initialized, resize and open
@@ -138,7 +140,7 @@ public class MainWindow {
 	/**
 	 * This method initializes main controls of the main window	
 	 */
-	private void initControlsArea(Composite controlsArea, Combo feederSelectionCombo, Button startStopButton, StartStopScanningAction startStopScanningAction, ToolsActions.Preferences preferencesListener, ToolsActions.ChooseFetchers chooseFetchersListsner) {
+	private void initControlsArea(Composite controlsArea, Combo feederSelectionCombo, Button startStopButton, StartStopScanningAction startStopScanningAction, ToolsActions.Preferences preferencesListener, ToolsActions.ChooseFetchers chooseFetchersListsner, HelpMenuActions.CheckVersion checkVersion) {
 		controlsArea.setLayoutData(formData(new FormAttachment(feederArea), null, new FormAttachment(0), new FormAttachment(feederArea, 0, SWT.BOTTOM)));
 
 		// start/stop button
@@ -186,6 +188,9 @@ public class MainWindow {
 		item.setImage(icon("buttons/fetchers"));
 		item.setToolTipText(Labels.getLabel("title.fetchers"));
 		item.addListener(SWT.Selection, chooseFetchersListsner);
+
+		var updateButton = new Button(controlsArea, SWT.PUSH);
+		checkVersion.bindUpdateButton(updateButton);
 
 		feederSelectionListener.widgetSelected(null);
 	}

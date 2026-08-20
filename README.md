@@ -12,6 +12,10 @@ Java security fixes arrive through normal APT updates. See
 [`docs/DEBIAN13.md`](docs/DEBIAN13.md) for build and runtime requirements and
 [`docs/COMPLETION_CHECKLIST.md`](docs/COMPLETION_CHECKLIST.md) for acceptance criteria.
 
+New GitHub releases activate a pulsing in-app Update button. The updater downloads
+the release `.deb` and `SHA256SUMS`, verifies the exact asset, requests desktop
+authorization through `pkexec`, installs with `dpkg`, and restarts the application.
+
 ## Upstream project
 
 This fork is based on the source code of [Angry IP Scanner](https://github.com/angryip/ipscan)

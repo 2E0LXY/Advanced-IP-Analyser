@@ -4,7 +4,7 @@ Version: VERSION
 Priority: optional
 Architecture: ARCH
 Installed-Size: INSTALLED_SIZE
-Depends: openjdk-21-jre, libgtk-3-0t64
+Depends: openjdk-21-jre, libgtk-3-0t64, pkexec
 Recommends: freerdp3-x11, gvfs-backends, iputils-ping, iputils-tracepath, openssh-client, telnet, whois
 Maintainer: Advanced IP Analyser contributors <2E0LXY@users.noreply.github.com>
 Conflicts: ipscan

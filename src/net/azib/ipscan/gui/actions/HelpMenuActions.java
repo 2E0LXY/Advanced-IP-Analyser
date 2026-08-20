@@ -18,9 +18,6 @@ import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.MessageBox;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.net.URL;
 import java.util.logging.Logger;
 
 import static java.util.logging.Level.WARNING;
@@ -94,11 +91,26 @@ public class HelpMenuActions {
 	}
 	
 	public static final class CheckVersion implements Listener {
-		private static final int CONNECTION_TIMEOUT_MILLIS = 5_000;
 		private final StatusBar statusBar;
+		private final DebianUpdater updater;
+		private org.eclipse.swt.widgets.Button updateButton;
+		private String latestVersion;
+		private int pulseGeneration;
 		
-		public CheckVersion(StatusBar statusBar) {
+		public CheckVersion(StatusBar statusBar, DebianUpdater updater) {
 			this.statusBar = statusBar;
+			this.updater = updater;
+		}
+
+		public void bindUpdateButton(org.eclipse.swt.widgets.Button button) {
+			this.updateButton = button;
+			button.setText(Labels.getLabel("button.update"));
+			button.setEnabled(false);
+			button.addListener(SWT.Selection, event -> {
+				button.setEnabled(false);
+				pulseGeneration++;
+				updater.install(latestVersion, button.getShell(), statusBar, () -> enableUpdateButton(latestVersion));
+			});
 		}
 
 		public void handleEvent(Event event) {
@@ -112,24 +124,18 @@ public class HelpMenuActions {
 				String message = null;
 				var messageStyle = SWT.ICON_INFORMATION;
 				try {
-					var url = new URL(Version.LATEST_VERSION_URL);
-					var conn = url.openConnection();
-					conn.setConnectTimeout(CONNECTION_TIMEOUT_MILLIS);
-					conn.setReadTimeout(CONNECTION_TIMEOUT_MILLIS);
-					try (var reader = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
-						var latestVersion = reader.readLine();
-						latestVersion = latestVersion.substring(latestVersion.indexOf(' ') + 1);
-
-						if (!Version.getVersion().equals(latestVersion)) {
+					var latestVersion = updater.latestRelease();
+					if (updater.isNewer(latestVersion, Version.getVersion())) {
+						this.latestVersion = latestVersion;
 							message = Labels.getLabel("text.version.old");
 							message = message.replaceFirst("%LATEST", latestVersion);
 							message = message.replaceFirst("%VERSION", Version.getVersion());
-							messageStyle = SWT.ICON_QUESTION | SWT.YES | SWT.NO;
+							final var tag = latestVersion;
+							Display.getDefault().asyncExec(() -> enableUpdateButton(tag));
 						} else if (userRequest) {
 							message = Labels.getLabel("text.version.latest");
 							messageStyle = SWT.ICON_INFORMATION;
 						}
-					}
 				} catch (Exception e) {
 					if (userRequest)
 						message = Labels.getLabel("exception.UserErrorException.version.latestFailed");
@@ -144,15 +150,28 @@ public class HelpMenuActions {
 						var messageBox = new MessageBox(statusBar.getShell(), messageStyleToShow | SWT.SHEET);
 						messageBox.setText(Version.getFullName());
 						messageBox.setMessage(messageToShow);
-						if (messageBox.open() == SWT.YES) {
-							BrowserLauncher.openURL(Version.DOWNLOAD_URL);
-						}
+						messageBox.open();
 					});
 				}
 			};
 			var thread = new Thread(checkVersionCode, "version-check");
 			thread.setDaemon(true);
 			thread.start();
+		}
+
+		private void enableUpdateButton(String tag) {
+			if (updateButton == null || updateButton.isDisposed()) return;
+			updateButton.setEnabled(true);
+			updateButton.setText(Labels.getLabel("button.update") + " " + tag);
+			updateButton.getParent().layout(true);
+			pulse(true, ++pulseGeneration);
+		}
+
+		private void pulse(boolean bright, int generation) {
+			if (generation != pulseGeneration || updateButton == null || updateButton.isDisposed() || !updateButton.isEnabled()) return;
+			updateButton.setText((bright ? "● " : "") + Labels.getLabel("button.update") + " " + latestVersion);
+			updateButton.getParent().layout(true);
+			updateButton.getDisplay().timerExec(650, () -> pulse(!bright, generation));
 		}
 	}
 }
