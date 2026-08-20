@@ -11,10 +11,15 @@ cp -a "$project_root/packaging/debian/." "$package_root/"
 mkdir -p "$package_root/usr/lib/advanced-ip-analyser" "$package_root/usr/share/doc/advanced-ip-analyser"
 cp -a "$project_root/src/ip_analyser" "$package_root/usr/lib/advanced-ip-analyser/"
 cp "$project_root/README.md" "$package_root/usr/share/doc/advanced-ip-analyser/README.md"
+cp "$project_root/CHANGELOG.md" "$package_root/usr/share/doc/advanced-ip-analyser/CHANGELOG.md"
 cp "$project_root/LICENSE" "$package_root/usr/share/doc/advanced-ip-analyser/copyright"
+find "$package_root" -type d -name __pycache__ -prune -exec rm -rf {} +
+find "$package_root" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
 chmod 0755 "$package_root/usr/bin/advanced-ip-analyser" "$package_root/usr/bin/advanced-ip-analyser-gui"
 chmod 0755 "$package_root/DEBIAN"
 find "$package_root" -type d -exec chmod 0755 {} +
 find "$package_root" -type f ! -path '*/usr/bin/*' -exec chmod 0644 {} +
+installed_size=$(du -sk "$package_root/usr" | cut -f1)
+sed -i "s/^Installed-Size:.*/Installed-Size: $installed_size/" "$package_root/DEBIAN/control"
 
-fakeroot dpkg-deb --build --root-owner-group "$package_root" "$output_dir/advanced-ip-analyser_0.2.1_all.deb"
+fakeroot dpkg-deb --build --root-owner-group "$package_root" "$output_dir/advanced-ip-analyser_0.3.0_all.deb"

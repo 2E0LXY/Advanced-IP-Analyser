@@ -5,6 +5,7 @@ import shutil
 import socket
 import subprocess
 import webbrowser
+from dataclasses import dataclass
 
 
 def wake(mac: str, broadcast: str = "255.255.255.255", port: int = 9) -> None:
@@ -32,6 +33,35 @@ def open_service(service: str, host: str) -> None:
         subprocess.Popen(["xfreerdp3", f"/v:{host}"])
     else:
         raise ValueError(f"unsupported service: {service}")
+
+
+@dataclass(frozen=True, slots=True)
+class RemotePowerResult:
+    host: str
+    action: str
+    succeeded: bool
+    detail: str
+
+
+def remote_power(host: str, action: str, user: str = "", timeout: int = 15) -> RemotePowerResult:
+    """Run a non-interactive SSH power command; credentials are never stored."""
+    ipaddress.ip_address(host)
+    commands = {"shutdown": ["systemctl", "poweroff"], "reboot": ["systemctl", "reboot"]}
+    if action not in commands:
+        raise ValueError("remote action must be shutdown or reboot")
+    destination = f"{user}@{host}" if user else host
+    executable = shutil.which("ssh")
+    if not executable:
+        return RemotePowerResult(host, action, False, "openssh-client is not installed")
+    try:
+        result = subprocess.run(
+            [executable, "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", destination, *commands[action]],
+            capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return RemotePowerResult(host, action, False, "SSH command timed out")
+    detail = (result.stderr or result.stdout).strip()
+    return RemotePowerResult(host, action, result.returncode == 0,
+                             detail or ("command accepted" if result.returncode == 0 else f"SSH exited {result.returncode}"))
 
 
 def service_url(service: str, host: str) -> str:

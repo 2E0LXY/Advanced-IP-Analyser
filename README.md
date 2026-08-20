@@ -29,11 +29,11 @@ The CLI works without Tk:
 
 ## Debian package
 
-Download `advanced-ip-analyser_0.2.1_all.deb` from the GitHub Release and install
+Download `advanced-ip-analyser_0.3.0_all.deb` from the GitHub Release and install
 it with:
 
 ```sh
-sudo apt install ./advanced-ip-analyser_0.2.1_all.deb
+sudo apt install ./advanced-ip-analyser_0.3.0_all.deb
 ```
 
 Maintainers can reproduce the package locally with `./packaging/build-deb.sh`.
@@ -56,17 +56,18 @@ exploitation, or remote power operations.
 - Current-interface IPv4 subnet shortcut
 - Cancellable scans with partial-result retention
 - Persistent device favorites stored under the user's configuration directory
+- Atomic saved-device updates with MAC-first identity and IP refresh
+- Safe JSON and XML inventory import plus CSV, JSON, XML, and HTML export
+- Active-interface subnet and broadcast discovery
+- Non-interactive, confirmation-ready SSH shutdown and reboot operations
 - Copy-IP, selection-aware export, and confirmed Wake-on-LAN actions
 - Double-click a host row to open HTTPS, with HTTP as fallback
 
 Copyright © 2026 Daren Loxley (2E0LXY).
-- CSV, JSON, and escaped HTML export
-- Versioned local favorites storage API
-- Wake-on-LAN
-- Original Tk desktop interface plus a scriptable CLI
 
-Planned work includes a favorites tab, interface-aware subnet presets, richer
-service detail, Debian packaging, and accessibility/polish passes.
+The device refresh, inventory import, and remote-power APIs added in v0.3.0 are
+currently foundations for the next desktop-interface update. Remote power always
+uses non-interactive SSH and never stores passwords.
 
 ## Independence and licensing
 
