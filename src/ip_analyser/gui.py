@@ -5,14 +5,14 @@ import threading
 import tkinter as tk
 import ipaddress
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
-from .actions import open_service, preferred_web_service, service_url, wake
+from .actions import open_service, preferred_web_service, remote_power, service_url, wake
 from .config import parse_ports
 from .models import Host
-from .network import current_ipv4_subnet
+from .network import active_ipv4_networks, current_ipv4_subnet
 from .scanner import Scanner
-from .storage import export, load_favorites, save_favorites
+from .storage import export, import_inventory, load_favorites, merge_devices, save_favorites
 from .targets import parse_targets
 
 
@@ -27,6 +27,7 @@ class Application(tk.Tk):
         self.sort_descending = {}
         self.events: queue.Queue = queue.Queue()
         self.cancel_scan = threading.Event()
+        self.network_presets = []
         self.favorites_path = Path.home() / ".config" / "advanced-ip-analyser" / "favorites.json"
         self._build()
 
@@ -37,12 +38,16 @@ class Application(tk.Tk):
         self.target = ttk.Entry(header)
         self.target.insert(0, "192.168.1.0/24")
         self.target.pack(side="left", fill="x", expand=True, padx=8)
-        ttk.Button(header, text="Current subnet", command=self.use_current_subnet).pack(side="left", padx=(0, 8))
+        self.subnets = ttk.Combobox(header, width=24, state="readonly")
+        self.subnets.pack(side="left", padx=(0, 8))
+        self.subnets.bind("<<ComboboxSelected>>", self.use_selected_subnet)
+        ttk.Button(header, text="Interfaces", command=self.refresh_subnets).pack(side="left", padx=(0, 8))
         self.scan_button = ttk.Button(header, text="Scan", command=self.start_scan)
         self.scan_button.pack(side="left")
         self.cancel_button = ttk.Button(header, text="Cancel", command=self.cancel_current_scan, state="disabled")
         self.cancel_button.pack(side="left", padx=(8, 0))
         ttk.Button(header, text="Export…", command=self.save_export).pack(side="left", padx=(8, 0))
+        ttk.Button(header, text="Import…", command=self.load_inventory).pack(side="left", padx=(8, 0))
 
         settings = ttk.Frame(self, padding=(12, 0, 12, 8))
         settings.pack(fill="x")
@@ -68,7 +73,10 @@ class Application(tk.Tk):
         ttk.Button(actions, text="Copy IP", command=self.copy_selected_ips).pack(side="left")
         ttk.Button(actions, text="Add favorite", command=self.add_favorites).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="View favorites", command=self.show_favorites).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Refresh favorites", command=self.refresh_favorites).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Wake", command=self.wake_selected).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Shutdown", command=lambda: self.power_selected("shutdown")).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Reboot", command=lambda: self.power_selected("reboot")).pack(side="left", padx=(8, 0))
         ttk.Label(actions, text="Export uses selected rows when any are selected.").pack(side="right")
 
         columns = ("address", "state", "hostname", "latency", "mac", "manufacturer", "services")
@@ -95,6 +103,7 @@ class Application(tk.Tk):
         self.progress = ttk.Progressbar(footer, mode="determinate", length=220)
         self.progress.pack(side="right")
         ttk.Label(footer, text="© 2026 Daren Loxley (2E0LXY)").pack(side="right", padx=18)
+        self.refresh_subnets(show_errors=False)
 
     def start_scan(self) -> None:
         try:
@@ -145,6 +154,15 @@ class Application(tk.Tk):
                     self.cancel_button.configure(state="disabled")
                     prefix = "Cancelled" if cancelled else "Finished"
                     self.status.configure(text=f"{prefix}: {len(self.results)} reachable; {len(scanned)} of {total} checked")
+                    self._merge_results_into_favorites()
+                    return
+                elif event[0] == "power_done":
+                    results = event[1]
+                    failed = [result for result in results if not result.succeeded]
+                    self.status.configure(text=f"Remote {results[0].action}: {len(results) - len(failed)} succeeded, {len(failed)} failed")
+                    if failed:
+                        messagebox.showwarning("Remote action results", "\n".join(
+                            f"{result.host}: {result.detail}" for result in failed))
                     return
                 else:
                     self.scan_button.configure(state="normal")
@@ -189,6 +207,27 @@ class Application(tk.Tk):
         self.target.delete(0, "end")
         self.target.insert(0, subnet)
 
+    def refresh_subnets(self, show_errors: bool = True) -> None:
+        try:
+            self.network_presets = active_ipv4_networks()
+        except RuntimeError as error:
+            self.network_presets = []
+            if show_errors:
+                messagebox.showerror("Interfaces unavailable", str(error))
+        labels = [f"{interface}: {network}" for interface, network, _broadcast in self.network_presets]
+        self.subnets.configure(values=labels)
+        if labels:
+            self.subnets.current(0)
+
+    def use_selected_subnet(self, _event=None) -> None:
+        index = self.subnets.current()
+        if index < 0 or index >= len(self.network_presets):
+            return
+        interface, network, _broadcast = self.network_presets[index]
+        self.target.delete(0, "end")
+        self.target.insert(0, network)
+        self.status.configure(text=f"Selected {network} on {interface}")
+
     def selected_hosts(self) -> list[Host]:
         return [self.hosts_by_item[item] for item in self.table.selection() if item in self.hosts_by_item]
 
@@ -215,6 +254,40 @@ class Application(tk.Tk):
             self.status.configure(text=f"Saved {len(hosts)} device(s) to favorites")
         except (OSError, ValueError) as error:
             messagebox.showerror("Favorites failed", str(error))
+
+    def _merge_results_into_favorites(self) -> None:
+        try:
+            saved = load_favorites(self.favorites_path)
+            if saved:
+                save_favorites(self.favorites_path, merge_devices(saved, self.results))
+        except (OSError, ValueError) as error:
+            self.status.configure(text=f"Scan finished; favorites refresh failed: {error}")
+
+    def refresh_favorites(self) -> None:
+        try:
+            favorites = load_favorites(self.favorites_path)
+        except (OSError, ValueError) as error:
+            messagebox.showerror("Favorites failed", str(error))
+            return
+        if not favorites:
+            messagebox.showinfo("No favorites", "Add devices to favorites before refreshing them.")
+            return
+        self.target.delete(0, "end")
+        self.target.insert(0, f"{favorites[0].address}-{favorites[-1].address}" if len(favorites) > 1 else favorites[0].address)
+        targets = [host.address for host in favorites]
+        try:
+            ports = parse_ports(self.ports.get())
+            timeout, workers = float(self.timeout.get()), int(self.workers.get())
+        except ValueError as error:
+            messagebox.showerror("Invalid scan settings", str(error))
+            return
+        self.results.clear()
+        self.scan_button.configure(state="disabled")
+        self.cancel_button.configure(state="normal")
+        self.cancel_scan = threading.Event()
+        self.progress.configure(maximum=len(targets), value=0)
+        threading.Thread(target=self._scan_worker, args=(targets, ports, timeout, workers), daemon=True).start()
+        self.after(50, self._drain_events)
 
     def show_favorites(self) -> None:
         try:
@@ -258,6 +331,40 @@ class Application(tk.Tk):
             self.status.configure(text=f"Sent Wake-on-LAN to {len(hosts)} device(s)")
         except (OSError, ValueError) as error:
             messagebox.showerror("Wake-on-LAN failed", str(error))
+
+    def power_selected(self, action: str) -> None:
+        hosts = self.selected_hosts()
+        if not hosts:
+            messagebox.showinfo("Nothing selected", "Select one or more hosts first.")
+            return
+        if not messagebox.askyesno(f"Confirm remote {action}",
+                                   f"Send {action} to {len(hosts)} selected device(s) over SSH?"):
+            return
+        user = simpledialog.askstring("SSH user", "SSH user name (leave blank for your current user):", parent=self)
+        if user is None:
+            return
+        self.status.configure(text=f"Sending remote {action}…")
+        threading.Thread(target=self._power_worker, args=(hosts, action, user.strip()), daemon=True).start()
+        self.after(50, self._drain_events)
+
+    def _power_worker(self, hosts: list[Host], action: str, user: str) -> None:
+        results = [remote_power(host.address, action, user) for host in hosts]
+        self.events.put(("power_done", results))
+
+    def load_inventory(self) -> None:
+        name = filedialog.askopenfilename(filetypes=[("Inventory", "*.json *.xml"),
+                                                     ("JSON", "*.json"), ("XML", "*.xml")])
+        if not name:
+            return
+        try:
+            imported = import_inventory(Path(name))
+            self.results = merge_devices(self.results, imported)
+            saved = merge_devices(load_favorites(self.favorites_path), imported)
+            save_favorites(self.favorites_path, saved)
+            self._refresh_table()
+            self.status.configure(text=f"Imported {len(imported)} device(s)")
+        except (OSError, ValueError) as error:
+            messagebox.showerror("Import failed", str(error))
 
     def _show_web_links(self, _event=None) -> None:
         for widget in self.link_area.winfo_children():
@@ -323,7 +430,7 @@ class Application(tk.Tk):
             messagebox.showinfo("Nothing to export", "Run a scan first.")
             return
         name = filedialog.asksaveasfilename(defaultextension=".csv",
-            filetypes=[("CSV", "*.csv"), ("JSON", "*.json"), ("HTML", "*.html")])
+            filetypes=[("CSV", "*.csv"), ("JSON", "*.json"), ("XML", "*.xml"), ("HTML", "*.html")])
         if name:
             try:
                 visible = list(self.hosts_by_item.values())

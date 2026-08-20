@@ -29,11 +29,11 @@ The CLI works without Tk:
 
 ## Debian package
 
-Download `advanced-ip-analyser_0.3.0_all.deb` from the GitHub Release and install
+Download `advanced-ip-analyser_0.3.1_all.deb` from the GitHub Release and install
 it with:
 
 ```sh
-sudo apt install ./advanced-ip-analyser_0.3.0_all.deb
+sudo apt install ./advanced-ip-analyser_0.3.1_all.deb
 ```
 
 Maintainers can reproduce the package locally with `./packaging/build-deb.sh`.
@@ -65,9 +65,24 @@ exploitation, or remote power operations.
 
 Copyright © 2026 Daren Loxley (2E0LXY).
 
-The device refresh, inventory import, and remote-power APIs added in v0.3.0 are
-currently foundations for the next desktop-interface update. Remote power always
-uses non-interactive SSH and never stores passwords.
+## Desktop workflow
+
+1. Choose an active interface from the subnet list or enter an IP, range, or CIDR.
+2. Select the TCP ports to inspect, then press **Scan**.
+3. Select discovered rows to copy addresses, save favorites, send Wake-on-LAN,
+   open detected services, or export an inventory.
+4. Use **Refresh favorites** to rescan saved addresses. Devices with a discovered
+   MAC address retain their identity, notes, and updated IP address.
+5. Use **Import** for inventories previously exported as JSON or XML. Imported
+   devices are merged into both the visible inventory and favorites.
+
+The **Shutdown** and **Reboot** buttons require an explicit confirmation and use
+non-interactive SSH. Configure key-based SSH access and passwordless permission
+for `systemctl poweroff` or `systemctl reboot` on machines you administer. The
+application does not request, retain, or pass passwords.
+
+Wake-on-LAN and remote administration should only be used on devices and networks
+you own or are authorized to manage.
 
 ## Independence and licensing
 

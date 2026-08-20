@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.1 - 2026-08-20
+
+- Integrate active-interface subnet presets into the desktop scanner.
+- Add desktop JSON/XML inventory import and XML export controls.
+- Automatically merge successful scans into existing favorites by stable device identity.
+- Add a dedicated favorites refresh workflow.
+- Add confirmed, asynchronous SSH shutdown and reboot controls with per-host failures.
+- Document the complete desktop workflow and remote-access prerequisites.
+
 ## 0.3.0 - 2026-08-20
 
 - Preserve saved-device notes while refreshing IP addresses and observations by MAC identity.
