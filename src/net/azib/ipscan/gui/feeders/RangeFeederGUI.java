@@ -53,8 +53,9 @@ public class RangeFeederGUI extends AbstractFeederGUI {
         endIPText = new Text(this, SWT.BORDER);
 		var hostnameLabel = new Label(this, SWT.NONE);
         hostnameText = new Text(this, SWT.BORDER);
-		var ipUpButton = new Button(this, SWT.NONE);
+        var ipUpButton = new Button(this, SWT.NONE);
         netmaskCombo = new Combo(this, SWT.NONE);
+		var classCButton = new Button(this, SWT.PUSH);
 
 		// the longest possible IP
         startIPText.setText("255.255.255.255xx");
@@ -116,6 +117,16 @@ public class RangeFeederGUI extends AbstractFeederGUI {
 		netmaskCombo.addListener(SWT.Selection, netmaskSelectionListener);
 		netmaskCombo.addListener(SWT.Traverse, netmaskSelectionListener);
 		netmaskCombo.setToolTipText(getLabel("feeder.range.netmask.tooltip"));
+		classCButton.setText(getLabel("button.scan24"));
+		classCButton.setToolTipText(getLabel("button.scan24.tooltip"));
+		classCButton.addListener(SWT.Selection, event -> {
+			try {
+				updateStartEndWithNetmask(InetAddress.getByName(startIPText.getText()), "/24");
+			}
+			catch (UnknownHostException e) {
+				throw new FeederException("invalidNetmask");
+			}
+		});
 
 		pack();
 		var comboBounds = netmaskCombo.getBounds();

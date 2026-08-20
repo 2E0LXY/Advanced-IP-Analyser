@@ -17,7 +17,7 @@ jobs:
         run: |
           apt-get update
           apt-get install --yes --no-install-recommends \
-            ca-certificates fakeroot git libgtk-3-0t64 openjdk-21-jdk unzip xauth xvfb
+            appstream ca-certificates desktop-file-utils fakeroot git libgtk-3-0t64 lintian openjdk-21-jdk unzip xauth xvfb
 
       - uses: actions/checkout@v4
         with:
@@ -38,6 +38,21 @@ jobs:
           dpkg-deb --info "$package"
           dpkg-deb --contents "$package" > package-contents.txt
           grep -q './usr/share/doc/advanced-ip-analyser/copyright' package-contents.txt
+          grep -q './usr/lib/advanced-ip-analyser/runtime/bin/java' package-contents.txt
+          lintian --fail-on error "$package"
+          desktop-file-validate ext/deb-bundle/usr/share/applications/net.azib.ipscan.desktop
+          appstreamcli validate --no-net ext/deb-bundle/usr/share/metainfo/net.azib.ipscan.metainfo.xml
+
+      - name: Install and smoke-test Debian package
+        run: |
+          package="$(find build/libs -maxdepth 1 -name '*.deb' -print -quit)"
+          apt-get install --yes --no-install-recommends "$package"
+          set +e
+          timeout 10s xvfb-run -a ipscan
+          status=$?
+          set -e
+          test "$status" -eq 124
+          dpkg --remove advanced-ip-analyser
 
       - uses: actions/upload-artifact@v4
         with:

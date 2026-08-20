@@ -8,12 +8,16 @@ package net.azib.ipscan.gui.actions;
 import net.azib.ipscan.config.Labels;
 import net.azib.ipscan.config.OpenersConfig;
 import net.azib.ipscan.core.UserErrorException;
+import net.azib.ipscan.core.devices.DeviceInventory;
+import net.azib.ipscan.core.devices.SavedDeviceFactory;
 import net.azib.ipscan.core.net.WakeOnLan;
+import net.azib.ipscan.core.remote.RemotePowerService;
 import net.azib.ipscan.core.state.ScanningState;
 import net.azib.ipscan.core.state.StateMachine;
 import net.azib.ipscan.fetchers.FetcherRegistry;
 import net.azib.ipscan.gui.DetailsWindow;
 import net.azib.ipscan.gui.EditOpenersDialog;
+import net.azib.ipscan.gui.FavoritesTable;
 import net.azib.ipscan.gui.ResultTable;
 import net.azib.ipscan.gui.StatusBar;
 import org.eclipse.swt.SWT;
@@ -38,20 +42,93 @@ public class CommandsMenuActions {
 	public CopyIP copyIP;
 	public CopyIPDetails copyIPDetails;
 	public WakeSelected wakeSelected;
+	public SaveSelectedDevices saveSelectedDevices;
+	public ShutdownSelected shutdownSelected;
+	public RebootSelected rebootSelected;
+	public CancelShutdownSelected cancelShutdownSelected;
 	public ShowOpenersMenu showOpenersMenu;
 	public EditOpeners editOpeners;
 	public SelectOpener selectOpener;
 
-	public CommandsMenuActions(Details details, Delete delete, Rescan rescan, CopyIP copyIP, CopyIPDetails copyIPDetails, WakeSelected wakeSelected, ShowOpenersMenu showOpenersMenu, EditOpeners editOpeners, SelectOpener selectOpener) {
+	public CommandsMenuActions(Details details, Delete delete, Rescan rescan, CopyIP copyIP, CopyIPDetails copyIPDetails, WakeSelected wakeSelected, SaveSelectedDevices saveSelectedDevices, ShutdownSelected shutdownSelected, RebootSelected rebootSelected, CancelShutdownSelected cancelShutdownSelected, ShowOpenersMenu showOpenersMenu, EditOpeners editOpeners, SelectOpener selectOpener) {
 		this.details = details;
 		this.delete = delete;
 		this.rescan = rescan;
 		this.copyIP = copyIP;
 		this.copyIPDetails = copyIPDetails;
 		this.wakeSelected = wakeSelected;
+		this.saveSelectedDevices = saveSelectedDevices;
+		this.shutdownSelected = shutdownSelected;
+		this.rebootSelected = rebootSelected;
+		this.cancelShutdownSelected = cancelShutdownSelected;
 		this.showOpenersMenu = showOpenersMenu;
 		this.editOpeners = editOpeners;
 		this.selectOpener = selectOpener;
+	}
+
+	private abstract static class RemotePowerAction implements Listener {
+		private final ResultTable resultTable;
+		private final RemotePowerService service;
+		private final RemotePowerService.Action action;
+
+		RemotePowerAction(ResultTable resultTable, RemotePowerService service, RemotePowerService.Action action) {
+			this.resultTable = resultTable;
+			this.service = service;
+			this.action = action;
+		}
+
+		@Override public void handleEvent(Event event) {
+			checkSelection(resultTable);
+			var confirmation = new org.eclipse.swt.widgets.MessageBox(resultTable.getShell(), SWT.ICON_WARNING | SWT.YES | SWT.NO | SWT.SHEET);
+			confirmation.setText(Labels.getLabel("remotePower.confirmTitle"));
+			confirmation.setMessage(Labels.getLabel("remotePower.confirm"));
+			if (confirmation.open() != SWT.YES) return;
+			var hosts = java.util.Arrays.stream(resultTable.getSelectionIndices())
+				.mapToObj(index -> resultTable.getScanningResults().getResult(index).getAddress().getHostAddress()).toList();
+			var display = resultTable.getDisplay();
+			var thread = new Thread(() -> {
+				var outcomes = service.execute(hosts, action);
+				display.asyncExec(() -> {
+					if (resultTable.isDisposed()) return;
+					var summary = new org.eclipse.swt.widgets.MessageBox(resultTable.getShell(), SWT.ICON_INFORMATION | SWT.OK | SWT.SHEET);
+					summary.setText(Labels.getLabel("remotePower.results"));
+					summary.setMessage(outcomes.stream().map(outcome -> outcome.host() + ": " + (outcome.successful() ? "OK" : "FAILED") + " — " + outcome.message()).collect(java.util.stream.Collectors.joining("\n")));
+					summary.open();
+				});
+			}, "remote-power");
+			thread.setDaemon(true);
+			thread.start();
+		}
+	}
+
+	public static final class ShutdownSelected extends RemotePowerAction {
+		public ShutdownSelected(ResultTable table, RemotePowerService service) { super(table, service, RemotePowerService.Action.SHUTDOWN); }
+	}
+	public static final class RebootSelected extends RemotePowerAction {
+		public RebootSelected(ResultTable table, RemotePowerService service) { super(table, service, RemotePowerService.Action.REBOOT); }
+	}
+	public static final class CancelShutdownSelected extends RemotePowerAction {
+		public CancelShutdownSelected(ResultTable table, RemotePowerService service) { super(table, service, RemotePowerService.Action.CANCEL_SHUTDOWN); }
+	}
+
+	public static final class SaveSelectedDevices implements Listener {
+		private final ResultTable resultTable;
+		private final DeviceInventory inventory;
+		private final FavoritesTable favoritesTable;
+
+		public SaveSelectedDevices(ResultTable resultTable, DeviceInventory inventory, FavoritesTable favoritesTable) {
+			this.resultTable = resultTable;
+			this.inventory = inventory;
+			this.favoritesTable = favoritesTable;
+		}
+
+		@Override public void handleEvent(Event event) {
+			checkSelection(resultTable);
+			var results = resultTable.getScanningResults();
+			for (var index : resultTable.getSelectionIndices())
+				inventory.save(SavedDeviceFactory.from(results.getResult(index), results.getFetchers()));
+			favoritesTable.refresh();
+		}
 	}
 
 	/** Sends Wake-on-LAN packets to all selected results that have a MAC address. */
@@ -207,10 +284,12 @@ public class CommandsMenuActions {
 		
 		private final Listener openersSelectListener;
 		private final OpenersConfig openersConfig;
+		private final ClientAvailability clientAvailability;
 
-		public ShowOpenersMenu(OpenersConfig openersConfig, SelectOpener selectOpener) {
+		public ShowOpenersMenu(OpenersConfig openersConfig, SelectOpener selectOpener, ClientAvailability clientAvailability) {
 			this.openersConfig = openersConfig;
 			this.openersSelectListener = selectOpener;
+			this.clientAvailability = clientAvailability;
 		}
 
 		public void handleEvent(Event event) {
@@ -222,8 +301,10 @@ public class CommandsMenuActions {
 			
 			// update menu items
 			var index = 0;
-			for (var name : openersConfig) {
+			for (var configuredName : openersConfig) {
+				var name = configuredName;
 				var menuItem = new MenuItem(openersMenu, SWT.CASCADE);
+				var available = clientAvailability.isAvailable(openersConfig.getOpener(configuredName));
 				
 				index++;
 				if (index <= 9) {
@@ -231,7 +312,8 @@ public class CommandsMenuActions {
 					menuItem.setAccelerator(SWT.MOD1 | ('0' + index));
 				}
 				
-				menuItem.setText(name);
+				menuItem.setText(name + (available ? "" : " (not installed)"));
+				menuItem.setEnabled(available);
 				menuItem.setData(index);
 				menuItem.addListener(SWT.Selection, openersSelectListener);
 			}

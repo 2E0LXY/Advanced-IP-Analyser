@@ -43,7 +43,7 @@ public class ResultTable extends Table implements FetcherRegistryUpdateListener,
 
 	private Listener columnResizeListener;
 
-	public ResultTable(Shell parent, GUIConfig guiConfig, FetcherRegistry fetcherRegistry,
+	public ResultTable(ResultsTabs parent, GUIConfig guiConfig, FetcherRegistry fetcherRegistry,
 							   ScanningResultList scanningResultList, StateMachine stateMachine,
 							   ColumnsActions.ColumnClick columnClickListener, ColumnsActions.ColumnResize columnResizeListener) {
 		super(parent, SWT.BORDER | SWT.MULTI | SWT.FULL_SELECTION | SWT.VIRTUAL);
@@ -75,6 +75,7 @@ public class ResultTable extends Table implements FetcherRegistryUpdateListener,
 		
 		// listen to state machine events
 		stateMachine.addTransitionListener(this);
+		parent.addPage("tabs.results", this);
 	}
 
 	/**
@@ -230,6 +231,7 @@ public class ResultTable extends Table implements FetcherRegistryUpdateListener,
 			}			 
 			item.setText(resultStrings);
 			item.setImage(0, listImages[scanningResult.getType().ordinal()]);
+			item.setBackground(getDisplay().getSystemColor(tableIndex % 2 == 0 ? SWT.COLOR_LIST_BACKGROUND : SWT.COLOR_WIDGET_LIGHT_SHADOW));
 		}
 	}
 

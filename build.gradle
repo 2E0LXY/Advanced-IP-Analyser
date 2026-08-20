@@ -33,7 +33,7 @@ version = System.getenv("RELEASE_VERSION") ?: exec("git describe --tags", ".", f
 
 java.sourceCompatibility = java.targetCompatibility = 21
 
-def javaModules = ["java.base", "java.prefs", "java.logging", "jdk.crypto.ec"]
+def javaModules = ["java.base", "java.prefs", "java.logging", "java.xml", "jdk.crypto.ec"]
 project.ext.set("javaModules", javaModules)
 
 sourceSets {
@@ -220,9 +220,16 @@ def deb(def platform, def arch, def moreDeps = '') {
     ant.copy(file: "build/libs/${project.name}-${version}-${platform}.jar", todir: "${dist}/usr/lib/ipscan")
     ant.copy(file: "resources/images/icon128.png", tofile: "${dist}/usr/share/pixmaps/net.azib.ipscan.png")
 
+    def runtimeDir = "${dist}/usr/lib/advanced-ip-analyser/runtime"
+    exec(new String[] {"${System.getProperty('java.home')}/bin/jlink", "--add-modules", (project.ext.javaModules + "java.desktop").join(','),
+        "--strip-debug", "--no-header-files", "--no-man-pages", "--compress=2", "--output", new File(runtimeDir).absolutePath})
+
+    def installedSize = exec(new String[] {"sh", "-c", "du -sk usr | cut -f1"}, dist)
+
     ant.replace(file: "${dist}/DEBIAN/control") {
         ant.replacefilter(token: "VERSION", value: version)
         ant.replacefilter(token: "ARCH", value: arch)
+		ant.replacefilter(token: "INSTALLED_SIZE", value: installedSize)
         ant.replacefilter(token: "DEPENDS ", value: moreDeps)
     }
 

@@ -57,7 +57,7 @@ public class MainWindow {
 	public MainWindow(Shell shell, GUIConfig guiConfig, FeederArea feederArea,
 					  ControlsArea controlsArea, FeederSelectionCombo feederSelectionCombo,
 					  Button startStopButton, StartStopScanningAction startStopScanningAction,
-					  ResultTable resultTable, StatusBar statusBar, ResultsContextMenu resultsContextMenu,
+					  ResultsTabs resultsTabs, ResultTable resultTable, FavoritesTable favoritesTable, StatusBar statusBar, ResultsContextMenu resultsContextMenu,
 					  FeederGUIRegistry feederGUIRegistry, final StateMachine stateMachine,
 					  ToolsActions.Preferences preferencesListener, ToolsActions.ChooseFetchers chooseFetchersListener,
 					  MainMenu menuBar /* don't delete: initiates main menu creation */
@@ -69,7 +69,7 @@ public class MainWindow {
 		initShell(shell);
 		initFeederArea(feederArea, feederGUIRegistry);
 		initControlsArea(controlsArea, feederSelectionCombo, startStopButton, startStopScanningAction, preferencesListener, chooseFetchersListener);
-		initTableAndStatusBar(resultTable, resultsContextMenu, statusBar);
+		initTableAndStatusBar(resultsTabs, resultTable, resultsContextMenu, statusBar);
 
 		// after all controls are initialized, resize and open
 		shell.setSize(guiConfig.getMainWindowSize());
@@ -123,8 +123,8 @@ public class MainWindow {
 	/**
 	 * This method initializes resultTable	
 	 */
-	private void initTableAndStatusBar(ResultTable resultTable, Menu resultsContextMenu, StatusBar statusBar) {
-		resultTable.setLayoutData(formData(new FormAttachment(0), new FormAttachment(100), new FormAttachment(feederArea), new FormAttachment(statusBar.getComposite())));
+	private void initTableAndStatusBar(ResultsTabs resultsTabs, ResultTable resultTable, Menu resultsContextMenu, StatusBar statusBar) {
+		resultsTabs.setLayoutData(formData(new FormAttachment(0), new FormAttachment(100), new FormAttachment(feederArea), new FormAttachment(statusBar.getComposite())));
 		resultTable.setMenu(resultsContextMenu);
 	}
 

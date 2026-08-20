@@ -8,23 +8,23 @@ package net.azib.ipscan.fetchers;
 
 import net.azib.ipscan.core.ScanningSubject;
 
+import java.time.Instant;
+
 /**
  * LastAliveTimeFetcher
- *
- * TODO: implement LastAliveTimeFetcher
  *
  * @author Anton Keks
  */
 public class LastAliveTimeFetcher extends AbstractFetcher {
+	public static final String ID = "fetcher.lastAlive";
 
 	public String getId() {
-		// TODO Auto-generated method stub
-		return null;
+		return ID;
 	}
 
 	public Object scan(ScanningSubject subject) {
-		// TODO Auto-generated method stub
-		return null;
+		return subject.getResultType().ordinal() > net.azib.ipscan.core.ScanningResult.ResultType.DEAD.ordinal()
+			? Instant.now().toString() : null;
 	}
 
 }

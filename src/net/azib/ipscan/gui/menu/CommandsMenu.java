@@ -24,6 +24,11 @@ public class CommandsMenu extends AbstractMenu {
 		initMenuItem(this, "menu.commands.copyDetails", null, null, actions.copyIPDetails);
 		initMenuItem(this, null, null, null, null);
 		initMenuItem(this, "menu.commands.wake", null, null, actions.wakeSelected, true);
+		initMenuItem(this, "menu.commands.saveDevice", null, null, actions.saveSelectedDevices, true);
+		initMenuItem(this, null, null, null, null);
+		initMenuItem(this, "menu.commands.shutdown", null, null, actions.shutdownSelected, true);
+		initMenuItem(this, "menu.commands.reboot", null, null, actions.rebootSelected, true);
+		initMenuItem(this, "menu.commands.cancelShutdown", null, null, actions.cancelShutdownSelected, true);
 		initMenuItem(this, null, null, null, null);
 
 		var openersMenuItem = new MenuItem(this, SWT.CASCADE);
