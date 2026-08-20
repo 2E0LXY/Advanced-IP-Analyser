@@ -7,7 +7,7 @@ import static org.junit.Assert.*;
 public class RemotePowerServiceTest {
     @Test
     public void createsNonInteractiveArgumentVector() {
-        assertEquals(java.util.List.of("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "--", "192.0.2.1", "sudo -n systemctl reboot"),
+        assertEquals(java.util.List.of("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "--", "192.0.2.1", "sudo -n shutdown -r +1"),
             RemotePowerService.commandFor("192.0.2.1", RemotePowerService.Action.REBOOT));
     }
 

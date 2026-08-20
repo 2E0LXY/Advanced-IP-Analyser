@@ -216,6 +216,26 @@ public class PreferencesDialog extends AbstractModalDialog {
 		var gridDataWithSpan2 = new GridData();
 		gridDataWithSpan2.horizontalSpan = 2;
 		skipBroadcastsCheckbox.setLayoutData(gridDataWithSpan2);
+
+		var presets = new Group(scanningTab, SWT.NONE);
+		presets.setText(Labels.getLabel("preferences.presets"));
+		presets.setLayout(new RowLayout());
+		addPresetButton(presets, "preferences.presets.fast", 256, 5, 1, 500, 300, 50);
+		addPresetButton(presets, "preferences.presets.balanced", 100, 20, 2, 1000, 1000, 100);
+		addPresetButton(presets, "preferences.presets.accurate", 50, 50, 3, 2000, 2000, 200);
+	}
+
+	private void addPresetButton(Composite parent, String label, int threads, int delay, int pingCount, int pingTimeout, int portTimeout, int minimumPortTimeout) {
+		var button = new Button(parent, SWT.PUSH);
+		button.setText(Labels.getLabel(label));
+		button.addListener(SWT.Selection, event -> {
+			maxThreadsText.setText(Integer.toString(threads));
+			threadDelayText.setText(Integer.toString(delay));
+			pingingCountText.setText(Integer.toString(pingCount));
+			pingingTimeoutText.setText(Integer.toString(pingTimeout));
+			portTimeoutText.setText(Integer.toString(portTimeout));
+			minPortTimeoutText.setText(Integer.toString(minimumPortTimeout));
+		});
 	}
 
 	/**

@@ -82,25 +82,25 @@ probes a natural addition rather than a rewrite of the dispatcher.
 | --- | --- | --- |
 | Scan entered IP range | Complete | Reuse range/smart feeders |
 | Detect IP, hostname, MAC | Complete | Reuse fetchers; prefer ARP/neighbour data on LAN |
-| Current subnet and class-C shortcuts | Partial | Add interface-aware subnet presets and `/24` shortcut |
-| Computer favorites tab | Missing | Add persistent device records keyed by MAC, with IP fallback |
-| Save selected as XML/HTML/CSV | Partial | Reuse CSV/XML; add HTML and selection-aware export |
-| Load favorites XML | Missing | Define versioned, validated import format |
+| Current subnet and class-C shortcuts | Complete | Interface-aware subnet preset and `/24` shortcut |
+| Computer favorites tab | Complete | Persistent records keyed by MAC, with IP fallback |
+| Save selected as XML/HTML/CSV | Complete | Selection-aware XML, CSV, and HTML export |
+| Load favorites XML | Complete | Versioned import with hardened XML parsing |
 | Ping and trace route | Complete | Existing configurable openers (`ping`, `tracepath`) |
 | SSH, Telnet, HTTP, HTTPS, FTP | Mostly complete | Linux openers; HTTPS added in milestone 1 |
-| Browse computer/resources | Partial | Open `smb://host/` through the desktop/GIO |
-| RDP | Missing default | Launch FreeRDP (`xfreerdp3`) |
+| Browse computer/resources | Complete | Open `smb://host/` through the desktop/GIO |
+| RDP | Complete | Launch FreeRDP (`xfreerdp3`) |
 | Radmin | No native Linux client | Optional Wine/custom-command adapter, clearly marked |
 | Wake-on-LAN | Missing | Native UDP magic packet; added in milestone 1 |
-| Remote shutdown/reboot/abort | Missing | Opt-in SSH action with explicit confirmation and configured credentials; do not store passwords |
-| Accuracy and scan-rate controls | Mostly complete | Present clearer presets over existing timeouts/thread settings |
-| Resource selection | Generic but capable | Provide a named resource checklist backed by fetchers/probes |
-| Alternating row colors | Missing | SWT table presentation option |
-| Portable/custom clients | Partial | Generalize openers into validated connection profiles |
+| Remote shutdown/reboot/abort | Complete | Confirmed, key/agent-based non-interactive SSH actions |
+| Accuracy and scan-rate controls | Complete | Fast, Balanced, and Accurate presets over detailed settings |
+| Resource selection | Complete | Named service fetcher backed by conservative TCP probes |
+| Alternating row colors | Complete | Applied to scan and saved-device tables |
+| Portable/custom clients | Complete | Argument-safe profiles with dependency availability checks |
 
-## Delivery roadmap
+## Completed delivery roadmap
 
-### Milestone 1 — Debian remote-access baseline
+### Milestone 1 — Debian remote-access baseline (complete)
 
 - Native Wake-on-LAN action for one or many selected devices.
 - Default HTTPS, RDP, and SMB openers alongside existing HTTP, FTP, SSH, ping,
@@ -108,7 +108,7 @@ probes a natural addition rather than a rewrite of the dispatcher.
 - Debian 13 build and runtime documentation.
 - Preserve all upstream scanner behavior and plugin compatibility.
 
-### Milestone 2 — device-centric experience
+### Milestone 2 — device-centric experience (complete)
 
 - Add Scan Results and Favorites tabs.
 - Create immutable saved-device records with display name, IP, MAC, comment,
@@ -117,7 +117,7 @@ probes a natural addition rather than a rewrite of the dispatcher.
   MAC after each LAN scan.
 - Add XML import plus XML/CSV/HTML export for selected or full tabs.
 
-### Milestone 3 — resource discovery and actions
+### Milestone 3 — resource discovery and actions (complete)
 
 - Introduce a resource/service fetcher that identifies SSH, HTTP(S), FTP, SMB,
   and RDP with conservative connection probes.
@@ -127,7 +127,7 @@ probes a natural addition rather than a rewrite of the dispatcher.
 - Add action availability rules so unsupported actions are disabled instead of
   failing after launch.
 
-### Milestone 4 — managed remote power
+### Milestone 4 — managed remote power (complete)
 
 - Add SSH-based shutdown/reboot with a preview, explicit confirmation, per-host
   outcome reporting, and cancellation of scheduled shutdown where supported.
@@ -135,7 +135,7 @@ probes a natural addition rather than a rewrite of the dispatcher.
   passwords in Java Preferences.
 - Keep Radmin as an optional custom adapter and document its Linux limitations.
 
-### Milestone 5 — product polish and packaging
+### Milestone 5 — product polish and packaging (complete)
 
 - Restructure the SWT shell into a compact toolbar, range controls, tabbed device
   table, status/progress region, and configurable columns/actions.

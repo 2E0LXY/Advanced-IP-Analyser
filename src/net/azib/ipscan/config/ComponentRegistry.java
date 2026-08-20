@@ -6,6 +6,7 @@
 package net.azib.ipscan.config;
 
 import net.azib.ipscan.core.PluginLoader;
+import net.azib.ipscan.core.devices.DeviceInventoryUpdater;
 import net.azib.ipscan.core.net.Pinger;
 import net.azib.ipscan.core.net.PingerRegistry;
 import net.azib.ipscan.di.Injector;
@@ -44,6 +45,7 @@ public class ComponentRegistry {
 				if (Pinger.class.isAssignableFrom(c))
 					pingerRegistry.register(plugin.getId(), (Class) c);
 			});
+			i.require(DeviceInventoryUpdater.class);
 		}
 		return i;
 	}

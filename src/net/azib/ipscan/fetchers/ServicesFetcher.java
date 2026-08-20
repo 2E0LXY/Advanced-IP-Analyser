@@ -6,6 +6,7 @@ import net.azib.ipscan.util.ThreadResourceBinder;
 
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -43,7 +44,7 @@ public class ServicesFetcher extends AbstractFetcher {
                 socket.connect(new InetSocketAddress(subject.getAddress(), service.getKey()), Math.min(subject.getAdaptedPortTimeout(), config.portTimeout));
                 detected.add(service.getValue());
             }
-            catch (Exception ignored) {
+            catch (IOException ignored) {
                 // A closed, filtered, or unreachable port is simply not advertised.
             }
             finally {

@@ -108,7 +108,7 @@ public class TXTExporter extends AbstractExporter {
 			String startIP = null;
 			String endIP = null;
 			String lastLoadedIP = null;
-			var columns = emptyList();
+			List<String> columns = emptyList();
 
 			int ipIndex = 0, pingIndex = 1, portsIndex = 3;
 

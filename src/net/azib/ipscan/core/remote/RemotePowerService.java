@@ -33,10 +33,10 @@ public class RemotePowerService {
     }
 
     public static List<String> commandFor(String host, Action action) {
-        if (host == null || !host.matches("[0-9A-Fa-f:.]+")) throw new IllegalArgumentException("Unsafe host: " + host);
+        if (host == null || !host.matches("[0-9A-Fa-f:.]+(?:%[A-Za-z0-9_.-]+)?")) throw new IllegalArgumentException("Unsafe host: " + host);
         var remoteCommand = switch (action) {
-            case SHUTDOWN -> "sudo -n systemctl poweroff";
-            case REBOOT -> "sudo -n systemctl reboot";
+            case SHUTDOWN -> "sudo -n shutdown -h +1";
+            case REBOOT -> "sudo -n shutdown -r +1";
             case CANCEL_SHUTDOWN -> "sudo -n shutdown -c";
         };
         return List.of("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "--", host, remoteCommand);

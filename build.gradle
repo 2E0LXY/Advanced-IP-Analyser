@@ -213,6 +213,7 @@ def winLauncher(def platform) {
 
 def deb(def platform, def arch, def moreDeps = '') {
     def dist = buildDir.path + "/libs/deb"
+    ant.delete(dir: dist)
     ant.mkdir(dir: dist)
     ant.copy(todir: dist) {
         ant.fileset(dir: "ext/deb-bundle")

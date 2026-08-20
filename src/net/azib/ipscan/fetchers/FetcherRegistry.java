@@ -18,6 +18,7 @@ import java.util.prefs.Preferences;
  */
 public class FetcherRegistry {
 	static final String PREFERENCE_SELECTED_FETCHERS = "selectedFetchers";
+	private static final String PREFERENCE_DEFAULTS_VERSION = "selectedFetchersDefaultsVersion";
 
 	private final Preferences preferences;
 	private final PreferencesDialog preferencesDialog;
@@ -39,6 +40,20 @@ public class FetcherRegistry {
 
 		// now load the preferences to init selected fetchers
 		loadSelectedFetchers(preferences);
+		migrateSelectedFetchers(preferences);
+	}
+
+	private void migrateSelectedFetchers(Preferences preferences) {
+		if (preferences.getInt(PREFERENCE_DEFAULTS_VERSION, 0) >= 1) return;
+		addSelectedIfRegistered(ServicesFetcher.ID);
+		addSelectedIfRegistered(LastAliveTimeFetcher.ID);
+		saveSelectedFetchers(preferences);
+		preferences.putInt(PREFERENCE_DEFAULTS_VERSION, 1);
+	}
+
+	private void addSelectedIfRegistered(String id) {
+		var fetcher = registeredFetchers.get(id);
+		if (fetcher != null) selectedFetchers.putIfAbsent(id, fetcher);
 	}
 
 	private Map<String, Fetcher> createFetchersMap(List<Fetcher> fetchers) {

@@ -5,9 +5,11 @@ application built on the Angry IP Scanner codebase. The current development plan
 feature comparison, and architecture notes are in
 [`docs/ADVANCED_IP_SCANNER_REPLICA.md`](docs/ADVANCED_IP_SCANNER_REPLICA.md).
 
-The first Debian milestone adds native Wake-on-LAN plus HTTPS, SMB, SSH, and
-FreeRDP host actions. See [`docs/DEBIAN13.md`](docs/DEBIAN13.md) for build and
-runtime requirements.
+The completed Debian workflow includes device favorites, service discovery,
+safe remote-access profiles, Wake-on-LAN, confirmed SSH power actions, XML/CSV/HTML
+inventory exchange, subnet shortcuts, and a bundled Java 21 runtime. See
+[`docs/DEBIAN13.md`](docs/DEBIAN13.md) for build and runtime requirements and
+[`docs/COMPLETION_CHECKLIST.md`](docs/COMPLETION_CHECKLIST.md) for acceptance criteria.
 
 ## Upstream project
 
@@ -43,5 +45,5 @@ The supported package target is `./gradlew linux64`, run on Debian 13.
 
 On Debian 13 install the following packages:
 ```
-sudo apt install openjdk-21-jdk fakeroot libgtk-3-0t64 xvfb xauth
+sudo apt install openjdk-21-jdk fakeroot libgtk-3-0t64 xvfb xauth appstream desktop-file-utils lintian
 ```

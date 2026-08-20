@@ -31,6 +31,9 @@ public class FavoritesTable extends Table {
         addColumn(Labels.getLabel("devices.lastSeen"), 190);
         addColumn(Labels.getLabel("devices.services"), 180);
         parent.addPage("tabs.favorites", this);
+		parent.addListener(SWT.Selection, event -> {
+			if (parent.getSelection().length > 0 && parent.getSelection()[0].getControl() == this) refresh();
+		});
         createContextMenu();
         refresh();
     }

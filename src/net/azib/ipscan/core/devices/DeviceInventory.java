@@ -41,6 +41,10 @@ public class DeviceInventory {
         return List.copyOf(devices.values());
     }
 
+    public synchronized boolean contains(String identity) {
+        return devices.containsKey(identity);
+    }
+
     public synchronized SavedDevice save(SavedDevice device) {
 		var saved = mergeIntoInventory(device);
         persist();
