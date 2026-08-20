@@ -3,6 +3,7 @@ package net.azib.ipscan.gui;
 import net.azib.ipscan.config.Labels;
 import net.azib.ipscan.core.devices.DeviceInventory;
 import net.azib.ipscan.core.devices.SavedDevice;
+import net.azib.ipscan.gui.actions.SavedDeviceLauncher;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.widgets.Table;
 import org.eclipse.swt.widgets.TableColumn;
@@ -19,7 +20,7 @@ import java.util.List;
 public class FavoritesTable extends Table {
     private final DeviceInventory inventory;
 
-    public FavoritesTable(ResultsTabs parent, DeviceInventory inventory) {
+    public FavoritesTable(ResultsTabs parent, DeviceInventory inventory, SavedDeviceLauncher launcher) {
         super(parent, SWT.BORDER | SWT.MULTI | SWT.FULL_SELECTION);
         this.inventory = inventory;
         setHeaderVisible(true);
@@ -36,6 +37,10 @@ public class FavoritesTable extends Table {
 		});
         createContextMenu();
         refresh();
+		addListener(SWT.MouseDoubleClick, event -> {
+			var selected = selectedDevices();
+			if (!selected.isEmpty()) launcher.launch(selected.getFirst());
+		});
     }
 
     public void refresh() {
