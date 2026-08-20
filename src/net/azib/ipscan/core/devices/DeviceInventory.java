@@ -32,7 +32,7 @@ public class DeviceInventory {
         this(Path.of(System.getProperty("user.home"), ".advanced-ip-analyser", "devices.xml"));
     }
 
-    public DeviceInventory(Path storageFile) {
+    DeviceInventory(Path storageFile) {
         this.storageFile = storageFile;
         if (Files.isRegularFile(storageFile)) importXml(storageFile, false);
     }
