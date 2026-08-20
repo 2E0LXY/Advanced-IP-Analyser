@@ -12,4 +12,4 @@
   per-host outcomes without storing passwords.
 - Removed telemetry and obsolete telemetry preferences.
 - Hardened opener substitution against shell injection and replacement errors.
-- Added a bundled Java 21 runtime and Debian install/start/remove smoke tests.
+- Added a Debian-managed OpenJDK 21 runtime dependency and install/start/remove smoke tests.

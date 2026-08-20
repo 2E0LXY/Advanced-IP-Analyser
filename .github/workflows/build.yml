@@ -39,7 +39,8 @@ jobs:
           dpkg-deb --info "$package"
           dpkg-deb --contents "$package" > package-contents.txt
           grep -q './usr/share/doc/advanced-ip-analyser/copyright' package-contents.txt
-          grep -q './usr/lib/advanced-ip-analyser/runtime/bin/java' package-contents.txt
+          ! grep -q './usr/lib/advanced-ip-analyser/runtime/bin/java' package-contents.txt
+          dpkg-deb --field "$package" Depends | grep -q 'openjdk-21-jre'
           lintian --fail-on error "$package"
           desktop-file-validate ext/deb-bundle/usr/share/applications/net.azib.ipscan.desktop
           appstreamcli validate --no-net ext/deb-bundle/usr/share/metainfo/net.azib.ipscan.metainfo.xml

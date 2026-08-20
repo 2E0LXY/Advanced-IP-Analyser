@@ -7,7 +7,8 @@ feature comparison, and architecture notes are in
 
 The completed Debian workflow includes device favorites, service discovery,
 safe remote-access profiles, Wake-on-LAN, confirmed SSH power actions, XML/CSV/HTML
-inventory exchange, subnet shortcuts, and a bundled Java 21 runtime. See
+inventory exchange and subnet shortcuts. Debian's OpenJDK 21 runtime is used so
+Java security fixes arrive through normal APT updates. See
 [`docs/DEBIAN13.md`](docs/DEBIAN13.md) for build and runtime requirements and
 [`docs/COMPLETION_CHECKLIST.md`](docs/COMPLETION_CHECKLIST.md) for acceptance criteria.
 

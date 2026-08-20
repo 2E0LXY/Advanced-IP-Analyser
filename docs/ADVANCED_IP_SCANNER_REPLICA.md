@@ -141,8 +141,8 @@ probes a natural addition rather than a rewrite of the dispatcher.
   table, status/progress region, and configurable columns/actions.
 - Add alternating rows, keyboard navigation, accessible labels, high-DPI icons,
   empty/error states, and a first-run dependency check.
-- Produce a Debian package with a desktop file, icon, AppStream metadata, bundled
-  runtime, license/source offer, and smoke tests on a clean Debian 13 VM.
+- Produce a Debian package with a desktop file, icon, AppStream metadata,
+  Debian-managed runtime, license/source offer, and smoke tests on Debian 13.
 
 ## Debian 13 dependencies
 

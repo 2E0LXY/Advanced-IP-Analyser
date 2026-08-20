@@ -221,11 +221,11 @@ def deb(def platform, def arch, def moreDeps = '') {
     ant.copy(file: "build/libs/${project.name}-${version}-${platform}.jar", todir: "${dist}/usr/lib/ipscan")
     ant.copy(file: "resources/images/icon128.png", tofile: "${dist}/usr/share/pixmaps/net.azib.ipscan.png")
 
-    def runtimeDir = "${dist}/usr/lib/advanced-ip-analyser/runtime"
-    exec(new String[] {"${System.getProperty('java.home')}/bin/jlink", "--add-modules", (project.ext.javaModules + "java.desktop").join(','),
-        "--strip-debug", "--no-header-files", "--no-man-pages", "--compress=2", "--output", new File(runtimeDir).absolutePath})
-
     def installedSize = exec(new String[] {"sh", "-c", "du -sk usr | cut -f1"}, dist)
+
+    ant.gzip(src: "${dist}/usr/share/doc/advanced-ip-analyser/changelog.Debian",
+        destfile: "${dist}/usr/share/doc/advanced-ip-analyser/changelog.Debian.gz")
+    ant.delete(file: "${dist}/usr/share/doc/advanced-ip-analyser/changelog.Debian")
 
     ant.replace(file: "${dist}/DEBIAN/control") {
         ant.replacefilter(token: "VERSION", value: version)

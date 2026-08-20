@@ -1,9 +1,6 @@
 #!/bin/sh
-java=/usr/lib/advanced-ip-analyser/runtime/bin/java
-if [ ! -x "$java" ]; then
-    java=$JAVA_HOME/bin/java
-    [ ! -x "$java" ] && java=java
-fi
+java=$JAVA_HOME/bin/java
+[ ! -x "$java" ] && java=java
 "$java" --add-opens java.base/java.net=ALL-UNNAMED --enable-native-access=ALL-UNNAMED -jar /usr/lib*/ipscan/ipscan*.jar "$@"
 status=$?
 if [ "$status" -ne 0 ] && command -v notify-send >/dev/null 2>&1; then
