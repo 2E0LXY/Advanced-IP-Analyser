@@ -41,6 +41,7 @@ jobs:
           dpkg-deb --info "$package"
           dpkg-deb --contents "$package" > package-contents.txt
           grep -q './usr/share/doc/advanced-ip-analyser/copyright' package-contents.txt
+          grep -q './usr/share/man/man1/advanced-ip-analyser-gui.1.gz' package-contents.txt
           grep -q './usr/share/metainfo/advanced-ip-analyser.metainfo.xml' package-contents.txt
           grep -q './usr/share/icons/hicolor/scalable/apps/advanced-ip-analyser.svg' package-contents.txt
           lintian --fail-on error "$package"
