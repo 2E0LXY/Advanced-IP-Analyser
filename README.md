@@ -29,14 +29,20 @@ The CLI works without Tk:
 
 ## Debian package
 
-Download `advanced-ip-analyser_0.5.0_all.deb` from the GitHub Release and install
+Download `advanced-ip-analyser_0.5.1_all.deb` from the GitHub Release and install
 it with:
 
 ```sh
-sudo apt install ./advanced-ip-analyser_0.5.0_all.deb
+sudo apt install ./advanced-ip-analyser_0.5.1_all.deb
 ```
 
 Maintainers can reproduce the package locally with `./packaging/build-deb.sh`.
+
+Version 0.5.1 introduces automatic updates. Older releases do not contain the
+update checker, so install 0.5.1 manually once. Later releases are detected after
+startup: click the flashing update button to download the verified package,
+authorize Debian installation, close the current process, and reopen the updated
+application automatically. Help also includes a manual **Check for updates** action.
 
 Targets are limited to 65,536 addresses per invocation. The scanner checks a
 small, explicit set of common service ports. It collects bounded,
@@ -56,6 +62,8 @@ exploitation, or remote power operations.
 - Expandable host rows showing every detected TCP port and its service detail
 - Nested service fingerprints showing HTTP status, server software, page title,
   content type, redirects, authentication realm, TLS details, and safe protocol greetings when exposed
+- Automatic GitHub release checks with a flashing update button, verified `.deb`
+  download, Debian authorization, application restart, and a manual Help-window check
 - Alternating white and light-blue inventory rows for easier scanning
 - Clickable HTTP, HTTPS, FTP, SMB, SSH, and RDP service rows
 - Double-click, Enter, and right-click service activation plus expand/collapse-all controls

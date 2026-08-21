@@ -4,6 +4,7 @@
 - Implementation screenshot: `/tmp/advanced-ip-analyser-v040-main.png`
 - Service-fingerprint screenshot: `/tmp/advanced-ip-analyser-v050-fingerprints.png`
 - Service-fingerprint comparison: `/tmp/advanced-ip-analyser-v050-comparison.png`
+- Automatic-update button screenshot: `/tmp/advanced-ip-analyser-v051-update-button.png`
 - Help screenshot: `/tmp/advanced-ip-analyser-v040-help-final.png`
 - Combined comparison: `/tmp/advanced-ip-analyser-v040-design-comparison.png`
 - Source pixels: 653 x 425
@@ -68,6 +69,7 @@ remains distinct from both alternating host stripes and clickable blue rows.
 - Completed: selected, expanded, and collapsed states visually verified.
 - Completed: clickable service styling, footer version, and illustrated Help centre visually verified.
 - Completed: nested server fingerprints, including Apache/nginx names and HTTP/TLS details, visually verified at the native viewport.
+- Completed: the conditional update control is prominent without displacing the Help, version, attribution, or progress controls; both flashing colour states were exercised.
 
 ## Follow-up polish
 

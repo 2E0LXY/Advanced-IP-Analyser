@@ -15,6 +15,7 @@ from .network import active_ipv4_networks, current_ipv4_subnet
 from .scanner import DEFAULT_PORTS, Scanner
 from .storage import export, import_inventory, load_favorites, merge_devices, save_favorites
 from .targets import parse_targets
+from .updater import Update, check_for_update, download_update, launch_installer
 
 OPENABLE_SERVICES = {"http", "https", "ftp", "smb", "ssh", "rdp"}
 COMMON_PORTS = ",".join(str(port) for port in DEFAULT_PORTS)
@@ -34,6 +35,9 @@ class Application(tk.Tk):
         self.metadata_by_item = {}
         self.sort_descending = {}
         self.events: queue.Queue = queue.Queue()
+        self.update_events: queue.Queue = queue.Queue()
+        self.available_update: Update | None = None
+        self.update_flash_on = False
         self.cancel_scan = threading.Event()
         self.network_presets = []
         self.favorites_path = Path.home() / ".config" / "advanced-ip-analyser" / "favorites.json"
@@ -52,6 +56,10 @@ class Application(tk.Tk):
         style.map("Accent.TButton", background=[("active", "#62c985"), ("disabled", "#b9d9c4")])
         style.configure("Danger.TButton", background="#f3c7c7", foreground="#6e1717")
         style.map("Danger.TButton", background=[("active", "#efa9a9")])
+        style.configure("Update.TButton", background="#ffd34f", foreground="#3f2b00",
+                        font=("TkDefaultFont", 9, "bold"))
+        style.configure("UpdateFlash.TButton", background="#ff8a3d", foreground="#321300",
+                        font=("TkDefaultFont", 9, "bold"))
         style.configure("Treeview", background="#ffffff", fieldbackground="#ffffff", foreground="#17324d", rowheight=25)
         style.configure("Treeview.Heading", background="#80c7e8", foreground="#102f49", font=("TkDefaultFont", 9, "bold"))
         style.map("Treeview", background=[("selected", "#4aa8d8")], foreground=[("selected", "#ffffff")])
@@ -155,6 +163,10 @@ class Application(tk.Tk):
         ttk.Label(footer, text="© 2026 Daren Loxley (2E0LXY)").pack(side="right", padx=18)
         ttk.Label(footer, text=f"Version {__version__}").pack(side="right", padx=(0, 12))
         ttk.Button(footer, text="Help", command=self.show_help).pack(side="right", padx=(0, 8))
+        self.update_button = ttk.Button(footer, text="Update available", style="Update.TButton",
+                                        command=self.install_available_update)
+        self.update_button.pack(side="right", padx=(0, 8))
+        self.update_button.pack_forget()
         self.bind_all("<F5>", lambda _event: self.start_scan())
         self.bind_all("<Escape>", lambda _event: self.cancel_current_scan())
         self.bind_all("<Control-f>", lambda _event: self.filter_entry.focus_set())
@@ -162,6 +174,7 @@ class Application(tk.Tk):
         self.bind_all("<Control-s>", lambda _event: self.save_export())
         self.bind_all("<Control-Shift-C>", lambda _event: self.copy_selected_detail())
         self.refresh_subnets(show_errors=False)
+        self.after(1500, self.check_updates)
 
     def show_help(self) -> None:
         window = tk.Toplevel(self)
@@ -175,6 +188,8 @@ class Application(tk.Tk):
         ttk.Label(heading, text="Advanced IP Analyser Help",
                   font=("TkDefaultFont", 16, "bold")).pack(side="left")
         ttk.Button(heading, text="Close", command=window.destroy).pack(side="right", padx=(12, 0))
+        ttk.Button(heading, text="Check for updates",
+                   command=lambda: self.check_updates(manual=True)).pack(side="right", padx=(12, 0))
         ttk.Label(heading, text=f"Version {__version__}").pack(side="right")
 
         notebook = ttk.Notebook(window)
@@ -227,6 +242,78 @@ class Application(tk.Tk):
                 "Ctrl+O — import JSON or XML inventory\nCtrl+S — export inventory\nCtrl+Shift+C — copy selected host or service detail\n"
                 "Enter — open the selected supported service\nDouble-click — open a service row or the preferred web service\n"
                 "Right-click — open service, copy detail, expand all, or collapse all")
+
+    def check_updates(self, manual: bool = False) -> None:
+        if manual:
+            self.status.configure(text="Checking GitHub for updates…")
+        threading.Thread(target=self._check_updates_worker, args=(manual,), daemon=True).start()
+        self.after(50, self._drain_update_events)
+
+    def _check_updates_worker(self, manual: bool) -> None:
+        try:
+            update = check_for_update(__version__)
+            self.update_events.put(("available" if update else "current", update, manual))
+        except Exception as error:
+            self.update_events.put(("check_error", error, manual))
+
+    def _drain_update_events(self) -> None:
+        try:
+            event, value, manual = self.update_events.get_nowait()
+        except queue.Empty:
+            self.after(50, self._drain_update_events)
+            return
+        if event == "available":
+            self.available_update = value
+            self.update_button.configure(text=f"Update to v{value.version}")
+            self.update_button.pack(side="right", padx=(0, 8))
+            self.status.configure(text=f"Version {value.version} is available")
+            self._flash_update_button()
+        elif event == "current":
+            if manual:
+                messagebox.showinfo("No update available", f"Version {__version__} is the latest release.")
+            self.status.configure(text=f"Version {__version__} is up to date")
+        elif event == "downloaded":
+            try:
+                launch_installer(value)
+                self.status.configure(text="Starting the updater; the application will reopen when installation finishes…")
+                self.after(350, self.destroy)
+            except OSError as error:
+                self.update_button.configure(state="normal")
+                messagebox.showerror("Cannot start updater", str(error))
+        else:
+            self.update_button.configure(state="normal")
+            if manual or event == "download_error":
+                messagebox.showerror("Update failed", str(value))
+            if manual:
+                self.status.configure(text="Could not check for updates")
+
+    def _flash_update_button(self) -> None:
+        if not self.available_update or not self.update_button.winfo_ismapped():
+            return
+        self.update_flash_on = not self.update_flash_on
+        self.update_button.configure(style="UpdateFlash.TButton" if self.update_flash_on else "Update.TButton")
+        self.after(650, self._flash_update_button)
+
+    def install_available_update(self) -> None:
+        update = self.available_update
+        if not update:
+            return
+        if not messagebox.askyesno(
+                "Install update",
+                f"Download and install Advanced IP Analyser v{update.version}?\n\n"
+                "The application will close, Debian will request administrator authorization, "
+                "and the updated version will reopen automatically."):
+            return
+        self.update_button.configure(state="disabled", text=f"Downloading v{update.version}…")
+        self.status.configure(text=f"Downloading verified update v{update.version}…")
+        threading.Thread(target=self._download_update_worker, args=(update,), daemon=True).start()
+        self.after(50, self._drain_update_events)
+
+    def _download_update_worker(self, update: Update) -> None:
+        try:
+            self.update_events.put(("downloaded", download_update(update), True))
+        except Exception as error:
+            self.update_events.put(("download_error", error, True))
 
 
     def start_scan(self) -> None:

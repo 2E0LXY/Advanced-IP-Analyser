@@ -1,10 +1,10 @@
 Package: advanced-ip-analyser
-Version: 0.5.0
+Version: 0.5.1
 Section: net
 Priority: optional
 Architecture: all
 Maintainer: Daren Loxley <24845841+2E0LXY@users.noreply.github.com>
-Depends: python3 (>= 3.11), python3-tk, iputils-ping, iproute2, xdg-utils
+Depends: python3 (>= 3.11), python3-tk, iputils-ping, iproute2, xdg-utils, pkexec
 Recommends: ieee-data, nmap-common, openssh-client, freerdp3-x11, gvfs-backends
 Installed-Size: 100
 Homepage: https://github.com/2E0LXY/Advanced-IP-Analyser

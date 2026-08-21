@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.1 - 2026-08-21
+
+- Check the latest GitHub Release automatically after startup.
+- Show a flashing update button only when a newer Debian package is available.
+- Download the release with a size bound and published SHA-256 verification.
+- Validate the downloaded Debian package name and version before installation.
+- Close the running application, request administrator authorization through
+  Debian PolicyKit, install the package, and reopen the application automatically.
+- Add a manual Check for updates action to the Help window.
+
 ## 0.5.0 - 2026-08-21
 
 - Add bounded, unauthenticated fingerprinting for already-open HTTP, HTTPS, SSH,
