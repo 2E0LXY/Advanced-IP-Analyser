@@ -4,7 +4,7 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
   <name>Advanced IP Analyser</name>
-  <developer id="io.github._2E0LXY">
+  <developer>
     <name>Daren Loxley</name>
   </developer>
   <summary>Discover, inventory, and access authorized network devices</summary>
