@@ -14,6 +14,7 @@ class Host:
     manufacturer: str = ""
     services: list[str] = field(default_factory=list)
     ports: list[int] = field(default_factory=list)
+    service_info: dict[str, dict[str, str]] = field(default_factory=dict)
     seen_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     note: str = ""
 
@@ -35,6 +36,7 @@ class Host:
             manufacturer=observed.manufacturer or self.manufacturer,
             services=list(observed.services),
             ports=list(observed.ports),
+            service_info={port: dict(details) for port, details in observed.service_info.items()},
             seen_at=observed.seen_at if observed.reachable else self.seen_at,
             note=self.note,
         )

@@ -27,7 +27,10 @@ class StorageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "inventory.xml"
             expected = Host("192.0.2.2", reachable=True, latency_ms=3.5,
-                            mac="AA:BB:CC:DD:EE:FF", services=["ssh", "https"], ports=[22, 443], note="server")
+                            mac="AA:BB:CC:DD:EE:FF", services=["ssh", "https"], ports=[22, 443],
+                            service_info={"22": {"Banner": "SSH-2.0-OpenSSH_9.2"},
+                                          "443": {"Server": "Apache/2.4", "Status": "200 OK"}},
+                            note="server")
             export(path, [expected])
             actual = import_inventory(path)
             self.assertEqual(actual[0].to_dict(), expected.to_dict())

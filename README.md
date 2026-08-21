@@ -29,17 +29,18 @@ The CLI works without Tk:
 
 ## Debian package
 
-Download `advanced-ip-analyser_0.4.0_all.deb` from the GitHub Release and install
+Download `advanced-ip-analyser_0.5.0_all.deb` from the GitHub Release and install
 it with:
 
 ```sh
-sudo apt install ./advanced-ip-analyser_0.4.0_all.deb
+sudo apt install ./advanced-ip-analyser_0.5.0_all.deb
 ```
 
 Maintainers can reproduce the package locally with `./packaging/build-deb.sh`.
 
 Targets are limited to 65,536 addresses per invocation. The scanner checks a
-small, explicit set of common service ports and does not attempt authentication,
+small, explicit set of common service ports. It collects bounded,
+unauthenticated protocol metadata but does not attempt authentication,
 exploitation, or remote power operations.
 
 ## Current scope
@@ -53,6 +54,8 @@ exploitation, or remote power operations.
 - Reachable-host-only table and exports; down addresses remain progress-only
 - Live filtering across addresses, names, MACs, manufacturers, and services
 - Expandable host rows showing every detected TCP port and its service detail
+- Nested service fingerprints showing HTTP status, server software, page title,
+  content type, redirects, authentication realm, TLS details, and safe protocol greetings when exposed
 - Alternating white and light-blue inventory rows for easier scanning
 - Clickable HTTP, HTTPS, FTP, SMB, SSH, and RDP service rows
 - Double-click, Enter, and right-click service activation plus expand/collapse-all controls
@@ -80,7 +83,8 @@ Copyright © 2026 Daren Loxley (2E0LXY).
    number of authorized targets because filtered ports can take a long time.
 3. Select discovered rows to copy addresses, save favorites, send Wake-on-LAN,
    open detected services, or export an inventory.
-   Expand a host to inspect individual ports. Open supported service rows with a
+   Expand a host to inspect individual ports, then expand a port to inspect any
+   server metadata it safely exposed. Open supported service rows with a
    double-click, Enter, the right-click menu, or the links below the table.
 4. Use **Refresh favorites** to rescan saved addresses. Devices with a discovered
    MAC address retain their identity, notes, and updated IP address.

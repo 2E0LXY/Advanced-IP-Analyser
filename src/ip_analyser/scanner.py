@@ -9,6 +9,7 @@ import threading
 from collections.abc import Callable, Iterable
 
 from .models import Host
+from .fingerprints import probe_service
 from .vendors import MacVendorLookup
 
 DEFAULT_PORTS = {
@@ -66,6 +67,15 @@ class Scanner:
                                       if future.result())
             open_ports.sort()
         services = [name for _port, name in open_ports]
+        service_info: dict[str, dict[str, str]] = {}
+        if open_ports:
+            fingerprint_timeout = min(2.0, max(0.5, self.timeout * 3))
+            with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(open_ports))) as pool:
+                probes = {pool.submit(probe_service, address, port, name, fingerprint_timeout): port
+                          for port, name in open_ports}
+                for future in concurrent.futures.as_completed(probes):
+                    if details := future.result():
+                        service_info[str(probes[future])] = details
         reachable = bool(services) or self._ping(address)
         latency = round((time.monotonic() - started) * 1000, 1) if reachable else None
         hostname = ""
@@ -77,7 +87,7 @@ class Scanner:
         mac = self._neighbour_mac(address)
         return Host(address=address, reachable=reachable, hostname=hostname, latency_ms=latency,
                     mac=mac, manufacturer=self.vendors.lookup(mac) if mac else "", services=services,
-                    ports=[port for port, _name in open_ports])
+                    ports=[port for port, _name in open_ports], service_info=service_info)
 
     def _port_open(self, address: str, port: int) -> bool:
         try:

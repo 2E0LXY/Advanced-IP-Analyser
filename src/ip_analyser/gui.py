@@ -31,6 +31,7 @@ class Application(tk.Tk):
         self.results = []
         self.hosts_by_item = {}
         self.services_by_item = {}
+        self.metadata_by_item = {}
         self.sort_descending = {}
         self.events: queue.Queue = queue.Queue()
         self.cancel_scan = threading.Event()
@@ -126,6 +127,7 @@ class Application(tk.Tk):
         self.table.tag_configure("detail", background="#f1f9fe", foreground="#315c78")
         self.table.tag_configure("detail_click", background="#f1f9fe", foreground="#0969b0",
                                  font=("TkDefaultFont", 9, "underline"))
+        self.table.tag_configure("metadata", background="#f8fcff", foreground="#315c78")
         self.table.bind("<<TreeviewSelect>>", self._show_web_links)
         self.table.bind("<Double-1>", self._open_row_web_service)
         self.table.bind("<Return>", self._activate_selected_row)
@@ -204,7 +206,10 @@ class Application(tk.Tk):
                 "A disclosure arrow appears beside every host with detected TCP ports. Expand it to see one row per port.\n\n"
                 "Blue underlined service rows are openable. Double-click one, select it and press Enter, or right-click and choose Open service. "
                 "HTTP, HTTPS, and FTP use the desktop URL handler; SMB uses the file manager; SSH opens a terminal; RDP uses FreeRDP. "
-                "Right-click to copy a row detail or expand/collapse every host. Parent-row double-click opens HTTPS or HTTP when available.",
+                "Expand a port row again to see safely discovered details such as the HTTP status, Apache/nginx/IIS Server header, page title, "
+                "content type, redirect, authentication realm, TLS version/cipher, or a protocol greeting. Availability depends on what the server exposes.\n\n"
+                "Right-click to copy a row detail or expand/collapse every host. Parent-row double-click opens HTTPS or HTTP when available. "
+                "Discovery is read-only, bounded, and never attempts authentication.",
                 "help-port-details.png")
         add_tab("Favorites and inventory",
                 "Add favorite stores selected devices in ~/.config/advanced-ip-analyser/favorites.json. Devices are identified by MAC address first, "
@@ -243,6 +248,7 @@ class Application(tk.Tk):
         self.results.clear()
         self.hosts_by_item.clear()
         self.services_by_item.clear()
+        self.metadata_by_item.clear()
         self.table.delete(*self.table.get_children())
         self.scan_button.configure(state="disabled")
         self.cancel_button.configure(state="normal")
@@ -321,16 +327,26 @@ class Application(tk.Tk):
         self.hosts_by_item[item] = host
         for port, service in zip(host.ports, host.services):
             detail = service_url(service, host.address, port) if service in {"http", "https", "ftp"} else f"TCP {port} · {service}"
+            info = host.service_info.get(str(port), {})
+            server = info.get("Server") or info.get("Banner", "")
+            service_label = service.upper() + (f" · {server}" if server else "")
+            summary = info.get("Page title") or info.get("Status") or detail
             clickable = service in OPENABLE_SERVICES
             child = self.table.insert(item, "end", text=str(port),
-                                      values=("", "Open", service.upper(), "", "", "", detail),
+                                      values=("", "Open", service_label, "", "", "", summary),
                                       tags=(("detail_click" if clickable else "detail"),))
             self.services_by_item[child] = (host, service, port)
+            for label, value in info.items():
+                metadata = self.table.insert(child, "end", text="",
+                    values=("", "Detail", label, "", "", "", value), tags=("metadata",))
+                self.metadata_by_item[metadata] = (label, value)
 
     def _matches_filter(self, host: Host) -> bool:
         term = self.filter_text.get().strip().casefold()
+        metadata = " ".join(f"{label} {value}" for details in host.service_info.values()
+                            for label, value in details.items())
         return not term or term in " ".join((host.address, host.hostname, host.mac, host.manufacturer,
-                                              " ".join(host.services), host.note)).casefold()
+                                              " ".join(host.services), metadata, host.note)).casefold()
 
     def _refresh_table(self) -> None:
         if not hasattr(self, "table"):
@@ -338,6 +354,7 @@ class Application(tk.Tk):
         self.table.delete(*self.table.get_children())
         self.hosts_by_item.clear()
         self.services_by_item.clear()
+        self.metadata_by_item.clear()
         for host in self.results:
             if self._matches_filter(host):
                 self._insert_host(host)
@@ -530,6 +547,10 @@ class Application(tk.Tk):
             else:
                 self.status.configure(text=f"Port {port} {service.upper()} is open; no desktop opener is configured")
             return
+        metadata = self.metadata_by_item.get(selected_item)
+        if metadata:
+            self.status.configure(text=f"{metadata[0]}: {metadata[1]}")
+            return
         host = self.hosts_by_item.get(selected_item)
         if not host:
             return
@@ -606,6 +627,9 @@ class Application(tk.Tk):
             value = service_url(service, host.address, port) if service in {"http", "https", "ftp"} else f"{host.address}:{port} ({service})"
         elif item in self.hosts_by_item:
             value = self.hosts_by_item[item].address
+        elif item in self.metadata_by_item:
+            label, detail = self.metadata_by_item[item]
+            value = f"{label}: {detail}"
         else:
             return
         self.clipboard_clear()
@@ -613,9 +637,15 @@ class Application(tk.Tk):
         self.status.configure(text=f"Copied {value}")
 
     def set_all_expanded(self, expanded: bool) -> None:
-        for item in self.table.get_children(""):
-            if self.table.get_children(item):
+        def set_branch(item: str) -> None:
+            children = self.table.get_children(item)
+            if children:
                 self.table.item(item, open=expanded)
+                for child in children:
+                    set_branch(child)
+
+        for item in self.table.get_children(""):
+            set_branch(item)
 
     def _sort_column(self, column: str) -> None:
         descending = not self.sort_descending.get(column, True)

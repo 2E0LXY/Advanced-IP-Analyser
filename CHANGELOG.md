@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0 - 2026-08-21
+
+- Add bounded, unauthenticated fingerprinting for already-open HTTP, HTTPS, SSH,
+  FTP, SMTP, POP3, and IMAP services.
+- Discover HTTP status, server software, powered-by header, content type, page
+  title, redirects, authentication realm, TLS protocol/cipher, and safe greetings
+  when the remote service exposes them.
+- Add a third expandable table level beneath ports for named service metadata.
+- Include detected server details in filtering, favorites, JSON/XML inventory,
+  and CSV exports.
+- Extend the built-in Help centre with fingerprinting behavior and safety limits.
+
 ## 0.4.0 - 2026-08-20
 
 - Add a blue desktop colour system with clear action and danger states.

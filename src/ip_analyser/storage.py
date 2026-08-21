@@ -44,10 +44,11 @@ def export(path: Path, hosts: list[Host]) -> None:
     elif suffix == ".csv":
         with path.open("w", newline="") as stream:
             writer = csv.writer(stream)
-            writer.writerow(["address", "reachable", "hostname", "latency_ms", "mac", "manufacturer", "services", "ports", "seen_at", "note"])
+            writer.writerow(["address", "reachable", "hostname", "latency_ms", "mac", "manufacturer", "services", "ports", "service_info", "seen_at", "note"])
             for host in hosts:
                 writer.writerow([host.address, host.reachable, host.hostname, host.latency_ms, host.mac, host.manufacturer,
-                                 ",".join(host.services), ",".join(str(port) for port in host.ports), host.seen_at, host.note])
+                                 ",".join(host.services), ",".join(str(port) for port in host.ports),
+                                 json.dumps(host.service_info, sort_keys=True), host.seen_at, host.note])
     elif suffix in {".html", ".htm"}:
         rows = "".join("<tr>" + "".join(f"<td>{html.escape(str(value))}</td>" for value in
             [h.address, h.hostname, h.mac, h.manufacturer, ", ".join(h.services), h.seen_at]) + "</tr>" for h in hosts)
@@ -60,7 +61,12 @@ def export(path: Path, hosts: list[Host]) -> None:
             device = ET.SubElement(root, "device")
             for key, value in host.to_dict().items():
                 child = ET.SubElement(device, key)
-                child.text = ",".join(str(item) for item in value) if isinstance(value, list) else str(value if value is not None else "")
+                if isinstance(value, list):
+                    child.text = ",".join(str(item) for item in value)
+                elif isinstance(value, dict):
+                    child.text = json.dumps(value, sort_keys=True)
+                else:
+                    child.text = str(value if value is not None else "")
         ET.indent(root)
         ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
     else:
@@ -86,6 +92,10 @@ def import_inventory(path: Path, limit: int = 65_536) -> list[Host]:
             value = {child.tag: child.text or "" for child in device}
             value["services"] = [item for item in value.get("services", "").split(",") if item]
             value["ports"] = [int(item) for item in value.get("ports", "").split(",") if item]
+            try:
+                value["service_info"] = json.loads(value.get("service_info", "") or "{}")
+            except json.JSONDecodeError as error:
+                raise ValueError("invalid service metadata in inventory XML") from error
             value["reachable"] = value.get("reachable", "").casefold() == "true"
             latency = value.get("latency_ms", "")
             value["latency_ms"] = float(latency) if latency else None

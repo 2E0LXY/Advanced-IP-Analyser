@@ -2,6 +2,8 @@
 
 - Source visual truth: `/tmp/codex-clipboard-274cefba-4d5e-45cc-88fb-24d61367208e.png`
 - Implementation screenshot: `/tmp/advanced-ip-analyser-v040-main.png`
+- Service-fingerprint screenshot: `/tmp/advanced-ip-analyser-v050-fingerprints.png`
+- Service-fingerprint comparison: `/tmp/advanced-ip-analyser-v050-comparison.png`
 - Help screenshot: `/tmp/advanced-ip-analyser-v040-help-final.png`
 - Combined comparison: `/tmp/advanced-ip-analyser-v040-design-comparison.png`
 - Source pixels: 653 x 425
@@ -35,6 +37,13 @@ are visible without clipping at the tested viewport.
 
 No actionable P0, P1, or P2 mismatch remains for the requested changes.
 
+The v0.5.0 comparison adds the requested third tree level without changing the
+established layout or colour system. The selected HTTP row clearly identifies
+Apache in-line, while its expanded children separate Status, Server, Powered by,
+Content type, and Page title into readable label/value rows. Native arrows make
+the host-to-port-to-metadata hierarchy unambiguous, and the pale metadata surface
+remains distinct from both alternating host stripes and clickable blue rows.
+
 ## Required fidelity surfaces
 
 - Fonts and typography: native Tk/KDE UI font is consistent across controls and table; bold table headers establish hierarchy.
@@ -58,6 +67,7 @@ No actionable P0, P1, or P2 mismatch remains for the requested changes.
 - Completed: expandable host parents with per-port child details.
 - Completed: selected, expanded, and collapsed states visually verified.
 - Completed: clickable service styling, footer version, and illustrated Help centre visually verified.
+- Completed: nested server fingerprints, including Apache/nginx names and HTTP/TLS details, visually verified at the native viewport.
 
 ## Follow-up polish
 
