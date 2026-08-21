@@ -12,3 +12,7 @@ class PortConfigTests(unittest.TestCase):
         for value in ("", "0", "65536", "90-80"):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 parse_ports(value)
+
+    def test_all_tcp_ports_requires_explicit_large_limit(self):
+        ports = parse_ports("1-65535", limit=65_535)
+        self.assertEqual((len(ports), min(ports), max(ports)), (65_535, 1, 65_535))

@@ -5,6 +5,5 @@ Comment=Discover and inventory authorized network hosts
 Exec=advanced-ip-analyser-gui
 Icon=network-workgroup
 Terminal=false
-Categories=Network;System;
+Categories=Network;
 Keywords=network;scanner;inventory;wake-on-lan;
-

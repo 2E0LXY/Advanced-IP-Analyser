@@ -11,7 +11,16 @@ from collections.abc import Callable, Iterable
 from .models import Host
 from .vendors import MacVendorLookup
 
-DEFAULT_PORTS = {21: "ftp", 22: "ssh", 53: "dns", 80: "http", 139: "netbios", 443: "https", 445: "smb", 3389: "rdp"}
+DEFAULT_PORTS = {
+    20: "ftp-data", 21: "ftp", 22: "ssh", 23: "telnet", 25: "smtp", 53: "dns",
+    80: "http", 110: "pop3", 135: "rpc", 139: "netbios", 143: "imap", 389: "ldap",
+    443: "https", 445: "smb", 465: "smtps", 587: "submission", 631: "ipp",
+    636: "ldaps", 873: "rsync", 993: "imaps", 995: "pop3s", 1433: "mssql",
+    1521: "oracle", 2049: "nfs", 3000: "http", 3306: "mysql", 3389: "rdp",
+    5000: "http", 5432: "postgresql", 5900: "vnc", 6379: "redis", 8000: "http",
+    8080: "http", 8081: "http", 8443: "https", 8888: "http", 9000: "http",
+    9090: "http", 9100: "printer", 9200: "elasticsearch", 27017: "mongodb",
+}
 
 
 class Scanner:
@@ -26,7 +35,8 @@ class Scanner:
              cancel: threading.Event | None = None) -> list[Host]:
         addresses = list(targets)
         results: list[Host] = []
-        pool = concurrent.futures.ThreadPoolExecutor(max_workers=self.workers)
+        host_workers = self.workers if len(self.ports) <= 1024 else min(4, self.workers)
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=host_workers)
         futures = {pool.submit(self.inspect, address): address for address in addresses}
         try:
             for done, future in enumerate(concurrent.futures.as_completed(futures), 1):
@@ -43,7 +53,19 @@ class Scanner:
 
     def inspect(self, address: str) -> Host:
         started = time.monotonic()
-        services = [name for port, name in self.ports.items() if self._port_open(address, port)]
+        if len(self.ports) <= 1024:
+            open_ports = [(port, name) for port, name in self.ports.items() if self._port_open(address, port)]
+        else:
+            open_ports = []
+            port_items = list(self.ports.items())
+            with concurrent.futures.ThreadPoolExecutor(max_workers=min(128, max(8, self.workers))) as pool:
+                for start in range(0, len(port_items), 2048):
+                    checks = {pool.submit(self._port_open, address, port): (port, name)
+                              for port, name in port_items[start:start + 2048]}
+                    open_ports.extend(checks[future] for future in concurrent.futures.as_completed(checks)
+                                      if future.result())
+            open_ports.sort()
+        services = [name for _port, name in open_ports]
         reachable = bool(services) or self._ping(address)
         latency = round((time.monotonic() - started) * 1000, 1) if reachable else None
         hostname = ""
@@ -54,7 +76,8 @@ class Scanner:
                 pass
         mac = self._neighbour_mac(address)
         return Host(address=address, reachable=reachable, hostname=hostname, latency_ms=latency,
-                    mac=mac, manufacturer=self.vendors.lookup(mac) if mac else "", services=services)
+                    mac=mac, manufacturer=self.vendors.lookup(mac) if mac else "", services=services,
+                    ports=[port for port, _name in open_ports])
 
     def _port_open(self, address: str, port: int) -> bool:
         try:

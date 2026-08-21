@@ -7,13 +7,18 @@ import ipaddress
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
+from . import __version__
 from .actions import open_service, preferred_web_service, remote_power, service_url, wake
 from .config import parse_ports
 from .models import Host
 from .network import active_ipv4_networks, current_ipv4_subnet
-from .scanner import Scanner
+from .scanner import DEFAULT_PORTS, Scanner
 from .storage import export, import_inventory, load_favorites, merge_devices, save_favorites
 from .targets import parse_targets
+
+OPENABLE_SERVICES = {"http", "https", "ftp", "smb", "ssh", "rdp"}
+COMMON_PORTS = ",".join(str(port) for port in DEFAULT_PORTS)
+WEB_APP_PORTS = "80,443,3000,5000,8000,8080,8081,8443,8888,9000,9090"
 
 
 class Application(tk.Tk):
@@ -22,14 +27,33 @@ class Application(tk.Tk):
         self.title("Advanced IP Analyser")
         self.geometry("1200x620")
         self.minsize(720, 420)
+        self.configure(background="#d9f0fb")
         self.results = []
         self.hosts_by_item = {}
+        self.services_by_item = {}
         self.sort_descending = {}
         self.events: queue.Queue = queue.Queue()
         self.cancel_scan = threading.Event()
         self.network_presets = []
         self.favorites_path = Path.home() / ".config" / "advanced-ip-analyser" / "favorites.json"
+        self._configure_styles()
         self._build()
+
+    def _configure_styles(self) -> None:
+        style = ttk.Style(self)
+        if "clam" in style.theme_names():
+            style.theme_use("clam")
+        style.configure("TFrame", background="#d9f0fb")
+        style.configure("TLabel", background="#d9f0fb", foreground="#17324d")
+        style.configure("TButton", padding=(9, 5), background="#d7eefa", foreground="#17324d")
+        style.map("TButton", background=[("active", "#b9e0f4")])
+        style.configure("Accent.TButton", background="#42b96d", foreground="#082b16", font=("TkDefaultFont", 9, "bold"))
+        style.map("Accent.TButton", background=[("active", "#62c985"), ("disabled", "#b9d9c4")])
+        style.configure("Danger.TButton", background="#f3c7c7", foreground="#6e1717")
+        style.map("Danger.TButton", background=[("active", "#efa9a9")])
+        style.configure("Treeview", background="#ffffff", fieldbackground="#ffffff", foreground="#17324d", rowheight=25)
+        style.configure("Treeview.Heading", background="#80c7e8", foreground="#102f49", font=("TkDefaultFont", 9, "bold"))
+        style.map("Treeview", background=[("selected", "#4aa8d8")], foreground=[("selected", "#ffffff")])
 
     def _build(self) -> None:
         header = ttk.Frame(self, padding=12)
@@ -42,7 +66,7 @@ class Application(tk.Tk):
         self.subnets.pack(side="left", padx=(0, 8))
         self.subnets.bind("<<ComboboxSelected>>", self.use_selected_subnet)
         ttk.Button(header, text="Interfaces", command=self.refresh_subnets).pack(side="left", padx=(0, 8))
-        self.scan_button = ttk.Button(header, text="Scan", command=self.start_scan)
+        self.scan_button = ttk.Button(header, text="Scan", command=self.start_scan, style="Accent.TButton")
         self.scan_button.pack(side="left")
         self.cancel_button = ttk.Button(header, text="Cancel", command=self.cancel_current_scan, state="disabled")
         self.cancel_button.pack(side="left", padx=(8, 0))
@@ -53,8 +77,15 @@ class Application(tk.Tk):
         settings.pack(fill="x")
         ttk.Label(settings, text="TCP ports").pack(side="left")
         self.ports = ttk.Entry(settings, width=34)
-        self.ports.insert(0, "21,22,53,80,139,443,445,3389")
+        self.ports.insert(0, COMMON_PORTS)
         self.ports.pack(side="left", padx=(6, 12))
+        self.ports.bind("<Button-3>", self._show_ports_menu)
+        self.ports_menu = tk.Menu(self, tearoff=False)
+        self.ports_menu.add_command(label="Common service ports", command=lambda: self.set_port_preset(COMMON_PORTS))
+        self.ports_menu.add_command(label="Web and application ports", command=lambda: self.set_port_preset(WEB_APP_PORTS))
+        self.ports_menu.add_command(label="All TCP ports (1–65535)", command=self.set_all_ports)
+        self.ports_menu.add_separator()
+        self.ports_menu.add_command(label="Clear", command=lambda: self.set_port_preset(""))
         ttk.Label(settings, text="Timeout (s)").pack(side="left")
         self.timeout = ttk.Spinbox(settings, from_=0.05, to=10, increment=0.05, width=6)
         self.timeout.set("0.35")
@@ -66,7 +97,8 @@ class Application(tk.Tk):
         ttk.Label(settings, text="Filter").pack(side="left")
         self.filter_text = tk.StringVar()
         self.filter_text.trace_add("write", lambda *_args: self._refresh_table())
-        ttk.Entry(settings, textvariable=self.filter_text).pack(side="left", fill="x", expand=True, padx=(6, 0))
+        self.filter_entry = ttk.Entry(settings, textvariable=self.filter_text)
+        self.filter_entry.pack(side="left", fill="x", expand=True, padx=(6, 0))
 
         actions = ttk.Frame(self, padding=(12, 0, 12, 8))
         actions.pack(fill="x")
@@ -75,24 +107,40 @@ class Application(tk.Tk):
         ttk.Button(actions, text="View favorites", command=self.show_favorites).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Refresh favorites", command=self.refresh_favorites).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Wake", command=self.wake_selected).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Shutdown", command=lambda: self.power_selected("shutdown")).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Reboot", command=lambda: self.power_selected("reboot")).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Shutdown", command=lambda: self.power_selected("shutdown"), style="Danger.TButton").pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Reboot", command=lambda: self.power_selected("reboot"), style="Danger.TButton").pack(side="left", padx=(8, 0))
         ttk.Label(actions, text="Export uses selected rows when any are selected.").pack(side="right")
 
         columns = ("address", "state", "hostname", "latency", "mac", "manufacturer", "services")
-        self.table = ttk.Treeview(self, columns=columns, show="headings", selectmode="extended")
+        self.table = ttk.Treeview(self, columns=columns, show="tree headings", selectmode="extended")
+        self.table.heading("#0", text="Ports")
+        self.table.column("#0", width=70, minwidth=55, stretch=False, anchor="w")
         widths = (130, 55, 190, 75, 135, 210, 260)
         for column, width in zip(columns, widths):
             self.table.heading(column, text=column.replace("_", " ").title(),
                                command=lambda selected=column: self._sort_column(selected))
             self.table.column(column, width=width, anchor="w")
         self.table.pack(fill="both", expand=True, padx=12)
+        self.table.tag_configure("even", background="#ffffff")
+        self.table.tag_configure("odd", background="#e4f5ff")
+        self.table.tag_configure("detail", background="#f1f9fe", foreground="#315c78")
+        self.table.tag_configure("detail_click", background="#f1f9fe", foreground="#0969b0",
+                                 font=("TkDefaultFont", 9, "underline"))
         self.table.bind("<<TreeviewSelect>>", self._show_web_links)
         self.table.bind("<Double-1>", self._open_row_web_service)
+        self.table.bind("<Return>", self._activate_selected_row)
+        self.table.bind("<Button-3>", self._show_table_menu)
+
+        self.table_menu = tk.Menu(self, tearoff=False)
+        self.table_menu.add_command(label="Open service", command=self._activate_selected_row)
+        self.table_menu.add_command(label="Copy row detail", command=self.copy_selected_detail)
+        self.table_menu.add_separator()
+        self.table_menu.add_command(label="Expand all ports", command=lambda: self.set_all_expanded(True))
+        self.table_menu.add_command(label="Collapse all ports", command=lambda: self.set_all_expanded(False))
 
         self.links = ttk.Frame(self, padding=(12, 8, 12, 0))
         self.links.pack(fill="x")
-        ttk.Label(self.links, text="Web links:").pack(side="left")
+        ttk.Label(self.links, text="Open services:").pack(side="left")
         self.link_area = ttk.Frame(self.links)
         self.link_area.pack(side="left", padx=8)
 
@@ -103,12 +151,83 @@ class Application(tk.Tk):
         self.progress = ttk.Progressbar(footer, mode="determinate", length=220)
         self.progress.pack(side="right")
         ttk.Label(footer, text="© 2026 Daren Loxley (2E0LXY)").pack(side="right", padx=18)
+        ttk.Label(footer, text=f"Version {__version__}").pack(side="right", padx=(0, 12))
+        ttk.Button(footer, text="Help", command=self.show_help).pack(side="right", padx=(0, 8))
+        self.bind_all("<F5>", lambda _event: self.start_scan())
+        self.bind_all("<Escape>", lambda _event: self.cancel_current_scan())
+        self.bind_all("<Control-f>", lambda _event: self.filter_entry.focus_set())
+        self.bind_all("<Control-o>", lambda _event: self.load_inventory())
+        self.bind_all("<Control-s>", lambda _event: self.save_export())
+        self.bind_all("<Control-Shift-C>", lambda _event: self.copy_selected_detail())
         self.refresh_subnets(show_errors=False)
+
+    def show_help(self) -> None:
+        window = tk.Toplevel(self)
+        window.title(f"Advanced IP Analyser Help · {__version__}")
+        window.geometry("1000x820")
+        window.minsize(760, 560)
+        window.transient(self)
+
+        heading = ttk.Frame(window, padding=(18, 14, 18, 8))
+        heading.pack(fill="x")
+        ttk.Label(heading, text="Advanced IP Analyser Help",
+                  font=("TkDefaultFont", 16, "bold")).pack(side="left")
+        ttk.Button(heading, text="Close", command=window.destroy).pack(side="right", padx=(12, 0))
+        ttk.Label(heading, text=f"Version {__version__}").pack(side="right")
+
+        notebook = ttk.Notebook(window)
+        notebook.pack(fill="both", expand=True, padx=18, pady=(0, 12))
+        assets = Path(__file__).with_name("assets")
+        window.help_images = []
+
+        def add_tab(title: str, body: str, image_name: str | None = None) -> None:
+            tab = ttk.Frame(notebook, padding=16)
+            notebook.add(tab, text=title)
+            ttk.Label(tab, text=title, font=("TkDefaultFont", 13, "bold")).pack(anchor="w")
+            ttk.Label(tab, text=body, justify="left", wraplength=920).pack(anchor="w", fill="x", pady=(8, 12))
+            if image_name:
+                try:
+                    picture = tk.PhotoImage(file=assets / image_name)
+                    window.help_images.append(picture)
+                    ttk.Label(tab, image=picture).pack(anchor="center", pady=(4, 0))
+                except tk.TclError:
+                    ttk.Label(tab, text="Help image is unavailable in this installation.").pack(anchor="w")
+
+        add_tab("Getting started",
+                "1. Choose an active interface preset or enter one IP, an inclusive range, or a CIDR.\n"
+                "2. Set the TCP ports, timeout, and worker count. The defaults cover common network services.\n"
+                "3. Press Scan (F5). Reachable devices appear as they are found; press Escape to cancel safely.\n"
+                "4. Use Filter (Ctrl+F) to search addresses, names, MACs, manufacturers, services, and notes.\n\n"
+                "Only scan networks and devices you own or are authorized to administer.",
+                "help-overview.png")
+        add_tab("Ports and services",
+                "A disclosure arrow appears beside every host with detected TCP ports. Expand it to see one row per port.\n\n"
+                "Blue underlined service rows are openable. Double-click one, select it and press Enter, or right-click and choose Open service. "
+                "HTTP, HTTPS, and FTP use the desktop URL handler; SMB uses the file manager; SSH opens a terminal; RDP uses FreeRDP. "
+                "Right-click to copy a row detail or expand/collapse every host. Parent-row double-click opens HTTPS or HTTP when available.",
+                "help-port-details.png")
+        add_tab("Favorites and inventory",
+                "Add favorite stores selected devices in ~/.config/advanced-ip-analyser/favorites.json. Devices are identified by MAC address first, "
+                "so a later scan can update an IP address without losing the saved note. Refresh favorites rescans saved addresses.\n\n"
+                "Export writes selected rows—or all visible rows when nothing is selected—to CSV, JSON, XML, or escaped HTML. "
+                "Import accepts this application's bounded JSON and XML formats and merges devices into the table and favorites. "
+                "Use Ctrl+O to import and Ctrl+S to export.")
+        add_tab("Device actions",
+                "Copy IP copies selected host addresses. Wake sends a confirmed Wake-on-LAN magic packet to selected devices with MAC addresses.\n\n"
+                "Shutdown and Reboot require confirmation and use non-interactive SSH. Configure SSH keys and passwordless permission for "
+                "systemctl poweroff or systemctl reboot on machines you administer. The application never asks for, stores, or forwards passwords. "
+                "Remote results are reported per host. Detected service links never bypass authentication.")
+        add_tab("Shortcuts",
+                "F5 — start a scan\nEscape — cancel the active scan\nCtrl+F — focus the live filter\n"
+                "Ctrl+O — import JSON or XML inventory\nCtrl+S — export inventory\nCtrl+Shift+C — copy selected host or service detail\n"
+                "Enter — open the selected supported service\nDouble-click — open a service row or the preferred web service\n"
+                "Right-click — open service, copy detail, expand all, or collapse all")
+
 
     def start_scan(self) -> None:
         try:
             targets = parse_targets(self.target.get())
-            ports = parse_ports(self.ports.get())
+            ports = parse_ports(self.ports.get(), limit=65_535)
             timeout = float(self.timeout.get())
             workers = int(self.workers.get())
             if timeout < 0.05 or workers < 1 or workers > 512:
@@ -116,8 +235,14 @@ class Application(tk.Tk):
         except (ValueError, TypeError) as error:
             messagebox.showerror("Invalid scan settings", str(error))
             return
+        if len(ports) > 1024 and not messagebox.askyesno(
+                "Confirm full TCP scan",
+                f"Scan {len(ports):,} TCP ports on {len(targets):,} target(s)?\n\n"
+                "This can take a long time, especially when firewalls silently drop connections."):
+            return
         self.results.clear()
         self.hosts_by_item.clear()
+        self.services_by_item.clear()
         self.table.delete(*self.table.get_children())
         self.scan_button.configure(state="disabled")
         self.cancel_button.configure(state="normal")
@@ -125,6 +250,20 @@ class Application(tk.Tk):
         self.progress.configure(maximum=len(targets), value=0)
         threading.Thread(target=self._scan_worker, args=(targets, ports, timeout, workers), daemon=True).start()
         self.after(50, self._drain_events)
+
+    def _show_ports_menu(self, event) -> None:
+        self.ports_menu.tk_popup(event.x_root, event.y_root)
+
+    def set_port_preset(self, value: str) -> None:
+        self.ports.delete(0, "end")
+        self.ports.insert(0, value)
+        self.status.configure(text="TCP port preset updated")
+
+    def set_all_ports(self) -> None:
+        if messagebox.askyesno("Use all TCP ports",
+                               "Set the scan to all 65,535 TCP ports?\n\n"
+                               "Use this on a small number of authorized targets. A full subnet scan may take a long time."):
+            self.set_port_preset("1-65535")
 
     def _scan_worker(self, targets: list[str], ports: dict[int, str], timeout: float, workers: int) -> None:
         try:
@@ -173,11 +312,20 @@ class Application(tk.Tk):
             self.after(50, self._drain_events)
 
     def _insert_host(self, host: Host) -> None:
-        web_services = [service_url(service, host.address) if service in {"http", "https"} else service
-                        for service in host.services]
-        item = self.table.insert("", "end", values=(host.address, "Up", host.hostname,
-            host.latency_ms or "", host.mac, host.manufacturer, ", ".join(web_services)))
+        web_services = [service_url(service, host.address, port) if service in {"http", "https"} else service
+                        for port, service in zip(host.ports, host.services)]
+        stripe = "even" if len(self.table.get_children("")) % 2 == 0 else "odd"
+        item = self.table.insert("", "end", text=f"{len(host.ports)} port{'s' if len(host.ports) != 1 else ''}",
+            values=(host.address, "Up", host.hostname, host.latency_ms or "", host.mac,
+                    host.manufacturer, ", ".join(web_services)), tags=(stripe,))
         self.hosts_by_item[item] = host
+        for port, service in zip(host.ports, host.services):
+            detail = service_url(service, host.address, port) if service in {"http", "https", "ftp"} else f"TCP {port} · {service}"
+            clickable = service in OPENABLE_SERVICES
+            child = self.table.insert(item, "end", text=str(port),
+                                      values=("", "Open", service.upper(), "", "", "", detail),
+                                      tags=(("detail_click" if clickable else "detail"),))
+            self.services_by_item[child] = (host, service, port)
 
     def _matches_filter(self, host: Host) -> bool:
         term = self.filter_text.get().strip().casefold()
@@ -189,6 +337,7 @@ class Application(tk.Tk):
             return
         self.table.delete(*self.table.get_children())
         self.hosts_by_item.clear()
+        self.services_by_item.clear()
         for host in self.results:
             if self._matches_filter(host):
                 self._insert_host(host)
@@ -276,7 +425,7 @@ class Application(tk.Tk):
         self.target.insert(0, f"{favorites[0].address}-{favorites[-1].address}" if len(favorites) > 1 else favorites[0].address)
         targets = [host.address for host in favorites]
         try:
-            ports = parse_ports(self.ports.get())
+            ports = parse_ports(self.ports.get(), limit=65_535)
             timeout, workers = float(self.timeout.get()), int(self.workers.get())
         except ValueError as error:
             messagebox.showerror("Invalid scan settings", str(error))
@@ -372,28 +521,101 @@ class Application(tk.Tk):
         selected = self.table.selection()
         if not selected:
             return
-        host = self.hosts_by_item.get(selected[0])
+        selected_item = selected[0]
+        service_detail = self.services_by_item.get(selected_item)
+        if service_detail:
+            _host, service, port = service_detail
+            if service in OPENABLE_SERVICES:
+                self.status.configure(text=f"Port {port} {service.upper()} · double-click or press Enter to open")
+            else:
+                self.status.configure(text=f"Port {port} {service.upper()} is open; no desktop opener is configured")
+            return
+        host = self.hosts_by_item.get(selected_item)
         if not host:
             return
-        for service in ("http", "https"):
-            if service in host.services:
-                url = service_url(service, host.address)
-                link = tk.Label(self.link_area, text=url, fg="#0969da", cursor="hand2", underline=True)
+        for service, port in zip(host.services, host.ports):
+            if service in OPENABLE_SERVICES:
+                label = service_url(service, host.address, port) if service in {"http", "https", "ftp"} else f"{service.upper()} :{port}"
+                link = tk.Label(self.link_area, text=label, fg="#0969da", bg="#d9f0fb",
+                                cursor="hand2", underline=True)
                 link.pack(side="left", padx=(0, 12))
-                link.bind("<Button-1>", lambda _click, selected_service=service, address=host.address:
-                          open_service(selected_service, address))
+                link.bind("<Button-1>", lambda _click, selected_service=service, address=host.address,
+                          selected_port=port: open_service(selected_service, address, selected_port))
 
     def _open_row_web_service(self, event) -> None:
         item = self.table.identify_row(event.y)
+        if item in self.services_by_item:
+            self.table.selection_set(item)
+            self._activate_selected_row()
+            return
         host = self.hosts_by_item.get(item)
         if not host:
             return
         service = preferred_web_service(host.services)
         if service:
-            open_service(service, host.address)
-            self.status.configure(text=f"Opened {service_url(service, host.address)}")
+            port = next((port for port, name in zip(host.ports, host.services) if name == service), None)
+            open_service(service, host.address, port)
+            self.status.configure(text=f"Opened {service_url(service, host.address, port)}")
         else:
             self.status.configure(text=f"{host.address} has no discovered HTTP or HTTPS service")
+
+    def _activate_selected_row(self, _event=None) -> None:
+        selected = self.table.selection()
+        if not selected:
+            return
+        item = selected[0]
+        detail = self.services_by_item.get(item)
+        if detail:
+            host, service, port = detail
+            try:
+                open_service(service, host.address, port)
+                self.status.configure(text=f"Opened {service.upper()} on {host.address}:{port}")
+            except (OSError, RuntimeError, ValueError) as error:
+                messagebox.showerror("Cannot open service", str(error))
+            return
+        host = self.hosts_by_item.get(item)
+        if host:
+            service = preferred_web_service(host.services)
+            if service:
+                try:
+                    port = next((port for port, name in zip(host.ports, host.services) if name == service), None)
+                    open_service(service, host.address, port)
+                    self.status.configure(text=f"Opened {service_url(service, host.address, port)}")
+                except (OSError, RuntimeError, ValueError) as error:
+                    messagebox.showerror("Cannot open service", str(error))
+            elif host.ports:
+                self.table.item(item, open=not bool(self.table.item(item, "open")))
+
+    def _show_table_menu(self, event) -> None:
+        item = self.table.identify_row(event.y)
+        if not item:
+            return
+        self.table.selection_set(item)
+        detail = self.services_by_item.get(item)
+        can_open = bool(detail and detail[1] in OPENABLE_SERVICES)
+        self.table_menu.entryconfigure("Open service", state=("normal" if can_open else "disabled"))
+        self.table_menu.tk_popup(event.x_root, event.y_root)
+
+    def copy_selected_detail(self) -> None:
+        selected = self.table.selection()
+        if not selected:
+            return
+        item = selected[0]
+        if item in self.services_by_item:
+            host, service, port = self.services_by_item[item]
+            value = service_url(service, host.address, port) if service in {"http", "https", "ftp"} else f"{host.address}:{port} ({service})"
+        elif item in self.hosts_by_item:
+            value = self.hosts_by_item[item].address
+        else:
+            return
+        self.clipboard_clear()
+        self.clipboard_append(value)
+        self.status.configure(text=f"Copied {value}")
+
+    def set_all_expanded(self, expanded: bool) -> None:
+        for item in self.table.get_children(""):
+            if self.table.get_children(item):
+                self.table.item(item, open=expanded)
 
     def _sort_column(self, column: str) -> None:
         descending = not self.sort_descending.get(column, True)

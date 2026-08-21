@@ -13,6 +13,7 @@ class Host:
     mac: str = ""
     manufacturer: str = ""
     services: list[str] = field(default_factory=list)
+    ports: list[int] = field(default_factory=list)
     seen_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     note: str = ""
 
@@ -33,6 +34,7 @@ class Host:
             mac=observed.mac or self.mac,
             manufacturer=observed.manufacturer or self.manufacturer,
             services=list(observed.services),
+            ports=list(observed.ports),
             seen_at=observed.seen_at if observed.reachable else self.seen_at,
             note=self.note,
         )

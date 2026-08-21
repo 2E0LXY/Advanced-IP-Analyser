@@ -29,11 +29,11 @@ The CLI works without Tk:
 
 ## Debian package
 
-Download `advanced-ip-analyser_0.3.1_all.deb` from the GitHub Release and install
+Download `advanced-ip-analyser_0.4.0_all.deb` from the GitHub Release and install
 it with:
 
 ```sh
-sudo apt install ./advanced-ip-analyser_0.3.1_all.deb
+sudo apt install ./advanced-ip-analyser_0.4.0_all.deb
 ```
 
 Maintainers can reproduce the package locally with `./packaging/build-deb.sh`.
@@ -52,7 +52,13 @@ exploitation, or remote power operations.
 - Ascending and descending sorting from every results-table heading
 - Reachable-host-only table and exports; down addresses remain progress-only
 - Live filtering across addresses, names, MACs, manufacturers, and services
+- Expandable host rows showing every detected TCP port and its service detail
+- Alternating white and light-blue inventory rows for easier scanning
+- Clickable HTTP, HTTPS, FTP, SMB, SSH, and RDP service rows
+- Double-click, Enter, and right-click service activation plus expand/collapse-all controls
+- Keyboard shortcuts: F5 scan, Escape cancel, Ctrl+F filter, Ctrl+O import, Ctrl+S export, Ctrl+Shift+C copy detail
 - Custom TCP port ranges, timeout, and concurrency controls
+- Right-click TCP presets for common services, web/application ports, or all 65,535 TCP ports
 - Current-interface IPv4 subnet shortcut
 - Cancellable scans with partial-result retention
 - Persistent device favorites stored under the user's configuration directory
@@ -69,8 +75,13 @@ Copyright © 2026 Daren Loxley (2E0LXY).
 
 1. Choose an active interface from the subnet list or enter an IP, range, or CIDR.
 2. Select the TCP ports to inspect, then press **Scan**.
+   Right-click the TCP-port field for common, web/application, and full-port presets.
+   Full-port scans use bounded concurrency but should still be limited to a small
+   number of authorized targets because filtered ports can take a long time.
 3. Select discovered rows to copy addresses, save favorites, send Wake-on-LAN,
    open detected services, or export an inventory.
+   Expand a host to inspect individual ports. Open supported service rows with a
+   double-click, Enter, the right-click menu, or the links below the table.
 4. Use **Refresh favorites** to rescan saved addresses. Devices with a discovered
    MAC address retain their identity, notes, and updated IP address.
 5. Use **Import** for inventories previously exported as JSON or XML. Imported
@@ -83,6 +94,13 @@ application does not request, retain, or pass passwords.
 
 Wake-on-LAN and remote administration should only be used on devices and networks
 you own or are authorized to manage.
+
+## Built-in help
+
+Press **Help** beside the footer version number for illustrated guidance covering
+target selection, scanning, expandable port rows, clickable services, favorites,
+inventory import/export, Wake-on-LAN, SSH power actions, and every keyboard
+shortcut. The Help centre is included in the Debian package and works offline.
 
 ## Independence and licensing
 

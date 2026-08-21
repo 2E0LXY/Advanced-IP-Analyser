@@ -16,6 +16,8 @@ class WebActionTests(unittest.TestCase):
     def test_ipv4_and_ipv6_urls(self):
         self.assertEqual(service_url("https", "192.0.2.1"), "https://192.0.2.1")
         self.assertEqual(service_url("http", "2001:db8::1"), "http://[2001:db8::1]")
+        self.assertEqual(service_url("http", "192.0.2.1", 8080), "http://192.0.2.1:8080")
+        self.assertEqual(service_url("https", "2001:db8::1", 8443), "https://[2001:db8::1]:8443")
 
     @patch("ip_analyser.actions.shutil.which", return_value="/usr/bin/ssh")
     @patch("ip_analyser.actions.subprocess.run")

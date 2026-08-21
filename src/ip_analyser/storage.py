@@ -44,9 +44,10 @@ def export(path: Path, hosts: list[Host]) -> None:
     elif suffix == ".csv":
         with path.open("w", newline="") as stream:
             writer = csv.writer(stream)
-            writer.writerow(["address", "reachable", "hostname", "latency_ms", "mac", "manufacturer", "services", "seen_at", "note"])
+            writer.writerow(["address", "reachable", "hostname", "latency_ms", "mac", "manufacturer", "services", "ports", "seen_at", "note"])
             for host in hosts:
-                writer.writerow([host.address, host.reachable, host.hostname, host.latency_ms, host.mac, host.manufacturer, ",".join(host.services), host.seen_at, host.note])
+                writer.writerow([host.address, host.reachable, host.hostname, host.latency_ms, host.mac, host.manufacturer,
+                                 ",".join(host.services), ",".join(str(port) for port in host.ports), host.seen_at, host.note])
     elif suffix in {".html", ".htm"}:
         rows = "".join("<tr>" + "".join(f"<td>{html.escape(str(value))}</td>" for value in
             [h.address, h.hostname, h.mac, h.manufacturer, ", ".join(h.services), h.seen_at]) + "</tr>" for h in hosts)
@@ -59,7 +60,7 @@ def export(path: Path, hosts: list[Host]) -> None:
             device = ET.SubElement(root, "device")
             for key, value in host.to_dict().items():
                 child = ET.SubElement(device, key)
-                child.text = ",".join(value) if isinstance(value, list) else str(value if value is not None else "")
+                child.text = ",".join(str(item) for item in value) if isinstance(value, list) else str(value if value is not None else "")
         ET.indent(root)
         ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
     else:
@@ -84,6 +85,7 @@ def import_inventory(path: Path, limit: int = 65_536) -> list[Host]:
         for device in root.findall("device"):
             value = {child.tag: child.text or "" for child in device}
             value["services"] = [item for item in value.get("services", "").split(",") if item]
+            value["ports"] = [int(item) for item in value.get("ports", "").split(",") if item]
             value["reachable"] = value.get("reachable", "").casefold() == "true"
             latency = value.get("latency_ms", "")
             value["latency_ms"] = float(latency) if latency else None

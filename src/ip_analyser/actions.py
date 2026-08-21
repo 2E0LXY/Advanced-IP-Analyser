@@ -18,9 +18,9 @@ def wake(mac: str, broadcast: str = "255.255.255.255", port: int = 9) -> None:
         channel.sendto(packet, (broadcast, port))
 
 
-def open_service(service: str, host: str) -> None:
+def open_service(service: str, host: str, port: int | None = None) -> None:
     if service in {"http", "https", "ftp"}:
-        url = service_url(service, host)
+        url = service_url(service, host, port)
         if shutil.which("xdg-open"):
             subprocess.Popen(["xdg-open", url])
         elif not webbrowser.open(url):
@@ -28,9 +28,12 @@ def open_service(service: str, host: str) -> None:
     elif service == "smb":
         subprocess.Popen(["xdg-open", f"smb://{host}/"])
     elif service == "ssh":
-        subprocess.Popen(["x-terminal-emulator", "-e", "ssh", host])
+        command = ["x-terminal-emulator", "-e", "ssh"]
+        if port and port != 22:
+            command.extend(["-p", str(port)])
+        subprocess.Popen([*command, host])
     elif service == "rdp":
-        subprocess.Popen(["xfreerdp3", f"/v:{host}"])
+        subprocess.Popen(["xfreerdp3", f"/v:{host}:{port}" if port and port != 3389 else f"/v:{host}"])
     else:
         raise ValueError(f"unsupported service: {service}")
 
@@ -64,14 +67,16 @@ def remote_power(host: str, action: str, user: str = "", timeout: int = 15) -> R
                              detail or ("command accepted" if result.returncode == 0 else f"SSH exited {result.returncode}"))
 
 
-def service_url(service: str, host: str) -> str:
+def service_url(service: str, host: str, port: int | None = None) -> str:
     """Build a browser URL, including brackets required for IPv6 literals."""
     try:
         address = ipaddress.ip_address(host)
         authority = f"[{host}]" if address.version == 6 else host
     except ValueError:
         authority = host
-    return f"{service}://{authority}"
+    defaults = {"http": 80, "https": 443, "ftp": 21}
+    suffix = f":{port}" if port and port != defaults.get(service) else ""
+    return f"{service}://{authority}{suffix}"
 
 
 def preferred_web_service(services: list[str]) -> str | None:
