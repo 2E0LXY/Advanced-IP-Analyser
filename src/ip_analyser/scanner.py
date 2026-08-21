@@ -7,6 +7,7 @@ import subprocess
 import time
 import threading
 from collections.abc import Callable, Iterable
+from dataclasses import replace
 
 from .models import Host
 from .fingerprints import probe_service
@@ -33,7 +34,8 @@ class Scanner:
         self.vendors = vendors or MacVendorLookup()
 
     def scan(self, targets: Iterable[str], progress: Callable[[int, int, Host], None] | None = None,
-             cancel: threading.Event | None = None) -> list[Host]:
+             cancel: threading.Event | None = None, discover_services: bool = True,
+             discovery_progress: Callable[[int, int, Host], None] | None = None) -> list[Host]:
         addresses = list(targets)
         results: list[Host] = []
         host_workers = self.workers if len(self.ports) <= 1024 else min(4, self.workers)
@@ -49,8 +51,9 @@ class Scanner:
                     progress(done, len(addresses), host)
         finally:
             pool.shutdown(wait=not (cancel and cancel.is_set()), cancel_futures=True)
-        return sorted(results, key=lambda host: (ipaddress.ip_address(host.address).version,
-                                                  int(ipaddress.ip_address(host.address))))
+        results = sorted(results, key=lambda host: (ipaddress.ip_address(host.address).version,
+                                                     int(ipaddress.ip_address(host.address))))
+        return self.discover_all(results, discovery_progress, cancel) if discover_services else results
 
     def inspect(self, address: str) -> Host:
         started = time.monotonic()
@@ -67,15 +70,6 @@ class Scanner:
                                       if future.result())
             open_ports.sort()
         services = [name for _port, name in open_ports]
-        service_info: dict[str, dict[str, str]] = {}
-        if open_ports:
-            fingerprint_timeout = min(2.0, max(0.5, self.timeout * 3))
-            with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(open_ports))) as pool:
-                probes = {pool.submit(probe_service, address, port, name, fingerprint_timeout): port
-                          for port, name in open_ports}
-                for future in concurrent.futures.as_completed(probes):
-                    if details := future.result():
-                        service_info[str(probes[future])] = details
         reachable = bool(services) or self._ping(address)
         latency = round((time.monotonic() - started) * 1000, 1) if reachable else None
         hostname = ""
@@ -87,7 +81,44 @@ class Scanner:
         mac = self._neighbour_mac(address)
         return Host(address=address, reachable=reachable, hostname=hostname, latency_ms=latency,
                     mac=mac, manufacturer=self.vendors.lookup(mac) if mac else "", services=services,
-                    ports=[port for port, _name in open_ports], service_info=service_info)
+                    ports=[port for port, _name in open_ports])
+
+    def discover(self, host: Host) -> Host:
+        """Enrich one completed host result without delaying its initial display."""
+        service_info: dict[str, dict[str, str]] = {}
+        services = list(zip(host.ports, host.services))
+        if services:
+            fingerprint_timeout = min(2.0, max(0.5, self.timeout * 3))
+            with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(services))) as pool:
+                probes = {pool.submit(probe_service, host.address, port, name, fingerprint_timeout): port
+                          for port, name in services}
+                for future in concurrent.futures.as_completed(probes):
+                    if details := future.result():
+                        service_info[str(probes[future])] = details
+        return replace(host, service_info=service_info)
+
+    def discover_all(self, hosts: Iterable[Host],
+                     progress: Callable[[int, int, Host], None] | None = None,
+                     cancel: threading.Event | None = None) -> list[Host]:
+        """Run the second discovery phase concurrently after host scanning."""
+        hosts = list(hosts)
+        candidates = [host for host in hosts if host.reachable and host.ports]
+        discovered = {host.identity: host for host in hosts}
+        if not candidates:
+            return hosts
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=min(16, self.workers, len(candidates)))
+        futures = {pool.submit(self.discover, host): host for host in candidates}
+        try:
+            for done, future in enumerate(concurrent.futures.as_completed(futures), 1):
+                if cancel and cancel.is_set():
+                    break
+                host = future.result()
+                discovered[host.identity] = host
+                if progress:
+                    progress(done, len(candidates), host)
+        finally:
+            pool.shutdown(wait=not (cancel and cancel.is_set()), cancel_futures=True)
+        return [discovered[host.identity] for host in hosts]
 
     def _port_open(self, address: str, port: int) -> bool:
         try:

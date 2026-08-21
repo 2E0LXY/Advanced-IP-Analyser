@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ipaddress
+import re
 import shutil
 import socket
 import subprocess
@@ -18,7 +19,7 @@ def wake(mac: str, broadcast: str = "255.255.255.255", port: int = 9) -> None:
         channel.sendto(packet, (broadcast, port))
 
 
-def open_service(service: str, host: str, port: int | None = None) -> None:
+def open_service(service: str, host: str, port: int | None = None, username: str = "") -> None:
     if service in {"http", "https", "ftp"}:
         url = service_url(service, host, port)
         if shutil.which("xdg-open"):
@@ -28,10 +29,12 @@ def open_service(service: str, host: str, port: int | None = None) -> None:
     elif service == "smb":
         subprocess.Popen(["xdg-open", f"smb://{host}/"])
     elif service == "ssh":
+        if username and (username.startswith("-") or not re.fullmatch(r"[A-Za-z0-9._-]+", username)):
+            raise ValueError("SSH username contains unsupported characters")
         command = ["x-terminal-emulator", "-e", "ssh"]
         if port and port != 22:
             command.extend(["-p", str(port)])
-        subprocess.Popen([*command, host])
+        subprocess.Popen([*command, f"{username}@{host}" if username else host])
     elif service == "rdp":
         subprocess.Popen(["xfreerdp3", f"/v:{host}:{port}" if port and port != 3389 else f"/v:{host}"])
     else:

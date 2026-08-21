@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.2 - 2026-08-21
+
+- Split scanning into a fast host/port phase followed by server-detail discovery.
+- Populate the complete reachable-host table before HTTP, TLS, and banner probes begin.
+- Add a flashing blue Please wait discovery indicator with completed/total progress.
+- Keep the populated table usable during discovery and retain partial details when cancelled.
+- Prompt for the remote SSH username before opening a terminal, pre-filled with
+  the local or most recently used session username.
+- Pass SSH destinations safely as `username@address`, including custom SSH ports.
+
 ## 0.5.1 - 2026-08-21
 
 - Check the latest GitHub Release automatically after startup.

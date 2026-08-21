@@ -5,6 +5,7 @@
 - Service-fingerprint screenshot: `/tmp/advanced-ip-analyser-v050-fingerprints.png`
 - Service-fingerprint comparison: `/tmp/advanced-ip-analyser-v050-comparison.png`
 - Automatic-update button screenshot: `/tmp/advanced-ip-analyser-v051-update-button.png`
+- Two-phase discovery indicator screenshot: `/tmp/codex-clipboard-364b1ac0-8a84-4495-aa56-9e9d2cb01902.png`
 - Help screenshot: `/tmp/advanced-ip-analyser-v040-help-final.png`
 - Combined comparison: `/tmp/advanced-ip-analyser-v040-design-comparison.png`
 - Source pixels: 653 x 425
@@ -70,6 +71,12 @@ remains distinct from both alternating host stripes and clickable blue rows.
 - Completed: clickable service styling, footer version, and illustrated Help centre visually verified.
 - Completed: nested server fingerprints, including Apache/nginx names and HTTP/TLS details, visually verified at the native viewport.
 - Completed: the conditional update control is prominent without displacing the Help, version, attribution, or progress controls; both flashing colour states were exercised.
+- Completed: the blue discovery indicator, numeric phase progress, completed host rows, footer status, version, attribution, and progress bar fit the native 1200 x 620 layout without clipping.
+
+The discovery screenshot used a deliberately paused three-host fixture solely to
+verify the in-progress state. It was closed immediately after capture and was not
+a live scan. No further visual fixtures should be opened on the user's desktop
+without explicit notice.
 
 ## Follow-up polish
 

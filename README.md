@@ -29,17 +29,17 @@ The CLI works without Tk:
 
 ## Debian package
 
-Download `advanced-ip-analyser_0.5.1_all.deb` from the GitHub Release and install
+Download `advanced-ip-analyser_0.5.2_all.deb` from the GitHub Release and install
 it with:
 
 ```sh
-sudo apt install ./advanced-ip-analyser_0.5.1_all.deb
+sudo apt install ./advanced-ip-analyser_0.5.2_all.deb
 ```
 
 Maintainers can reproduce the package locally with `./packaging/build-deb.sh`.
 
-Version 0.5.1 introduces automatic updates. Older releases do not contain the
-update checker, so install 0.5.1 manually once. Later releases are detected after
+Version 0.5.1 introduced automatic updates. Older releases do not contain the
+update checker, so install 0.5.1 or later manually once. Later releases are detected after
 startup: click the flashing update button to download the verified package,
 authorize Debian installation, close the current process, and reopen the updated
 application automatically. Help also includes a manual **Check for updates** action.
@@ -53,6 +53,8 @@ exploitation, or remote power operations.
 
 - IPv4/IPv6 single addresses, CIDRs, and inclusive ranges
 - Concurrent reachability and common-service checks
+- Two-stage scanning: show every host and open port first, then discover server
+  metadata with separate progress and a flashing please-wait indicator
 - Reverse DNS and local neighbour-table MAC lookup
 - Offline MAC manufacturer lookup from Debian's IEEE or Nmap OUI database
 - Clickable HTTP and HTTPS links for selected hosts
@@ -66,6 +68,7 @@ exploitation, or remote power operations.
   download, Debian authorization, application restart, and a manual Help-window check
 - Alternating white and light-blue inventory rows for easier scanning
 - Clickable HTTP, HTTPS, FTP, SMB, SSH, and RDP service rows
+- SSH username prompt before terminal launch, retaining the last username for the current session
 - Double-click, Enter, and right-click service activation plus expand/collapse-all controls
 - Keyboard shortcuts: F5 scan, Escape cancel, Ctrl+F filter, Ctrl+O import, Ctrl+S export, Ctrl+Shift+C copy detail
 - Custom TCP port ranges, timeout, and concurrency controls
@@ -85,7 +88,9 @@ Copyright © 2026 Daren Loxley (2E0LXY).
 ## Desktop workflow
 
 1. Choose an active interface from the subnet list or enter an IP, range, or CIDR.
-2. Select the TCP ports to inspect, then press **Scan**.
+2. Select the TCP ports to inspect, then press **Scan**. Address and open-port
+   results finish first; server-detail discovery then runs as a clearly labelled
+   second phase without delaying the initial host list.
    Right-click the TCP-port field for common, web/application, and full-port presets.
    Full-port scans use bounded concurrency but should still be limited to a small
    number of authorized targets because filtered ports can take a long time.
@@ -94,6 +99,8 @@ Copyright © 2026 Daren Loxley (2E0LXY).
    Expand a host to inspect individual ports, then expand a port to inspect any
    server metadata it safely exposed. Open supported service rows with a
    double-click, Enter, the right-click menu, or the links below the table.
+   Opening SSH asks for the remote username before the terminal asks for that
+   account's password. The username is retained only for the current app session.
 4. Use **Refresh favorites** to rescan saved addresses. Devices with a discovered
    MAC address retain their identity, notes, and updated IP address.
 5. Use **Import** for inventories previously exported as JSON or XML. Imported

@@ -22,4 +22,4 @@ find "$package_root" -type f ! -path '*/usr/bin/*' -exec chmod 0644 {} +
 installed_size=$(du -sk "$package_root/usr" | cut -f1)
 sed -i "s/^Installed-Size:.*/Installed-Size: $installed_size/" "$package_root/DEBIAN/control"
 
-fakeroot dpkg-deb --build --root-owner-group "$package_root" "$output_dir/advanced-ip-analyser_0.5.1_all.deb"
+fakeroot dpkg-deb --build --root-owner-group "$package_root" "$output_dir/advanced-ip-analyser_0.5.2_all.deb"

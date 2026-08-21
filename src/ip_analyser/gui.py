@@ -4,6 +4,7 @@ import queue
 import threading
 import tkinter as tk
 import ipaddress
+import getpass
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
@@ -38,6 +39,9 @@ class Application(tk.Tk):
         self.update_events: queue.Queue = queue.Queue()
         self.available_update: Update | None = None
         self.update_flash_on = False
+        self.discovery_active = False
+        self.discovery_flash_on = False
+        self.ssh_username = getpass.getuser()
         self.cancel_scan = threading.Event()
         self.network_presets = []
         self.favorites_path = Path.home() / ".config" / "advanced-ip-analyser" / "favorites.json"
@@ -59,6 +63,10 @@ class Application(tk.Tk):
         style.configure("Update.TButton", background="#ffd34f", foreground="#3f2b00",
                         font=("TkDefaultFont", 9, "bold"))
         style.configure("UpdateFlash.TButton", background="#ff8a3d", foreground="#321300",
+                        font=("TkDefaultFont", 9, "bold"))
+        style.configure("Discovery.TButton", background="#77c8ee", foreground="#102f49",
+                        font=("TkDefaultFont", 9, "bold"))
+        style.configure("DiscoveryFlash.TButton", background="#c4ebff", foreground="#102f49",
                         font=("TkDefaultFont", 9, "bold"))
         style.configure("Treeview", background="#ffffff", fieldbackground="#ffffff", foreground="#17324d", rowheight=25)
         style.configure("Treeview.Heading", background="#80c7e8", foreground="#102f49", font=("TkDefaultFont", 9, "bold"))
@@ -163,6 +171,10 @@ class Application(tk.Tk):
         ttk.Label(footer, text="© 2026 Daren Loxley (2E0LXY)").pack(side="right", padx=18)
         ttk.Label(footer, text=f"Version {__version__}").pack(side="right", padx=(0, 12))
         ttk.Button(footer, text="Help", command=self.show_help).pack(side="right", padx=(0, 8))
+        self.discovery_button = ttk.Button(footer, text="Please wait · discovering details…",
+                                           style="Discovery.TButton")
+        self.discovery_button.pack(side="right", padx=(0, 8))
+        self.discovery_button.pack_forget()
         self.update_button = ttk.Button(footer, text="Update available", style="Update.TButton",
                                         command=self.install_available_update)
         self.update_button.pack(side="right", padx=(0, 8))
@@ -214,6 +226,7 @@ class Application(tk.Tk):
                 "1. Choose an active interface preset or enter one IP, an inclusive range, or a CIDR.\n"
                 "2. Set the TCP ports, timeout, and worker count. The defaults cover common network services.\n"
                 "3. Press Scan (F5). Reachable devices appear as they are found; press Escape to cancel safely.\n"
+                "   The fast address/port scan completes first. A separate flashing discovery indicator then shows progress while server details are collected.\n"
                 "4. Use Filter (Ctrl+F) to search addresses, names, MACs, manufacturers, services, and notes.\n\n"
                 "Only scan networks and devices you own or are authorized to administer.",
                 "help-overview.png")
@@ -221,6 +234,8 @@ class Application(tk.Tk):
                 "A disclosure arrow appears beside every host with detected TCP ports. Expand it to see one row per port.\n\n"
                 "Blue underlined service rows are openable. Double-click one, select it and press Enter, or right-click and choose Open service. "
                 "HTTP, HTTPS, and FTP use the desktop URL handler; SMB uses the file manager; SSH opens a terminal; RDP uses FreeRDP. "
+                "When opening SSH, enter the remote account username first; the terminal then requests that account's password if needed. "
+                "The most recent username is remembered only until the application closes. "
                 "Expand a port row again to see safely discovered details such as the HTTP status, Apache/nginx/IIS Server header, page title, "
                 "content type, redirect, authentication realm, TLS version/cipher, or a protocol greeting. Availability depends on what the server exposes.\n\n"
                 "Right-click to copy a row detail or expand/collapse every host. Parent-row double-click opens HTTPS or HTTP when available. "
@@ -337,6 +352,7 @@ class Application(tk.Tk):
         self.services_by_item.clear()
         self.metadata_by_item.clear()
         self.table.delete(*self.table.get_children())
+        self._stop_discovery_indicator()
         self.scan_button.configure(state="disabled")
         self.cancel_button.configure(state="normal")
         self.cancel_scan = threading.Event()
@@ -360,9 +376,17 @@ class Application(tk.Tk):
 
     def _scan_worker(self, targets: list[str], ports: dict[int, str], timeout: float, workers: int) -> None:
         try:
-            results = Scanner(timeout, workers, ports).scan(
-                targets, lambda done, total, host: self.events.put(("host", done, total, host)), self.cancel_scan)
-            self.events.put(("done", results, len(targets), self.cancel_scan.is_set()))
+            scanner = Scanner(timeout, workers, ports)
+            results = scanner.scan(
+                targets, lambda done, total, host: self.events.put(("host", done, total, host)),
+                self.cancel_scan, discover_services=False)
+            candidates = sum(bool(host.reachable and host.ports) for host in results)
+            self.events.put(("scan_complete", results, len(targets), self.cancel_scan.is_set(), candidates))
+            if not self.cancel_scan.is_set() and candidates:
+                results = scanner.discover_all(
+                    results, lambda done, total, host: self.events.put(("discovery", done, total, host)),
+                    self.cancel_scan)
+            self.events.put(("discovery_done", results, len(targets), self.cancel_scan.is_set(), candidates))
         except Exception as error:
             self.events.put(("error", error))
 
@@ -378,14 +402,33 @@ class Application(tk.Tk):
                             self._insert_host(host)
                     self.progress.configure(value=done)
                     self.status.configure(text=f"Scanned {done} of {total}")
-                elif event[0] == "done":
-                    scanned, total, cancelled = event[1], event[2], event[3]
+                elif event[0] == "scan_complete":
+                    scanned, total, cancelled, candidates = event[1], event[2], event[3], event[4]
                     self.results = [host for host in scanned if host.reachable]
                     self._refresh_table()
+                    if cancelled or not candidates:
+                        prefix = "Cancelled" if cancelled else "Finished"
+                        self.status.configure(text=f"{prefix}: {len(self.results)} reachable; {len(scanned)} of {total} checked")
+                    else:
+                        self.progress.configure(maximum=candidates, value=0)
+                        self.status.configure(text=f"Scan complete: {len(self.results)} reachable · discovering service details 0 of {candidates}")
+                        self._start_discovery_indicator(candidates)
+                elif event[0] == "discovery":
+                    _, done, total, host = event
+                    self.results = [host if existing.identity == host.identity else existing for existing in self.results]
+                    self.progress.configure(maximum=total, value=done)
+                    self.discovery_button.configure(text=f"Please wait · discovering {done}/{total}")
+                    self.status.configure(text=f"Scan complete · discovering service details {done} of {total}")
+                elif event[0] == "discovery_done":
+                    scanned, total, cancelled, candidates = event[1], event[2], event[3], event[4]
+                    self.results = [host for host in scanned if host.reachable]
+                    self._refresh_table()
+                    self._stop_discovery_indicator()
                     self.scan_button.configure(state="normal")
                     self.cancel_button.configure(state="disabled")
                     prefix = "Cancelled" if cancelled else "Finished"
-                    self.status.configure(text=f"{prefix}: {len(self.results)} reachable; {len(scanned)} of {total} checked")
+                    suffix = " · discovery cancelled" if cancelled and candidates else (" · discovery complete" if candidates else "")
+                    self.status.configure(text=f"{prefix}: {len(self.results)} reachable; {len(scanned)} of {total} checked{suffix}")
                     self._merge_results_into_favorites()
                     return
                 elif event[0] == "power_done":
@@ -397,12 +440,33 @@ class Application(tk.Tk):
                             f"{result.host}: {result.detail}" for result in failed))
                     return
                 else:
+                    self._stop_discovery_indicator()
                     self.scan_button.configure(state="normal")
                     self.cancel_button.configure(state="disabled")
                     messagebox.showerror("Scan failed", str(event[1]))
                     return
         except queue.Empty:
             self.after(50, self._drain_events)
+
+    def _start_discovery_indicator(self, total: int) -> None:
+        self.discovery_active = True
+        self.discovery_button.configure(text=f"Please wait · discovering 0/{total}")
+        self.discovery_button.pack(side="right", padx=(0, 8))
+        self._flash_discovery_indicator()
+
+    def _flash_discovery_indicator(self) -> None:
+        if not self.discovery_active:
+            return
+        self.discovery_flash_on = not self.discovery_flash_on
+        self.discovery_button.configure(
+            style="DiscoveryFlash.TButton" if self.discovery_flash_on else "Discovery.TButton")
+        self.after(600, self._flash_discovery_indicator)
+
+    def _stop_discovery_indicator(self) -> None:
+        self.discovery_active = False
+        self.discovery_flash_on = False
+        if hasattr(self, "discovery_button"):
+            self.discovery_button.pack_forget()
 
     def _insert_host(self, host: Host) -> None:
         web_services = [service_url(service, host.address, port) if service in {"http", "https"} else service
@@ -648,7 +712,7 @@ class Application(tk.Tk):
                                 cursor="hand2", underline=True)
                 link.pack(side="left", padx=(0, 12))
                 link.bind("<Button-1>", lambda _click, selected_service=service, address=host.address,
-                          selected_port=port: open_service(selected_service, address, selected_port))
+                          selected_port=port: self._launch_service(selected_service, address, selected_port))
 
     def _open_row_web_service(self, event) -> None:
         item = self.table.identify_row(event.y)
@@ -662,8 +726,8 @@ class Application(tk.Tk):
         service = preferred_web_service(host.services)
         if service:
             port = next((port for port, name in zip(host.ports, host.services) if name == service), None)
-            open_service(service, host.address, port)
-            self.status.configure(text=f"Opened {service_url(service, host.address, port)}")
+            if self._launch_service(service, host.address, port):
+                self.status.configure(text=f"Opened {service_url(service, host.address, port)}")
         else:
             self.status.configure(text=f"{host.address} has no discovered HTTP or HTTPS service")
 
@@ -676,8 +740,8 @@ class Application(tk.Tk):
         if detail:
             host, service, port = detail
             try:
-                open_service(service, host.address, port)
-                self.status.configure(text=f"Opened {service.upper()} on {host.address}:{port}")
+                if self._launch_service(service, host.address, port):
+                    self.status.configure(text=f"Opened {service.upper()} on {host.address}:{port}")
             except (OSError, RuntimeError, ValueError) as error:
                 messagebox.showerror("Cannot open service", str(error))
             return
@@ -687,12 +751,29 @@ class Application(tk.Tk):
             if service:
                 try:
                     port = next((port for port, name in zip(host.ports, host.services) if name == service), None)
-                    open_service(service, host.address, port)
-                    self.status.configure(text=f"Opened {service_url(service, host.address, port)}")
+                    if self._launch_service(service, host.address, port):
+                        self.status.configure(text=f"Opened {service_url(service, host.address, port)}")
                 except (OSError, RuntimeError, ValueError) as error:
                     messagebox.showerror("Cannot open service", str(error))
             elif host.ports:
                 self.table.item(item, open=not bool(self.table.item(item, "open")))
+
+    def _launch_service(self, service: str, address: str, port: int | None) -> bool:
+        username = ""
+        if service == "ssh":
+            username = simpledialog.askstring(
+                "SSH username", f"Username for SSH on {address}:", initialvalue=self.ssh_username,
+                parent=self)
+            if username is None:
+                self.status.configure(text="SSH connection cancelled")
+                return False
+            username = username.strip()
+            if not username:
+                messagebox.showerror("Invalid SSH username", "Enter the remote account username.")
+                return False
+            self.ssh_username = username
+        open_service(service, address, port, username=username)
+        return True
 
     def _show_table_menu(self, event) -> None:
         item = self.table.identify_row(event.y)

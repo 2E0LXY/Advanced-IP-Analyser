@@ -30,7 +30,7 @@ class ServiceRowInteractionTests(unittest.TestCase):
 
         app._activate_selected_row()
 
-        open_service.assert_called_once_with("https", "192.0.2.20", 443)
+        open_service.assert_called_once_with("https", "192.0.2.20", 443, username="")
         self.assertEqual(app.status.text, "Opened HTTPS on 192.0.2.20:443")
 
 
