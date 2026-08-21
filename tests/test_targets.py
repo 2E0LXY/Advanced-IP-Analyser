@@ -17,3 +17,7 @@ class TargetTests(unittest.TestCase):
     def test_rejects_oversized_target(self):
         with self.assertRaisesRegex(ValueError, "limit"):
             parse_targets("10.0.0.0/8")
+
+    def test_point_to_point_network_respects_target_limit(self):
+        with self.assertRaisesRegex(ValueError, "limit"):
+            parse_targets("192.0.2.0/31", limit=1)

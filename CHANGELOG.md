@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.0 - 2026-08-21
+
+- Completed the Debian 13 desktop workflow with Scan results and Favorites tabs,
+  editable notes, MAC-first identity, current-interface and `/24` shortcuts.
+- Hardened JSON/XML import validation and spreadsheet exports against untrusted
+  network values and formula execution.
+- Blocked SSH option injection and added safe Ping, Tracepath, Telnet, delayed
+  shutdown/reboot, and abort-shutdown actions.
+- Required GitHub's SHA-256 release digest, revalidated the package before the
+  PolicyKit handoff, and retained automatic close/install/reopen behavior.
+- Added original project artwork, Debian copyright/changelog/manual/AppStream
+  metadata, and tag-driven Debian 13 test, package, smoke, checksum, and release CI.
+
 ## 0.5.2 - 2026-08-21
 
 - Split scanning into a fast host/port phase followed by server-detail discovery.

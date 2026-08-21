@@ -34,8 +34,9 @@ def main(argv: list[str] | None = None) -> int:
     hosts = scanner.scan(targets, lambda done, total, host: print(
         f"[{done}/{total}] {host.address:>39} {'up' if host.reachable else 'down':4} {','.join(host.services)}"))
     if args.output:
-        export(args.output, hosts)
-        print(f"Exported {len(hosts)} results to {args.output}")
+        reachable = [host for host in hosts if host.reachable]
+        export(args.output, reachable)
+        print(f"Exported {len(reachable)} reachable results to {args.output}")
     return 0
 
 

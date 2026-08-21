@@ -16,3 +16,7 @@ class PortConfigTests(unittest.TestCase):
     def test_all_tcp_ports_requires_explicit_large_limit(self):
         ports = parse_ports("1-65535", limit=65_535)
         self.assertEqual((len(ports), min(ports), max(ports)), (65_535, 1, 65_535))
+
+    def test_out_of_range_endpoint_is_rejected_before_expansion(self):
+        with self.assertRaisesRegex(ValueError, "between 1 and 65535"):
+            parse_ports("1-999999999")

@@ -5,27 +5,28 @@ import threading
 import tkinter as tk
 import ipaddress
 import getpass
+from dataclasses import replace
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from . import __version__
-from .actions import open_service, preferred_web_service, remote_power, service_url, wake
+from .actions import open_network_tool, open_service, preferred_web_service, remote_power, service_url, wake
 from .config import parse_ports
 from .models import Host
-from .network import active_ipv4_networks, current_ipv4_subnet
+from .network import active_ipv4_networks, broadcasts_for_host, current_ipv4_subnet, ipv4_24_target
 from .scanner import DEFAULT_PORTS, Scanner
 from .storage import export, import_inventory, load_favorites, merge_devices, save_favorites
 from .targets import parse_targets
 from .updater import Update, check_for_update, download_update, launch_installer
 
-OPENABLE_SERVICES = {"http", "https", "ftp", "smb", "ssh", "rdp"}
+OPENABLE_SERVICES = {"http", "https", "ftp", "smb", "ssh", "rdp", "telnet"}
 COMMON_PORTS = ",".join(str(port) for port in DEFAULT_PORTS)
 WEB_APP_PORTS = "80,443,3000,5000,8000,8080,8081,8443,8888,9000,9090"
 
 
 class Application(tk.Tk):
     def __init__(self):
-        super().__init__()
+        super().__init__(className="AdvancedIPAnalyser")
         self.title("Advanced IP Analyser")
         self.geometry("1200x620")
         self.minsize(720, 420)
@@ -34,6 +35,7 @@ class Application(tk.Tk):
         self.hosts_by_item = {}
         self.services_by_item = {}
         self.metadata_by_item = {}
+        self.favorite_hosts_by_item = {}
         self.sort_descending = {}
         self.events: queue.Queue = queue.Queue()
         self.update_events: queue.Queue = queue.Queue()
@@ -45,6 +47,11 @@ class Application(tk.Tk):
         self.cancel_scan = threading.Event()
         self.network_presets = []
         self.favorites_path = Path.home() / ".config" / "advanced-ip-analyser" / "favorites.json"
+        try:
+            self.app_icon = tk.PhotoImage(file=Path(__file__).with_name("assets") / "advanced-ip-analyser.png")
+            self.iconphoto(True, self.app_icon)
+        except tk.TclError:
+            self.app_icon = None
         self._configure_styles()
         self._build()
 
@@ -83,6 +90,7 @@ class Application(tk.Tk):
         self.subnets.pack(side="left", padx=(0, 8))
         self.subnets.bind("<<ComboboxSelected>>", self.use_selected_subnet)
         ttk.Button(header, text="Interfaces", command=self.refresh_subnets).pack(side="left", padx=(0, 8))
+        ttk.Button(header, text="/24", command=self.use_24_subnet).pack(side="left", padx=(0, 8))
         self.scan_button = ttk.Button(header, text="Scan", command=self.start_scan, style="Accent.TButton")
         self.scan_button.pack(side="left")
         self.cancel_button = ttk.Button(header, text="Cancel", command=self.cancel_current_scan, state="disabled")
@@ -111,6 +119,12 @@ class Application(tk.Tk):
         self.workers = ttk.Spinbox(settings, from_=1, to=512, width=6)
         self.workers.set("64")
         self.workers.pack(side="left", padx=(6, 12))
+        ttk.Label(settings, text="Profile").pack(side="left")
+        self.profile = ttk.Combobox(settings, values=("Fast", "Balanced", "Accurate"),
+                                    state="readonly", width=9)
+        self.profile.set("Balanced")
+        self.profile.pack(side="left", padx=(6, 12))
+        self.profile.bind("<<ComboboxSelected>>", self.apply_scan_profile)
         ttk.Label(settings, text="Filter").pack(side="left")
         self.filter_text = tk.StringVar()
         self.filter_text.trace_add("write", lambda *_args: self._refresh_table())
@@ -124,12 +138,22 @@ class Application(tk.Tk):
         ttk.Button(actions, text="View favorites", command=self.show_favorites).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Refresh favorites", command=self.refresh_favorites).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Wake", command=self.wake_selected).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Ping", command=lambda: self.run_selected_tool("ping")).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Trace", command=lambda: self.run_selected_tool("trace")).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Shutdown", command=lambda: self.power_selected("shutdown"), style="Danger.TButton").pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Reboot", command=lambda: self.power_selected("reboot"), style="Danger.TButton").pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Abort shutdown", command=lambda: self.power_selected("cancel")).pack(side="left", padx=(8, 0))
         ttk.Label(actions, text="Export uses selected rows when any are selected.").pack(side="right")
 
+        self.notebook = ttk.Notebook(self)
+        self.notebook.pack(fill="both", expand=True, padx=12)
+        results_page = ttk.Frame(self.notebook)
+        self.favorites_page = ttk.Frame(self.notebook)
+        self.notebook.add(results_page, text="Scan results")
+        self.notebook.add(self.favorites_page, text="Favorites")
+
         columns = ("address", "state", "hostname", "latency", "mac", "manufacturer", "services")
-        self.table = ttk.Treeview(self, columns=columns, show="tree headings", selectmode="extended")
+        self.table = ttk.Treeview(results_page, columns=columns, show="tree headings", selectmode="extended")
         self.table.heading("#0", text="Ports")
         self.table.column("#0", width=70, minwidth=55, stretch=False, anchor="w")
         widths = (130, 55, 190, 75, 135, 210, 260)
@@ -137,7 +161,7 @@ class Application(tk.Tk):
             self.table.heading(column, text=column.replace("_", " ").title(),
                                command=lambda selected=column: self._sort_column(selected))
             self.table.column(column, width=width, anchor="w")
-        self.table.pack(fill="both", expand=True, padx=12)
+        self.table.pack(fill="both", expand=True)
         self.table.tag_configure("even", background="#ffffff")
         self.table.tag_configure("odd", background="#e4f5ff")
         self.table.tag_configure("detail", background="#f1f9fe", foreground="#315c78")
@@ -152,9 +176,26 @@ class Application(tk.Tk):
         self.table_menu = tk.Menu(self, tearoff=False)
         self.table_menu.add_command(label="Open service", command=self._activate_selected_row)
         self.table_menu.add_command(label="Copy row detail", command=self.copy_selected_detail)
+        self.table_menu.add_command(label="Ping", command=lambda: self.run_selected_tool("ping"))
+        self.table_menu.add_command(label="Trace route", command=lambda: self.run_selected_tool("trace"))
         self.table_menu.add_separator()
         self.table_menu.add_command(label="Expand all ports", command=lambda: self.set_all_expanded(True))
         self.table_menu.add_command(label="Collapse all ports", command=lambda: self.set_all_expanded(False))
+
+        favorite_columns = ("address", "hostname", "mac", "manufacturer", "services", "seen", "note")
+        self.favorites_table = ttk.Treeview(
+            self.favorites_page, columns=favorite_columns, show="headings", selectmode="extended")
+        for column in favorite_columns:
+            self.favorites_table.heading(column, text=column.title())
+            self.favorites_table.column(column, width=145 if column != "note" else 240, anchor="w")
+        self.favorites_table.pack(fill="both", expand=True, padx=8, pady=(8, 4))
+        favorite_actions = ttk.Frame(self.favorites_page, padding=8)
+        favorite_actions.pack(fill="x")
+        ttk.Button(favorite_actions, text="Edit note", command=self.edit_favorite_note).pack(side="left")
+        ttk.Button(favorite_actions, text="Remove selected", command=self.remove_selected_favorites).pack(side="left", padx=(8, 0))
+        ttk.Button(favorite_actions, text="Export selected…", command=self.export_selected_favorites).pack(side="left", padx=(8, 0))
+        ttk.Button(favorite_actions, text="Refresh devices", command=self.refresh_favorites).pack(side="left", padx=(8, 0))
+        self._refresh_favorites_table()
 
         self.links = ttk.Frame(self, padding=(12, 8, 12, 0))
         self.links.pack(fill="x")
@@ -225,6 +266,7 @@ class Application(tk.Tk):
         add_tab("Getting started",
                 "1. Choose an active interface preset or enter one IP, an inclusive range, or a CIDR.\n"
                 "2. Set the TCP ports, timeout, and worker count. The defaults cover common network services.\n"
+                "   Fast, Balanced, and Accurate profiles provide useful timeout/concurrency presets.\n"
                 "3. Press Scan (F5). Reachable devices appear as they are found; press Escape to cancel safely.\n"
                 "   The fast address/port scan completes first. A separate flashing discovery indicator then shows progress while server details are collected.\n"
                 "4. Use Filter (Ctrl+F) to search addresses, names, MACs, manufacturers, services, and notes.\n\n"
@@ -233,7 +275,7 @@ class Application(tk.Tk):
         add_tab("Ports and services",
                 "A disclosure arrow appears beside every host with detected TCP ports. Expand it to see one row per port.\n\n"
                 "Blue underlined service rows are openable. Double-click one, select it and press Enter, or right-click and choose Open service. "
-                "HTTP, HTTPS, and FTP use the desktop URL handler; SMB uses the file manager; SSH opens a terminal; RDP uses FreeRDP. "
+                "HTTP, HTTPS, and FTP use the desktop URL handler; SMB uses the file manager; SSH and Telnet open a terminal; RDP uses FreeRDP. "
                 "When opening SSH, enter the remote account username first; the terminal then requests that account's password if needed. "
                 "The most recent username is remembered only until the application closes. "
                 "Expand a port row again to see safely discovered details such as the HTTP status, Apache/nginx/IIS Server header, page title, "
@@ -242,15 +284,16 @@ class Application(tk.Tk):
                 "Discovery is read-only, bounded, and never attempts authentication.",
                 "help-port-details.png")
         add_tab("Favorites and inventory",
-                "Add favorite stores selected devices in ~/.config/advanced-ip-analyser/favorites.json. Devices are identified by MAC address first, "
+                "Add favorite stores selected devices in ~/.config/advanced-ip-analyser/favorites.json and shows them in the Favorites tab. Devices are identified by MAC address first, "
                 "so a later scan can update an IP address without losing the saved note. Refresh favorites rescans saved addresses.\n\n"
                 "Export writes selected rows—or all visible rows when nothing is selected—to CSV, JSON, XML, or escaped HTML. "
                 "Import accepts this application's bounded JSON and XML formats and merges devices into the table and favorites. "
                 "Use Ctrl+O to import and Ctrl+S to export.")
         add_tab("Device actions",
                 "Copy IP copies selected host addresses. Wake sends a confirmed Wake-on-LAN magic packet to selected devices with MAC addresses.\n\n"
-                "Shutdown and Reboot require confirmation and use non-interactive SSH. Configure SSH keys and passwordless permission for "
-                "systemctl poweroff or systemctl reboot on machines you administer. The application never asks for, stores, or forwards passwords. "
+                "Shutdown, Reboot, and Abort shutdown require confirmation and use non-interactive SSH. Configure SSH keys and passwordless permission for "
+                "sudo shutdown on machines you administer. Power actions are delayed one minute so they can be aborted. The application never asks for, stores, or forwards passwords. "
+                "Ping and Trace open bounded Debian diagnostic commands in a terminal. "
                 "Remote results are reported per host. Detected service links never bypass authentication.")
         add_tab("Shortcuts",
                 "F5 — start a scan\nEscape — cancel the active scan\nCtrl+F — focus the live filter\n"
@@ -289,7 +332,8 @@ class Application(tk.Tk):
             self.status.configure(text=f"Version {__version__} is up to date")
         elif event == "downloaded":
             try:
-                launch_installer(value)
+                package, update = value
+                launch_installer(package, update)
                 self.status.configure(text="Starting the updater; the application will reopen when installation finishes…")
                 self.after(350, self.destroy)
             except OSError as error:
@@ -326,7 +370,7 @@ class Application(tk.Tk):
 
     def _download_update_worker(self, update: Update) -> None:
         try:
-            self.update_events.put(("downloaded", download_update(update), True))
+            self.update_events.put(("downloaded", (download_update(update), update), True))
         except Exception as error:
             self.update_events.put(("download_error", error, True))
 
@@ -373,6 +417,14 @@ class Application(tk.Tk):
                                "Set the scan to all 65,535 TCP ports?\n\n"
                                "Use this on a small number of authorized targets. A full subnet scan may take a long time."):
             self.set_port_preset("1-65535")
+
+    def apply_scan_profile(self, _event=None) -> None:
+        profiles = {"Fast": ("0.15", "128"), "Balanced": ("0.35", "64"),
+                    "Accurate": ("1.00", "32")}
+        timeout, workers = profiles[self.profile.get()]
+        self.timeout.set(timeout)
+        self.workers.set(workers)
+        self.status.configure(text=f"{self.profile.get()} scan profile selected")
 
     def _scan_worker(self, targets: list[str], ports: dict[int, str], timeout: float, workers: int) -> None:
         try:
@@ -524,6 +576,16 @@ class Application(tk.Tk):
         self.target.delete(0, "end")
         self.target.insert(0, subnet)
 
+    def use_24_subnet(self) -> None:
+        try:
+            subnet = ipv4_24_target(self.target.get())
+        except ValueError as error:
+            messagebox.showerror("/24 unavailable", str(error))
+            return
+        self.target.delete(0, "end")
+        self.target.insert(0, subnet)
+        self.status.configure(text=f"Selected class-C-style subnet {subnet}")
+
     def refresh_subnets(self, show_errors: bool = True) -> None:
         try:
             self.network_presets = active_ipv4_networks()
@@ -546,7 +608,20 @@ class Application(tk.Tk):
         self.status.configure(text=f"Selected {network} on {interface}")
 
     def selected_hosts(self) -> list[Host]:
-        return [self.hosts_by_item[item] for item in self.table.selection() if item in self.hosts_by_item]
+        selected: list[Host] = []
+        seen: set[str] = set()
+        for item in self.table.selection():
+            host = self.hosts_by_item.get(item)
+            if host is None and item in self.services_by_item:
+                host = self.services_by_item[item][0]
+            if host is None and item in self.metadata_by_item:
+                service_item = self.table.parent(item)
+                if service_item in self.services_by_item:
+                    host = self.services_by_item[service_item][0]
+            if host is not None and host.identity not in seen:
+                selected.append(host)
+                seen.add(host.identity)
+        return selected
 
     def copy_selected_ips(self) -> None:
         hosts = self.selected_hosts()
@@ -564,10 +639,8 @@ class Application(tk.Tk):
             return
         try:
             existing = load_favorites(self.favorites_path)
-            keyed = {(host.mac or host.address).casefold(): host for host in existing}
-            for host in hosts:
-                keyed[(host.mac or host.address).casefold()] = host
-            save_favorites(self.favorites_path, list(keyed.values()))
+            save_favorites(self.favorites_path, merge_devices(existing, hosts))
+            self._refresh_favorites_table()
             self.status.configure(text=f"Saved {len(hosts)} device(s) to favorites")
         except (OSError, ValueError) as error:
             messagebox.showerror("Favorites failed", str(error))
@@ -577,6 +650,7 @@ class Application(tk.Tk):
             saved = load_favorites(self.favorites_path)
             if saved:
                 save_favorites(self.favorites_path, merge_devices(saved, self.results))
+                self._refresh_favorites_table()
         except (OSError, ValueError) as error:
             self.status.configure(text=f"Scan finished; favorites refresh failed: {error}")
 
@@ -589,8 +663,6 @@ class Application(tk.Tk):
         if not favorites:
             messagebox.showinfo("No favorites", "Add devices to favorites before refreshing them.")
             return
-        self.target.delete(0, "end")
-        self.target.insert(0, f"{favorites[0].address}-{favorites[-1].address}" if len(favorites) > 1 else favorites[0].address)
         targets = [host.address for host in favorites]
         try:
             ports = parse_ports(self.ports.get(), limit=65_535)
@@ -603,37 +675,78 @@ class Application(tk.Tk):
         self.cancel_button.configure(state="normal")
         self.cancel_scan = threading.Event()
         self.progress.configure(maximum=len(targets), value=0)
+        self.status.configure(text=f"Refreshing {len(targets)} saved device(s)…")
         threading.Thread(target=self._scan_worker, args=(targets, ports, timeout, workers), daemon=True).start()
         self.after(50, self._drain_events)
 
     def show_favorites(self) -> None:
+        self._refresh_favorites_table(show_errors=True)
+        self.notebook.select(self.favorites_page)
+
+    def _refresh_favorites_table(self, show_errors: bool = False) -> None:
         try:
             favorites = load_favorites(self.favorites_path)
         except (OSError, ValueError) as error:
-            messagebox.showerror("Favorites failed", str(error))
+            if show_errors:
+                messagebox.showerror("Favorites failed", str(error))
             return
-        window = tk.Toplevel(self)
-        window.title("Favorite devices")
-        window.geometry("850x360")
-        columns = ("address", "hostname", "mac", "manufacturer", "services", "seen")
-        table = ttk.Treeview(window, columns=columns, show="headings", selectmode="extended")
-        for column in columns:
-            table.heading(column, text=column.title())
-            table.column(column, width=130)
+        self.favorites_table.delete(*self.favorites_table.get_children())
+        self.favorite_hosts_by_item.clear()
         for host in favorites:
-            table.insert("", "end", values=(host.address, host.hostname, host.mac, host.manufacturer,
-                                              ", ".join(host.services), host.seen_at))
-        table.pack(fill="both", expand=True, padx=12, pady=12)
+            item = self.favorites_table.insert("", "end", values=(
+                host.address, host.hostname, host.mac, host.manufacturer,
+                ", ".join(host.services), host.seen_at, host.note))
+            self.favorite_hosts_by_item[item] = host
 
-        def remove_selected() -> None:
-            indexes = {table.index(item) for item in table.selection()}
-            remaining = [host for index, host in enumerate(favorites) if index not in indexes]
-            save_favorites(self.favorites_path, remaining)
-            for item in table.selection():
-                table.delete(item)
-            favorites[:] = remaining
+    def selected_favorite_hosts(self) -> list[Host]:
+        return [self.favorite_hosts_by_item[item] for item in self.favorites_table.selection()
+                if item in self.favorite_hosts_by_item]
 
-        ttk.Button(window, text="Remove selected", command=remove_selected).pack(pady=(0, 12))
+    def edit_favorite_note(self) -> None:
+        selected = self.selected_favorite_hosts()
+        if len(selected) != 1:
+            messagebox.showinfo("Select one favorite", "Select exactly one favorite to edit its note.")
+            return
+        host = selected[0]
+        note = simpledialog.askstring("Favorite note", f"Note for {host.address}:",
+                                      initialvalue=host.note, parent=self)
+        if note is None:
+            return
+        try:
+            favorites = load_favorites(self.favorites_path)
+            updated = [replace(item, note=note[:4096]) if item.identity == host.identity else item
+                       for item in favorites]
+            save_favorites(self.favorites_path, updated)
+            self._refresh_favorites_table()
+        except (OSError, ValueError) as error:
+            messagebox.showerror("Favorites failed", str(error))
+
+    def remove_selected_favorites(self) -> None:
+        selected = {host.identity for host in self.selected_favorite_hosts()}
+        if not selected:
+            return
+        if not messagebox.askyesno("Remove favorites",
+                                   f"Remove {len(selected)} selected device(s) from favorites?"):
+            return
+        try:
+            favorites = load_favorites(self.favorites_path)
+            save_favorites(self.favorites_path, [host for host in favorites if host.identity not in selected])
+            self._refresh_favorites_table()
+        except (OSError, ValueError) as error:
+            messagebox.showerror("Favorites failed", str(error))
+
+    def export_selected_favorites(self) -> None:
+        hosts = self.selected_favorite_hosts()
+        if not hosts:
+            messagebox.showinfo("Nothing selected", "Select one or more favorites first.")
+            return
+        name = filedialog.asksaveasfilename(defaultextension=".csv",
+            filetypes=[("CSV", "*.csv"), ("JSON", "*.json"), ("XML", "*.xml"), ("HTML", "*.html")])
+        if name:
+            try:
+                export(Path(name), hosts)
+            except (OSError, ValueError) as error:
+                messagebox.showerror("Export failed", str(error))
 
     def wake_selected(self) -> None:
         hosts = [host for host in self.selected_hosts() if host.mac]
@@ -643,9 +756,12 @@ class Application(tk.Tk):
         if not messagebox.askyesno("Wake devices", f"Send Wake-on-LAN to {len(hosts)} device(s)?"):
             return
         try:
+            sent = 0
             for host in hosts:
-                wake(host.mac)
-            self.status.configure(text=f"Sent Wake-on-LAN to {len(hosts)} device(s)")
+                for broadcast in broadcasts_for_host(host.address, self.network_presets):
+                    wake(host.mac, broadcast)
+                    sent += 1
+            self.status.configure(text=f"Sent {sent} Wake-on-LAN packet(s) to {len(hosts)} device(s)")
         except (OSError, ValueError) as error:
             messagebox.showerror("Wake-on-LAN failed", str(error))
 
@@ -664,6 +780,17 @@ class Application(tk.Tk):
         threading.Thread(target=self._power_worker, args=(hosts, action, user.strip()), daemon=True).start()
         self.after(50, self._drain_events)
 
+    def run_selected_tool(self, tool: str) -> None:
+        hosts = self.selected_hosts()
+        if not hosts:
+            messagebox.showinfo("Nothing selected", "Select one or more hosts first.")
+            return
+        try:
+            for host in hosts:
+                open_network_tool(tool, host.address)
+        except (OSError, RuntimeError, ValueError) as error:
+            messagebox.showerror("Tool unavailable", str(error))
+
     def _power_worker(self, hosts: list[Host], action: str, user: str) -> None:
         results = [remote_power(host.address, action, user) for host in hosts]
         self.events.put(("power_done", results))
@@ -678,6 +805,7 @@ class Application(tk.Tk):
             self.results = merge_devices(self.results, imported)
             saved = merge_devices(load_favorites(self.favorites_path), imported)
             save_favorites(self.favorites_path, saved)
+            self._refresh_favorites_table()
             self._refresh_table()
             self.status.configure(text=f"Imported {len(imported)} device(s)")
         except (OSError, ValueError) as error:

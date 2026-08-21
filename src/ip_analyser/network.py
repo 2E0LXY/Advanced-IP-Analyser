@@ -5,6 +5,28 @@ import re
 import subprocess
 
 
+def ipv4_24_target(value: str) -> str:
+    """Return the containing /24 for an IPv4 address or interface value."""
+    try:
+        address = ipaddress.ip_interface(value.strip()).ip
+    except ValueError as error:
+        raise ValueError("enter one IPv4 address or CIDR before using /24") from error
+    if address.version != 4:
+        raise ValueError("the /24 shortcut is available for IPv4 targets only")
+    return str(ipaddress.ip_network(f"{address}/24", strict=False))
+
+
+def broadcasts_for_host(address: str, networks: list[tuple[str, str, str]]) -> list[str]:
+    """Choose active-interface broadcasts that can reach a host, with safe fallbacks."""
+    host = ipaddress.ip_address(address)
+    if host.version != 4:
+        return []
+    matching = [broadcast for _interface, network, broadcast in networks
+                if host in ipaddress.ip_network(network, strict=False)]
+    candidates = matching or [broadcast for _interface, _network, broadcast in networks]
+    return list(dict.fromkeys(candidates or ["255.255.255.255"]))
+
+
 def current_ipv4_subnet() -> str:
     """Return the first global IPv4 subnet reported by iproute2."""
     try:

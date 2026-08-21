@@ -1,0 +1,79 @@
+name: Debian 13 CI and release
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  debian:
+    runs-on: ubuntu-24.04
+    container: debian:trixie-slim
+    steps:
+      - name: Install Debian 13 test dependencies
+        run: |
+          apt-get update
+          apt-get install --yes --no-install-recommends \
+            appstream ca-certificates desktop-file-utils fakeroot git iproute2 \
+            iputils-ping lintian pkexec python3 python3-tk xauth xdg-utils xvfb
+
+      - uses: actions/checkout@v4
+
+      - name: Verify source version and run tests
+        run: |
+          version="$(PYTHONPATH=src python3 -c 'from ip_analyser import __version__; print(__version__)')"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then test "v$version" = "$GITHUB_REF_NAME"; fi
+          python3 -m compileall -q src tests
+          python3 -m unittest discover -v
+
+      - name: Build Debian package
+        run: sh packaging/build-deb.sh
+
+      - name: Validate package and desktop metadata
+        run: |
+          package="$(find dist -maxdepth 1 -name 'advanced-ip-analyser_*_all.deb' -print -quit)"
+          test -n "$package"
+          dpkg-deb --info "$package"
+          dpkg-deb --contents "$package" > package-contents.txt
+          grep -q './usr/share/doc/advanced-ip-analyser/copyright' package-contents.txt
+          grep -q './usr/share/metainfo/advanced-ip-analyser.metainfo.xml' package-contents.txt
+          grep -q './usr/share/icons/hicolor/scalable/apps/advanced-ip-analyser.svg' package-contents.txt
+          lintian --fail-on error "$package"
+          desktop-file-validate packaging/debian/usr/share/applications/advanced-ip-analyser.desktop
+          appstreamcli validate --no-net packaging/debian/usr/share/metainfo/advanced-ip-analyser.metainfo.xml
+
+      - name: Install, launch, and remove package
+        run: |
+          package="./$(find dist -maxdepth 1 -name 'advanced-ip-analyser_*_all.deb' -print -quit)"
+          apt-get install --yes --no-install-recommends "$package"
+          advanced-ip-analyser --help > /dev/null
+          set +e
+          timeout 10s xvfb-run -a advanced-ip-analyser-gui
+          status=$?
+          set -e
+          test "$status" -eq 124
+          dpkg --remove advanced-ip-analyser
+
+      - name: Create published checksum
+        run: cd dist && sha256sum *.deb > SHA256SUMS
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: advanced-ip-analyser-debian-13
+          path: |
+            dist/*.deb
+            dist/SHA256SUMS
+
+      - name: Publish tagged release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/*.deb
+            dist/SHA256SUMS

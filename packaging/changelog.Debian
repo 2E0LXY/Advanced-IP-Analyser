@@ -1,0 +1,7 @@
+advanced-ip-analyser (1.0.0) stable; urgency=medium
+
+  * Complete the Debian 13 network discovery and saved-device workflow.
+  * Add safe remote access, remote power, inventory exchange, and updates.
+  * Add package validation, install, startup, removal, and release automation.
+
+ -- Daren Loxley <24845841+2E0LXY@users.noreply.github.com>  Fri, 21 Aug 2026 15:00:00 +0100

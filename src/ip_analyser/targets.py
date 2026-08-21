@@ -21,7 +21,10 @@ def parse_targets(text: str, limit: int = MAX_TARGETS) -> list[str]:
         return [str(ipaddress.ip_address(int(start) + offset)) for offset in range(count)]
     if "/" in text:
         network = ipaddress.ip_network(text, strict=False)
-        count = network.num_addresses if network.version == 6 else max(0, network.num_addresses - 2)
+        if network.prefixlen >= network.max_prefixlen - 1:
+            count = network.num_addresses
+        else:
+            count = network.num_addresses - (2 if network.version == 4 else 1)
         _check_size(count, limit)
         return [str(item) for item in network.hosts()]
     return [str(ipaddress.ip_address(text))]

@@ -29,11 +29,11 @@ The CLI works without Tk:
 
 ## Debian package
 
-Download `advanced-ip-analyser_0.5.2_all.deb` from the GitHub Release and install
+Download `advanced-ip-analyser_1.0.0_all.deb` from the GitHub Release and install
 it with:
 
 ```sh
-sudo apt install ./advanced-ip-analyser_0.5.2_all.deb
+sudo apt install ./advanced-ip-analyser_1.0.0_all.deb
 ```
 
 Maintainers can reproduce the package locally with `./packaging/build-deb.sh`.
@@ -45,9 +45,9 @@ authorize Debian installation, close the current process, and reopen the updated
 application automatically. Help also includes a manual **Check for updates** action.
 
 Targets are limited to 65,536 addresses per invocation. The scanner checks a
-small, explicit set of common service ports. It collects bounded,
-unauthenticated protocol metadata but does not attempt authentication,
-exploitation, or remote power operations.
+small, explicit set of common service ports. Fingerprinting is bounded and
+unauthenticated. Remote power is a separate, explicit, confirmed SSH-key action,
+and the application never attempts exploitation.
 
 ## Current scope
 
@@ -74,12 +74,15 @@ exploitation, or remote power operations.
 - Custom TCP port ranges, timeout, and concurrency controls
 - Right-click TCP presets for common services, web/application ports, or all 65,535 TCP ports
 - Current-interface IPv4 subnet shortcut
+- Direct class-C-style `/24` subnet shortcut
 - Cancellable scans with partial-result retention
 - Persistent device favorites stored under the user's configuration directory
 - Atomic saved-device updates with MAC-first identity and IP refresh
 - Safe JSON and XML inventory import plus CSV, JSON, XML, and HTML export
 - Active-interface subnet and broadcast discovery
 - Non-interactive, confirmation-ready SSH shutdown and reboot operations
+- Delayed remote shutdown/reboot with an abort-shutdown action
+- Safe Ping, Tracepath, and Telnet launchers using fixed argument vectors
 - Copy-IP, selection-aware export, and confirmed Wake-on-LAN actions
 - Double-click a host row to open HTTPS, with HTTP as fallback
 
@@ -106,9 +109,10 @@ Copyright © 2026 Daren Loxley (2E0LXY).
 5. Use **Import** for inventories previously exported as JSON or XML. Imported
    devices are merged into both the visible inventory and favorites.
 
-The **Shutdown** and **Reboot** buttons require an explicit confirmation and use
-non-interactive SSH. Configure key-based SSH access and passwordless permission
-for `systemctl poweroff` or `systemctl reboot` on machines you administer. The
+The **Shutdown**, **Reboot**, and **Abort shutdown** buttons require an explicit
+confirmation and use non-interactive SSH. Configure key-based SSH access and
+passwordless `sudo shutdown` permission on machines you administer. Shutdown and
+reboot are scheduled one minute ahead so the abort action remains useful. The
 application does not request, retain, or pass passwords.
 
 Wake-on-LAN and remote administration should only be used on devices and networks
@@ -129,3 +133,6 @@ Scanner or Famatech Advanced IP Scanner, and those projects' code, branding,
 documentation text, and assets are not included.
 
 Copyright (C) 2026 2E0LXY. Licensed under GPL-3.0-or-later; see `LICENSE`.
+
+Feature-by-feature Linux parity and documented platform limitations are tracked
+in [`docs/FEATURE_PARITY.md`](docs/FEATURE_PARITY.md).

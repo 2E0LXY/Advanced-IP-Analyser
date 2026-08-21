@@ -1,0 +1,36 @@
+.TH ADVANCED-IP-ANALYSER 1 "August 2026" "Advanced IP Analyser 1.0.0" "User Commands"
+.SH NAME
+advanced-ip-analyser \- discover and inventory authorized network hosts
+.SH SYNOPSIS
+.B advanced-ip-analyser
+.I scan TARGET
+[
+.B --timeout SECONDS
+]
+[
+.B --workers COUNT
+]
+[
+.B --output FILE
+]
+.br
+.B advanced-ip-analyser wake MAC
+[
+.B --broadcast ADDRESS
+]
+.SH DESCRIPTION
+Advanced IP Analyser scans an IPv4 or IPv6 address, CIDR, or inclusive range,
+identifies reachable devices and common TCP services, and exports inventories.
+Use it only on networks and systems you own or are authorized to administer.
+.SH GUI
+Run
+.B advanced-ip-analyser-gui
+for the Debian desktop interface, saved devices, service launchers,
+Wake-on-LAN, SSH power actions, and automatic updates.
+.SH FILES
+.I ~/.config/advanced-ip-analyser/favorites.json
+stores the current user's saved devices.
+.SH SEE ALSO
+.BR ping (8),
+.BR tracepath (8),
+.BR ssh (1)

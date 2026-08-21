@@ -1,0 +1,15 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Advanced IP Analyser
+Upstream-Contact: Daren Loxley <24845841+2E0LXY@users.noreply.github.com>
+Source: https://github.com/2E0LXY/Advanced-IP-Analyser
+
+Files: *
+Copyright: 2026 Daren Loxley (2E0LXY)
+License: GPL-3+
+ This program is free software: you can redistribute it and/or modify it under
+ the terms of the GNU General Public License as published by the Free Software
+ Foundation, either version 3 of the License, or (at your option) any later
+ version.
+ .
+ On Debian systems, the complete text of the GNU General Public License version
+ 3 is available in /usr/share/common-licenses/GPL-3.
