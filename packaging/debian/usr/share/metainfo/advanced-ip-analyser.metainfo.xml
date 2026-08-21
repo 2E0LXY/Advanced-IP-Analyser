@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>io.github.2E0LXY.AdvancedIPAnalyser</id>
+  <id>io.github._2E0LXY.AdvancedIPAnalyser</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
   <name>Advanced IP Analyser</name>
-  <developer id="io.github.2E0LXY">
+  <developer id="io.github._2E0LXY">
     <name>Daren Loxley</name>
   </developer>
   <summary>Discover, inventory, and access authorized network devices</summary>
