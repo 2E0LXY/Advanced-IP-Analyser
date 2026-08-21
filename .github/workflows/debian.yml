@@ -22,14 +22,14 @@ jobs:
             appstream ca-certificates desktop-file-utils fakeroot git iproute2 \
             iputils-ping lintian pkexec python3 python3-tk xauth xdg-utils xvfb
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Verify source version and run tests
         run: |
           version="$(PYTHONPATH=src python3 -c 'from ip_analyser import __version__; print(__version__)')"
           if [ "$GITHUB_REF_TYPE" = tag ]; then test "v$version" = "$GITHUB_REF_NAME"; fi
           python3 -m compileall -q src tests
-          python3 -m unittest discover -v
+          PYTHONPATH=src python3 -m unittest discover -s tests -v
 
       - name: Build Debian package
         run: sh packaging/build-deb.sh
