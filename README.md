@@ -25,15 +25,17 @@ The CLI works without Tk:
 .venv/bin/advanced-ip-analyser scan 192.168.1.0/24 --output inventory.csv
 .venv/bin/advanced-ip-analyser scan 192.168.1.10-192.168.1.30
 .venv/bin/advanced-ip-analyser wake AA:BB:CC:DD:EE:FF
+.venv/bin/advanced-ip-analyser capture 192.168.1.20 --interface enp1s0 --port 443
+.venv/bin/advanced-ip-analyser open-capture capture.pcapng --host 192.168.1.20
 ```
 
 ## Debian package
 
-Download `advanced-ip-analyser_1.0.0_all.deb` from the GitHub Release and install
+Download `advanced-ip-analyser_1.1.0_all.deb` from the GitHub Release and install
 it with:
 
 ```sh
-sudo apt install ./advanced-ip-analyser_1.0.0_all.deb
+sudo apt install ./advanced-ip-analyser_1.1.0_all.deb
 ```
 
 Maintainers can reproduce the package locally with `./packaging/build-deb.sh`.
@@ -83,6 +85,8 @@ and the application never attempts exploitation.
 - Non-interactive, confirmation-ready SSH shutdown and reboot operations
 - Delayed remote shutdown/reboot with an abort-shutdown action
 - Safe Ping, Tracepath, and Telnet launchers using fixed argument vectors
+- Optional Wireshark integration: capture selected host or service traffic,
+  list capture interfaces, open saved captures, and generate IPv4/IPv6 display filters
 - Copy-IP, selection-aware export, and confirmed Wake-on-LAN actions
 - Double-click a host row to open HTTPS, with HTTP as fallback
 
@@ -118,6 +122,29 @@ application does not request, retain, or pass passwords.
 Wake-on-LAN and remote administration should only be used on devices and networks
 you own or are authorized to manage.
 
+## Wireshark packet analysis
+
+Install Wireshark from Debian when packet analysis is needed:
+
+```sh
+sudo apt install wireshark
+```
+
+Use **Packets → Capture selected host/service in Wireshark** after selecting a
+host or service row. The application generates a bounded libpcap capture filter
+and starts Wireshark on the chosen interface. Selecting a service row also limits
+the capture to that TCP port. **Open capture file for selection** opens a saved
+capture with a generated Wireshark display filter for the selected IPv4/IPv6
+hosts. Use **Show capture interfaces** or the `capture-interfaces` CLI command to
+see the interface names reported by Wireshark.
+
+Capture filters and display filters are separate Wireshark languages; the
+application generates the appropriate form and passes it as a fixed process
+argument without a shell. Debian controls packet-capture privileges. Follow the
+package's capture-permission setup and do not run Advanced IP Analyser as root.
+See the official [Wireshark live-capture guide](https://www.wireshark.org/docs/wsug_html/#ChapterCapture)
+and [Wireshark command-line manual](https://www.wireshark.org/docs/man-pages/wireshark.html).
+
 ## Built-in help
 
 Press **Help** beside the footer version number for illustrated guidance covering
@@ -135,4 +162,6 @@ documentation text, and assets are not included.
 Copyright (C) 2026 2E0LXY. Licensed under GPL-3.0-or-later; see `LICENSE`.
 
 Feature-by-feature Linux parity and documented platform limitations are tracked
-in [`docs/FEATURE_PARITY.md`](docs/FEATURE_PARITY.md).
+in [`docs/FEATURE_PARITY.md`](docs/FEATURE_PARITY.md). Packet-analysis scope and
+safety boundaries are documented in
+[`docs/WIRESHARK_INTEGRATION.md`](docs/WIRESHARK_INTEGRATION.md).

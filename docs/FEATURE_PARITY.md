@@ -17,6 +17,7 @@ an independent GPL implementation and is not affiliated with Famatech.
 | Remote shutdown/reboot/abort | Explicitly confirmed, key-based, non-interactive SSH; shutdown/reboot are delayed one minute and cancellable |
 | Performance controls | Fast, Balanced, and Accurate profiles plus explicit timeout, worker, and port controls |
 | Automatic updates | Detects newer GitHub tags, flashes the Update button, requires the GitHub SHA-256 digest, validates package identity, requests PolicyKit authorization, and restarts |
+| Packet capture and analysis | Optional Wireshark integration for interface discovery, selected-host/service live capture, saved-capture opening, and generated capture/display filters |
 
 ## Linux-specific limitation
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0 - 2026-08-24
+
+- Add optional Wireshark live capture for selected IPv4/IPv6 hosts and service ports.
+- Add saved-capture opening with generated host and TCP-port display filters.
+- Add Wireshark capture-interface discovery in both the desktop and CLI interfaces.
+- Keep packet operations behind explicit user actions, bounded selections, validated
+  inputs, fixed subprocess arguments, and Debian-managed capture permissions.
+
 ## 1.0.0 - 2026-08-21
 
 - Completed the Debian 13 desktop workflow with Scan results and Favorites tabs,

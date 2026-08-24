@@ -1,4 +1,4 @@
-.TH ADVANCED-IP-ANALYSER 1 "August 2026" "Advanced IP Analyser 1.0.0" "User Commands"
+.TH ADVANCED-IP-ANALYSER 1 "August 2026" "Advanced IP Analyser 1.1.0" "User Commands"
 .SH NAME
 advanced-ip-analyser \- discover and inventory authorized network hosts
 .SH SYNOPSIS
@@ -18,6 +18,24 @@ advanced-ip-analyser \- discover and inventory authorized network hosts
 [
 .B --broadcast ADDRESS
 ]
+.br
+.B advanced-ip-analyser capture TARGET
+[
+.B --interface NAME
+]
+[
+.B --port PORT
+]
+.br
+.B advanced-ip-analyser capture-interfaces
+.br
+.B advanced-ip-analyser open-capture FILE
+[
+.B --host ADDRESS
+]
+[
+.B --port PORT
+]
 .SH DESCRIPTION
 Advanced IP Analyser scans an IPv4 or IPv6 address, CIDR, or inclusive range,
 identifies reachable devices and common TCP services, and exports inventories.
@@ -27,10 +45,13 @@ Run
 .B advanced-ip-analyser-gui
 for the Debian desktop interface, saved devices, service launchers,
 Wake-on-LAN, SSH power actions, and automatic updates.
+The optional Wireshark integration opens bounded live captures for selected
+hosts and services or saved capture files with generated display filters.
 .SH FILES
 .I ~/.config/advanced-ip-analyser/favorites.json
 stores the current user's saved devices.
 .SH SEE ALSO
 .BR ping (8),
 .BR tracepath (8),
-.BR ssh (1)
+.BR ssh (1),
+.BR wireshark (1)

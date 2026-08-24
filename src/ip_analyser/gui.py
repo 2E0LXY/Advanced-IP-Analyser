@@ -14,6 +14,8 @@ from .actions import open_network_tool, open_service, preferred_web_service, rem
 from .config import parse_ports
 from .models import Host
 from .network import active_ipv4_networks, broadcasts_for_host, current_ipv4_subnet, ipv4_24_target
+from .packet_tools import (launch_live_capture, launch_wireshark, list_capture_interfaces,
+                           open_capture, validate_interface)
 from .scanner import DEFAULT_PORTS, Scanner
 from .storage import export, import_inventory, load_favorites, merge_devices, save_favorites
 from .targets import parse_targets
@@ -140,10 +142,28 @@ class Application(tk.Tk):
         ttk.Button(actions, text="Wake", command=self.wake_selected).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Ping", command=lambda: self.run_selected_tool("ping")).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Trace", command=lambda: self.run_selected_tool("trace")).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Shutdown", command=lambda: self.power_selected("shutdown"), style="Danger.TButton").pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Reboot", command=lambda: self.power_selected("reboot"), style="Danger.TButton").pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Abort shutdown", command=lambda: self.power_selected("cancel")).pack(side="left", padx=(8, 0))
+        packet_button = ttk.Menubutton(actions, text="Packets ▾")
+        packet_button.pack(side="left", padx=(8, 0))
+        packet_menu = tk.Menu(packet_button, tearoff=False)
+        packet_menu.add_command(label="Capture selected host/service in Wireshark",
+                                command=self.capture_selected_packets)
+        packet_menu.add_command(label="Open capture file for selection…",
+                                command=self.open_packet_capture)
+        packet_menu.add_command(label="Show capture interfaces", command=self.show_capture_interfaces)
+        packet_menu.add_separator()
+        packet_menu.add_command(label="Open Wireshark", command=self.open_wireshark)
+        packet_button.configure(menu=packet_menu)
         ttk.Label(actions, text="Export uses selected rows when any are selected.").pack(side="right")
+
+        remote_actions = ttk.Frame(self, padding=(12, 0, 12, 8))
+        remote_actions.pack(fill="x")
+        ttk.Label(remote_actions, text="Remote administration").pack(side="left")
+        ttk.Button(remote_actions, text="Shutdown", command=lambda: self.power_selected("shutdown"),
+                   style="Danger.TButton").pack(side="left", padx=(8, 0))
+        ttk.Button(remote_actions, text="Reboot", command=lambda: self.power_selected("reboot"),
+                   style="Danger.TButton").pack(side="left", padx=(8, 0))
+        ttk.Button(remote_actions, text="Abort shutdown",
+                   command=lambda: self.power_selected("cancel")).pack(side="left", padx=(8, 0))
 
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill="both", expand=True, padx=12)
@@ -178,6 +198,8 @@ class Application(tk.Tk):
         self.table_menu.add_command(label="Copy row detail", command=self.copy_selected_detail)
         self.table_menu.add_command(label="Ping", command=lambda: self.run_selected_tool("ping"))
         self.table_menu.add_command(label="Trace route", command=lambda: self.run_selected_tool("trace"))
+        self.table_menu.add_command(label="Capture in Wireshark", command=self.capture_selected_packets)
+        self.table_menu.add_command(label="Open capture file…", command=self.open_packet_capture)
         self.table_menu.add_separator()
         self.table_menu.add_command(label="Expand all ports", command=lambda: self.set_all_expanded(True))
         self.table_menu.add_command(label="Collapse all ports", command=lambda: self.set_all_expanded(False))
@@ -295,6 +317,12 @@ class Application(tk.Tk):
                 "sudo shutdown on machines you administer. Power actions are delayed one minute so they can be aborted. The application never asks for, stores, or forwards passwords. "
                 "Ping and Trace open bounded Debian diagnostic commands in a terminal. "
                 "Remote results are reported per host. Detected service links never bypass authentication.")
+        add_tab("Packet analysis",
+                "The Packets menu integrates the optional Debian Wireshark package. Select a host row to capture only traffic to or from that IP. "
+                "Select an individual service row to additionally limit live capture to its TCP port. Choose the active interface when prompted; 'any' captures across Linux interfaces.\n\n"
+                "Open capture file loads an existing pcap, pcapng, or other Wireshark-supported capture. When hosts are selected, the file opens with a generated IPv4/IPv6 display filter. "
+                "Capture and display filters are different Wireshark languages, so Advanced IP Analyser generates the correct form for each. Commands use fixed arguments and never invoke a shell.\n\n"
+                "Install with: sudo apt install wireshark. Debian controls packet-capture permissions; do not run this application as root. Capture only traffic you are authorized to inspect.")
         add_tab("Shortcuts",
                 "F5 — start a scan\nEscape — cancel the active scan\nCtrl+F — focus the live filter\n"
                 "Ctrl+O — import JSON or XML inventory\nCtrl+S — export inventory\nCtrl+Shift+C — copy selected host or service detail\n"
@@ -622,6 +650,84 @@ class Application(tk.Tk):
                 selected.append(host)
                 seen.add(host.identity)
         return selected
+
+    def _selected_packet_scope(self) -> tuple[list[Host], int | None]:
+        hosts = self.selected_hosts()
+        ports: set[int] = set()
+        for item in self.table.selection():
+            detail = self.services_by_item.get(item)
+            if detail is None and item in self.metadata_by_item:
+                detail = self.services_by_item.get(self.table.parent(item))
+            if detail is not None:
+                ports.add(detail[2])
+        port = next(iter(ports)) if len(hosts) == 1 and len(ports) == 1 else None
+        return hosts, port
+
+    def _capture_interface_hint(self) -> str:
+        index = self.subnets.current()
+        if 0 <= index < len(self.network_presets):
+            return self.network_presets[index][0]
+        return "any"
+
+    def capture_selected_packets(self) -> None:
+        hosts, port = self._selected_packet_scope()
+        if not hosts:
+            messagebox.showinfo("Nothing selected", "Select one or more hosts or a service row first.")
+            return
+        interface = simpledialog.askstring(
+            "Wireshark capture interface",
+            "Capture interface (use 'any' for all Linux interfaces):",
+            initialvalue=self._capture_interface_hint(), parent=self)
+        if interface is None:
+            return
+        try:
+            interface = validate_interface(interface)
+        except ValueError as error:
+            messagebox.showerror("Invalid capture interface", str(error))
+            return
+        addresses = [host.address for host in hosts]
+        scope = f"{len(addresses)} selected host(s)" + (f" on TCP port {port}" if port else "")
+        if not messagebox.askyesno(
+                "Start packet capture",
+                f"Open Wireshark and start capturing {scope} on {interface}?\n\n"
+                "Capture only traffic you are authorized to inspect."):
+            return
+        try:
+            launch_live_capture(addresses, interface, port)
+            self.status.configure(text=f"Opened Wireshark live capture for {scope}")
+        except (OSError, RuntimeError, ValueError) as error:
+            messagebox.showerror("Wireshark unavailable", str(error))
+
+    def open_packet_capture(self) -> None:
+        name = filedialog.askopenfilename(filetypes=[
+            ("Packet captures", "*.pcap *.pcapng *.cap *.pcap.gz *.pcapng.gz"),
+            ("All files", "*")])
+        if not name:
+            return
+        hosts, port = self._selected_packet_scope()
+        try:
+            open_capture(Path(name), [host.address for host in hosts] or None, port)
+            suffix = " with the selected-host display filter" if hosts else ""
+            self.status.configure(text=f"Opened packet capture{suffix}")
+        except (OSError, RuntimeError, ValueError) as error:
+            messagebox.showerror("Cannot open capture", str(error))
+
+    def open_wireshark(self) -> None:
+        try:
+            launch_wireshark()
+            self.status.configure(text="Opened Wireshark")
+        except (OSError, RuntimeError) as error:
+            messagebox.showerror("Wireshark unavailable", str(error))
+
+    def show_capture_interfaces(self) -> None:
+        try:
+            interfaces = list_capture_interfaces()
+            details = "\n".join(f"{name} — {description}" for name, description in interfaces[:30])
+            if len(interfaces) > 30:
+                details += f"\n… and {len(interfaces) - 30} more"
+            messagebox.showinfo("Wireshark capture interfaces", details)
+        except (OSError, RuntimeError) as error:
+            messagebox.showerror("Wireshark unavailable", str(error))
 
     def copy_selected_ips(self) -> None:
         hosts = self.selected_hosts()
