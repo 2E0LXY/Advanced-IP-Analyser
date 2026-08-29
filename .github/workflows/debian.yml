@@ -22,7 +22,7 @@ jobs:
           apt-get update
           apt-get install --yes --no-install-recommends \
             appstream ca-certificates desktop-file-utils fakeroot git iproute2 \
-            iputils-ping lintian pkexec python3 python3-tk wireshark xauth xdg-utils xvfb
+            iputils-ping lintian pkexec python3 python3-tk xauth xdg-utils xvfb
 
       - uses: actions/checkout@v5
 

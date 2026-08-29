@@ -16,9 +16,12 @@ Analyser on Debian 13.
   and version before PolicyKit authorization is requested.
 - Remote power is explicitly confirmed, non-interactive, and key based; no
   passwords are collected or stored.
-- Wireshark capture and display filters are generated only from validated IP
-  addresses, ports, and interface names, use fixed subprocess arguments, and
-  retain Debian's normal capture-permission model.
+- Live capture accepts only validated IP addresses, ports, interfaces, durations,
+  and packet limits. A narrow installed helper uses Linux raw sockets and fixed
+  arguments, validates capture-file ownership before writing, and is elevated
+  through PolicyKit only when required; the desktop process remains unprivileged.
+- Capture readers bound compressed and expanded input, record counts, and packet
+  sizes before parsing untrusted PCAP or PCAPNG files.
 
 ## Reporting
 

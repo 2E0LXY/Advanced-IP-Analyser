@@ -1,3 +1,11 @@
+advanced-ip-analyser (1.2.0) stable; urgency=medium
+
+  * Replace the Wireshark dependency with built-in bounded packet capture.
+  * Add native PCAP/PCAPNG analysis, filtering, and packet byte previews.
+  * Keep privileged raw-socket work in a narrow PolicyKit helper.
+
+ -- Daren Loxley <24845841+2E0LXY@users.noreply.github.com>  Sat, 29 Aug 2026 12:00:00 +0100
+
 advanced-ip-analyser (1.1.0) stable; urgency=medium
 
   * Add optional Wireshark live and saved-capture integration.

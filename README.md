@@ -13,7 +13,7 @@ Use it only on networks and computers you own or are authorized to administer.
 Debian 13 needs Python 3 and Tk for the desktop interface:
 
 ```sh
-sudo apt install python3 python3-tk iputils-ping iproute2
+sudo apt install python3 python3-tk iputils-ping iproute2 pkexec
 python3 -m venv .venv
 .venv/bin/pip install -e .
 .venv/bin/advanced-ip-analyser-gui
@@ -31,11 +31,11 @@ The CLI works without Tk:
 
 ## Debian package
 
-Download `advanced-ip-analyser_1.1.0_all.deb` from the GitHub Release and install
+Download `advanced-ip-analyser_1.2.0_all.deb` from the GitHub Release and install
 it with:
 
 ```sh
-sudo apt install ./advanced-ip-analyser_1.1.0_all.deb
+sudo apt install ./advanced-ip-analyser_1.2.0_all.deb
 ```
 
 Maintainers can reproduce the package locally with `./packaging/build-deb.sh`.
@@ -85,8 +85,8 @@ and the application never attempts exploitation.
 - Non-interactive, confirmation-ready SSH shutdown and reboot operations
 - Delayed remote shutdown/reboot with an abort-shutdown action
 - Safe Ping, Tracepath, and Telnet launchers using fixed argument vectors
-- Optional Wireshark integration: capture selected host or service traffic,
-  list capture interfaces, open saved captures, and generate IPv4/IPv6 display filters
+- Built-in packet capture and analysis: capture selected host or service traffic,
+  list Linux interfaces, inspect saved PCAP/PCAPNG files, and filter IPv4/IPv6 traffic
 - Copy-IP, selection-aware export, and confirmed Wake-on-LAN actions
 - Double-click a host row to open HTTPS, with HTTP as fallback
 
@@ -122,28 +122,21 @@ application does not request, retain, or pass passwords.
 Wake-on-LAN and remote administration should only be used on devices and networks
 you own or are authorized to manage.
 
-## Wireshark packet analysis
+## Built-in packet analysis
 
-Install Wireshark from Debian when packet analysis is needed:
+Wireshark is not required. Use **Packets → Capture selected host/service** after
+selecting a host or service row. Live capture is restricted to the selected IP
+addresses and, for a single selected service, its TCP or UDP port. Captures are
+bounded to 1–300 seconds and at most 100,000 packets. Debian may show a PolicyKit
+administrator prompt because raw packet access requires elevated permission; the
+desktop application itself remains unprivileged and should not be run as root.
 
-```sh
-sudo apt install wireshark
-```
-
-Use **Packets → Capture selected host/service in Wireshark** after selecting a
-host or service row. The application generates a bounded libpcap capture filter
-and starts Wireshark on the chosen interface. Selecting a service row also limits
-the capture to that TCP port. **Open capture file for selection** opens a saved
-capture with a generated Wireshark display filter for the selected IPv4/IPv6
-hosts. Use **Show capture interfaces** or the `capture-interfaces` CLI command to
-see the interface names reported by Wireshark.
-
-Capture filters and display filters are separate Wireshark languages; the
-application generates the appropriate form and passes it as a fixed process
-argument without a shell. Debian controls packet-capture privileges. Follow the
-package's capture-permission setup and do not run Advanced IP Analyser as root.
-See the official [Wireshark live-capture guide](https://www.wireshark.org/docs/wsug_html/#ChapterCapture)
-and [Wireshark command-line manual](https://www.wireshark.org/docs/man-pages/wireshark.html).
+**Open capture file for selection** reads Ethernet PCAP, PCAPNG, and gzip-compressed
+captures in the built-in viewer. It displays endpoints, TCP/UDP ports, common IP
+protocols, TCP flags, packet lengths, and a bounded byte preview. Saved captures
+can be filtered to selected IPv4/IPv6 hosts and a service port. Payload decryption,
+stream reassembly, wireless monitor mode, and Wireshark's full dissector library
+are intentionally outside this lightweight analyser's scope.
 
 ## Built-in help
 
@@ -164,4 +157,4 @@ Copyright (C) 2026 2E0LXY. Licensed under GPL-3.0-or-later; see `LICENSE`.
 Feature-by-feature Linux parity and documented platform limitations are tracked
 in [`docs/FEATURE_PARITY.md`](docs/FEATURE_PARITY.md). Packet-analysis scope and
 safety boundaries are documented in
-[`docs/WIRESHARK_INTEGRATION.md`](docs/WIRESHARK_INTEGRATION.md).
+[`docs/PACKET_ANALYSIS.md`](docs/PACKET_ANALYSIS.md).

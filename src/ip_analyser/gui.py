@@ -5,6 +5,7 @@ import threading
 import tkinter as tk
 import ipaddress
 import getpass
+import shutil
 from dataclasses import replace
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
@@ -14,8 +15,8 @@ from .actions import open_network_tool, open_service, preferred_web_service, rem
 from .config import parse_ports
 from .models import Host
 from .network import active_ipv4_networks, broadcasts_for_host, current_ipv4_subnet, ipv4_24_target
-from .packet_tools import (launch_live_capture, launch_wireshark, list_capture_interfaces,
-                           open_capture, validate_interface)
+from .packet_tools import (PacketRecord, capture_live, list_capture_interfaces,
+                           packet_hex_preview, read_capture, validate_interface)
 from .scanner import DEFAULT_PORTS, Scanner
 from .storage import export, import_inventory, load_favorites, merge_devices, save_favorites
 from .targets import parse_targets
@@ -24,6 +25,97 @@ from .updater import Update, check_for_update, download_update, launch_installer
 OPENABLE_SERVICES = {"http", "https", "ftp", "smb", "ssh", "rdp", "telnet"}
 COMMON_PORTS = ",".join(str(port) for port in DEFAULT_PORTS)
 WEB_APP_PORTS = "80,443,3000,5000,8000,8080,8081,8443,8888,9000,9090"
+GUI_PACKET_LIMIT = 20_000
+
+
+class PacketViewer(tk.Toplevel):
+    def __init__(self, parent: "Application", capture: Path, records: list[PacketRecord]):
+        super().__init__(parent)
+        self.capture = capture
+        self.records = records
+        self.records_by_item: dict[str, PacketRecord] = {}
+        self.title(f"Packet analysis · {capture.name}")
+        self.geometry("1180x700")
+        self.minsize(760, 480)
+
+        header = ttk.Frame(self, padding=12)
+        header.pack(fill="x")
+        ttk.Label(header, text="Built-in packet analysis",
+                  font=("TkDefaultFont", 14, "bold")).pack(side="left")
+        ttk.Label(header, text=f"{len(records):,} matching packet(s)").pack(side="left", padx=16)
+        ttk.Button(header, text="Save capture as…", command=self.save_capture).pack(side="right")
+        ttk.Button(header, text="Close", command=self.destroy).pack(side="right", padx=(0, 8))
+
+        filter_bar = ttk.Frame(self, padding=(12, 0, 12, 8))
+        filter_bar.pack(fill="x")
+        ttk.Label(filter_bar, text="Filter packets").pack(side="left")
+        self.filter_text = tk.StringVar()
+        self.filter_text.trace_add("write", lambda *_args: self.refresh())
+        ttk.Entry(filter_bar, textvariable=self.filter_text).pack(side="left", fill="x", expand=True, padx=8)
+
+        pane = ttk.Panedwindow(self, orient="vertical")
+        pane.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        table_frame = ttk.Frame(pane)
+        detail_frame = ttk.Frame(pane)
+        pane.add(table_frame, weight=3)
+        pane.add(detail_frame, weight=2)
+
+        columns = ("number", "time", "source", "sport", "destination", "dport",
+                   "protocol", "length", "info")
+        self.table = ttk.Treeview(table_frame, columns=columns, show="headings", selectmode="browse")
+        widths = (60, 105, 190, 70, 190, 70, 85, 70, 180)
+        for column, width in zip(columns, widths):
+            self.table.heading(column, text=column.title())
+            self.table.column(column, width=width, anchor="w", stretch=column in {"source", "destination", "info"})
+        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.table.yview)
+        self.table.configure(yscrollcommand=scrollbar.set)
+        self.table.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        self.table.bind("<<TreeviewSelect>>", self.show_detail)
+
+        ttk.Label(detail_frame, text="Packet bytes (first 512 bytes)").pack(anchor="w", pady=(6, 4))
+        self.detail = tk.Text(detail_frame, height=12, wrap="none", font=("TkFixedFont", 9), state="disabled")
+        self.detail.pack(fill="both", expand=True)
+        self.refresh()
+
+    def refresh(self) -> None:
+        term = self.filter_text.get().strip().casefold()
+        self.table.delete(*self.table.get_children())
+        self.records_by_item.clear()
+        for record in self.records:
+            searchable = " ".join((record.source, record.destination, record.protocol, record.info,
+                                   str(record.source_port or ""), str(record.destination_port or ""))).casefold()
+            if term and term not in searchable:
+                continue
+            item = self.table.insert("", "end", values=(
+                record.number, record.time_text, record.source, record.source_port or "",
+                record.destination, record.destination_port or "", record.protocol,
+                record.length, record.info))
+            self.records_by_item[item] = record
+
+    def show_detail(self, _event=None) -> None:
+        selected = self.table.selection()
+        if not selected or selected[0] not in self.records_by_item:
+            return
+        record = self.records_by_item[selected[0]]
+        heading = (f"Packet {record.number} · {record.protocol} · {record.source}"
+                   f"{':' + str(record.source_port) if record.source_port else ''} → {record.destination}"
+                   f"{':' + str(record.destination_port) if record.destination_port else ''}\n\n")
+        self.detail.configure(state="normal")
+        self.detail.delete("1.0", "end")
+        self.detail.insert("1.0", heading + packet_hex_preview(record))
+        self.detail.configure(state="disabled")
+
+    def save_capture(self) -> None:
+        destination = filedialog.asksaveasfilename(
+            parent=self, defaultextension=".pcap", initialfile=self.capture.name,
+            filetypes=[("PCAP capture", "*.pcap"), ("All files", "*")])
+        if not destination:
+            return
+        try:
+            shutil.copyfile(self.capture, destination)
+        except OSError as error:
+            messagebox.showerror("Save failed", str(error), parent=self)
 
 
 class Application(tk.Tk):
@@ -145,13 +237,11 @@ class Application(tk.Tk):
         packet_button = ttk.Menubutton(actions, text="Packets ▾")
         packet_button.pack(side="left", padx=(8, 0))
         packet_menu = tk.Menu(packet_button, tearoff=False)
-        packet_menu.add_command(label="Capture selected host/service in Wireshark",
+        packet_menu.add_command(label="Capture selected host/service",
                                 command=self.capture_selected_packets)
         packet_menu.add_command(label="Open capture file for selection…",
                                 command=self.open_packet_capture)
         packet_menu.add_command(label="Show capture interfaces", command=self.show_capture_interfaces)
-        packet_menu.add_separator()
-        packet_menu.add_command(label="Open Wireshark", command=self.open_wireshark)
         packet_button.configure(menu=packet_menu)
         ttk.Label(actions, text="Export uses selected rows when any are selected.").pack(side="right")
 
@@ -198,7 +288,7 @@ class Application(tk.Tk):
         self.table_menu.add_command(label="Copy row detail", command=self.copy_selected_detail)
         self.table_menu.add_command(label="Ping", command=lambda: self.run_selected_tool("ping"))
         self.table_menu.add_command(label="Trace route", command=lambda: self.run_selected_tool("trace"))
-        self.table_menu.add_command(label="Capture in Wireshark", command=self.capture_selected_packets)
+        self.table_menu.add_command(label="Capture packets for selection", command=self.capture_selected_packets)
         self.table_menu.add_command(label="Open capture file…", command=self.open_packet_capture)
         self.table_menu.add_separator()
         self.table_menu.add_command(label="Expand all ports", command=lambda: self.set_all_expanded(True))
@@ -318,11 +408,11 @@ class Application(tk.Tk):
                 "Ping and Trace open bounded Debian diagnostic commands in a terminal. "
                 "Remote results are reported per host. Detected service links never bypass authentication.")
         add_tab("Packet analysis",
-                "The Packets menu integrates the optional Debian Wireshark package. Select a host row to capture only traffic to or from that IP. "
-                "Select an individual service row to additionally limit live capture to its TCP port. Choose the active interface when prompted; 'any' captures across Linux interfaces.\n\n"
-                "Open capture file loads an existing pcap, pcapng, or other Wireshark-supported capture. When hosts are selected, the file opens with a generated IPv4/IPv6 display filter. "
-                "Capture and display filters are different Wireshark languages, so Advanced IP Analyser generates the correct form for each. Commands use fixed arguments and never invoke a shell.\n\n"
-                "Install with: sudo apt install wireshark. Debian controls packet-capture permissions; do not run this application as root. Capture only traffic you are authorized to inspect.")
+                "Advanced IP Analyser includes its own Debian packet-capture and analysis engine; Wireshark is not required. Select a host row to capture only traffic to or from that IP. "
+                "Select an individual service row to additionally limit capture to its TCP or UDP port. Choose the active interface when prompted; 'any' captures across Linux interfaces.\n\n"
+                "A live capture is bounded by time and packet count. Debian may show an administrator authorization prompt because raw packet capture requires elevated permission; the main application remains unprivileged. "
+                "Open capture file reads bounded Ethernet PCAP, PCAPNG, and gzip-compressed captures and displays packet endpoints, protocols, ports, flags, and a byte preview.\n\n"
+                "Capture only traffic you are authorized to inspect. Encrypted payloads remain encrypted and this tool does not bypass authentication or encryption.")
         add_tab("Shortcuts",
                 "F5 — start a scan\nEscape — cancel the active scan\nCtrl+F — focus the live filter\n"
                 "Ctrl+O — import JSON or XML inventory\nCtrl+S — export inventory\nCtrl+Shift+C — copy selected host or service detail\n"
@@ -518,6 +608,14 @@ class Application(tk.Tk):
                     if failed:
                         messagebox.showwarning("Remote action results", "\n".join(
                             f"{result.host}: {result.detail}" for result in failed))
+                elif event[0] == "packet_done":
+                    _, path, records = event
+                    self.status.configure(text=f"Packet analysis ready: {len(records):,} matching packet(s)")
+                    PacketViewer(self, path, records)
+                    return
+                elif event[0] == "packet_error":
+                    self.status.configure(text="Packet operation failed")
+                    messagebox.showerror("Packet operation failed", str(event[1]))
                     return
                 else:
                     self._stop_discovery_indicator()
@@ -675,7 +773,7 @@ class Application(tk.Tk):
             messagebox.showinfo("Nothing selected", "Select one or more hosts or a service row first.")
             return
         interface = simpledialog.askstring(
-            "Wireshark capture interface",
+            "Capture interface",
             "Capture interface (use 'any' for all Linux interfaces):",
             initialvalue=self._capture_interface_hint(), parent=self)
         if interface is None:
@@ -685,18 +783,31 @@ class Application(tk.Tk):
         except ValueError as error:
             messagebox.showerror("Invalid capture interface", str(error))
             return
+        duration = simpledialog.askinteger(
+            "Capture duration", "Maximum capture time in seconds (1–300):",
+            initialvalue=10, minvalue=1, maxvalue=300, parent=self)
+        if duration is None:
+            return
         addresses = [host.address for host in hosts]
         scope = f"{len(addresses)} selected host(s)" + (f" on TCP port {port}" if port else "")
         if not messagebox.askyesno(
                 "Start packet capture",
-                f"Open Wireshark and start capturing {scope} on {interface}?\n\n"
-                "Capture only traffic you are authorized to inspect."):
+                f"Capture {scope} on {interface} for up to {duration} seconds?\n\n"
+                "Debian may request administrator authorization. Capture only traffic you are authorized to inspect."):
             return
+        self.status.configure(text=f"Capturing {scope}…")
+        threading.Thread(target=self._capture_packets_worker,
+                         args=(addresses, interface, port, duration), daemon=True).start()
+        self.after(50, self._drain_events)
+
+    def _capture_packets_worker(self, addresses: list[str], interface: str,
+                                port: int | None, duration: int) -> None:
         try:
-            launch_live_capture(addresses, interface, port)
-            self.status.configure(text=f"Opened Wireshark live capture for {scope}")
+            path = capture_live(addresses, interface, port, duration)
+            self.events.put(("packet_done", path, read_capture(
+                path, addresses, port, GUI_PACKET_LIMIT)))
         except (OSError, RuntimeError, ValueError) as error:
-            messagebox.showerror("Wireshark unavailable", str(error))
+            self.events.put(("packet_error", error))
 
     def open_packet_capture(self) -> None:
         name = filedialog.askopenfilename(filetypes=[
@@ -705,19 +816,19 @@ class Application(tk.Tk):
         if not name:
             return
         hosts, port = self._selected_packet_scope()
-        try:
-            open_capture(Path(name), [host.address for host in hosts] or None, port)
-            suffix = " with the selected-host display filter" if hosts else ""
-            self.status.configure(text=f"Opened packet capture{suffix}")
-        except (OSError, RuntimeError, ValueError) as error:
-            messagebox.showerror("Cannot open capture", str(error))
+        addresses = [host.address for host in hosts] or None
+        self.status.configure(text="Reading packet capture…")
+        threading.Thread(target=self._open_capture_worker,
+                         args=(Path(name), addresses, port), daemon=True).start()
+        self.after(50, self._drain_events)
 
-    def open_wireshark(self) -> None:
+    def _open_capture_worker(self, path: Path, addresses: list[str] | None,
+                             port: int | None) -> None:
         try:
-            launch_wireshark()
-            self.status.configure(text="Opened Wireshark")
-        except (OSError, RuntimeError) as error:
-            messagebox.showerror("Wireshark unavailable", str(error))
+            self.events.put(("packet_done", path, read_capture(
+                path, addresses, port, GUI_PACKET_LIMIT)))
+        except (OSError, RuntimeError, ValueError) as error:
+            self.events.put(("packet_error", error))
 
     def show_capture_interfaces(self) -> None:
         try:
@@ -725,9 +836,9 @@ class Application(tk.Tk):
             details = "\n".join(f"{name} — {description}" for name, description in interfaces[:30])
             if len(interfaces) > 30:
                 details += f"\n… and {len(interfaces) - 30} more"
-            messagebox.showinfo("Wireshark capture interfaces", details)
+            messagebox.showinfo("Capture interfaces", details)
         except (OSError, RuntimeError) as error:
-            messagebox.showerror("Wireshark unavailable", str(error))
+            messagebox.showerror("Cannot list capture interfaces", str(error))
 
     def copy_selected_ips(self) -> None:
         hosts = self.selected_hosts()

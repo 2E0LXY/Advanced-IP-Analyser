@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.0 - 2026-08-29
+
+- Replace the optional Wireshark integration with a native Debian packet engine.
+- Add bounded selected-host/service live capture through Linux raw sockets and a
+  narrow PolicyKit-authorized helper while keeping the desktop process unprivileged.
+- Add an in-app PCAP/PCAPNG viewer with IPv4/IPv6, ARP, TCP, UDP, DNS, ICMP,
+  common IP protocol summaries, filtering, capture export, and byte previews.
+- Add PCAP, PCAPNG, and gzip input bounds, secure output ownership checks, CLI
+  capture controls, and packet-parser regression coverage.
+
 ## 1.1.0 - 2026-08-24
 
 - Add optional Wireshark live capture for selected IPv4/IPv6 hosts and service ports.
