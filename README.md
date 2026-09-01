@@ -1,192 +1,328 @@
 # Advanced IP Analyser
 
-Advanced IP Analyser is an independently implemented Debian network inventory
-application. It discovers reachable hosts, resolves names and local neighbour
-MAC addresses, identifies common TCP services, exports inventories, and sends
-Wake-on-LAN packets. It contains no Angry IP Scanner source code, history, or
-assets.
+![Advanced IP Analyser icon](src/ip_analyser/assets/advanced-ip-analyser.png)
 
-Use it only on networks and computers you own or are authorized to administer.
+Advanced IP Analyser is an original, Debian 13-only desktop and command-line
+network inventory, packet analysis, long-term monitoring, and passive Wi-Fi
+observation application. It is designed for home labs, support teams, system
+administrators, and authorized network troubleshooting without requiring
+Wireshark.
 
-## Run from source
+> Use Advanced IP Analyser only on networks, systems, and radio traffic you own
+> or are explicitly authorized to inspect.
 
-Debian 13 needs Python 3 and Tk for the desktop interface:
+[Download the latest release](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/latest)
+· [Read the instruction book](output/pdf/Advanced-IP-Analyser-Instruction-Book.pdf)
+· [Report a problem](https://github.com/2E0LXY/Advanced-IP-Analyser/issues)
+
+## Application overview
+
+![Scanner overview](docs/images/scanner-overview.png)
+
+The main window combines target selection, scan profiles, TCP-port controls,
+live progress, expandable service results, favorites, inventory exchange, remote
+actions, packet tools, and verified updates in one interface.
+
+## Feature map
+
+| Area | Features |
+| --- | --- |
+| Network discovery | IPv4/IPv6 addresses, CIDRs, inclusive ranges, active-interface presets, `/24` shortcut, reachability, latency, DNS names, local MAC addresses, offline vendor lookup |
+| TCP services | Custom ports/ranges, common and web presets, optional all-65,535-port scan, expandable port rows, safe HTTP/TLS/banner metadata, cancellable two-stage discovery |
+| Results workflow | Live filtering and sorting, alternating rows, clickable services, copy IP/detail, selection-aware export, keyboard and context-menu actions |
+| Favorites | Persistent saved devices, MAC-first identity, refreshed IP observations, editable notes, rescan, removal, import, selected export |
+| Inventory | CSV/JSON/XML/escaped-HTML export, bounded JSON/XML import, spreadsheet-formula protection, atomic favorites updates |
+| Device access | HTTP, HTTPS, FTP, SMB, SSH, RDP and Telnet launchers; Ping, Tracepath, Wake-on-LAN; confirmed delayed SSH shutdown/reboot and abort |
+| Packet engine | Native Linux `AF_PACKET` capture, selected-host/service scope, interface discovery, Ethernet PCAP/PCAPNG/gzip reading, endpoint/port/protocol summaries, byte preview |
+| Display filters | IP/CIDR, TCP/UDP ports, DNS, HTTP, TLS, ICMP, ARP, TCP flags, lengths, comparisons, text/regex matching, boolean expressions, 20 quick filters, saved named filters |
+| Network Watch | Up to 24-hour sessions, minute timeline, conversations, devices, DNS, protocols/services, TCP diagnostics, baselines, findings, alerts, bookmarks, reports, retention, history |
+| Passive Wi-Fi | Monitor-mode virtual interface, AP/client discovery, SSID/BSSID, channel, signal, security advertisement, beacons/data, probes, passive EAPOL observation, PCAP/JSON save |
+| Updates | Automatic GitHub release check, flashing button, trusted release URL, SHA-256 verification, Debian package identity check, close/install/restart workflow |
+| Debian packaging | Reproducible `.deb`, Lintian/AppStream/desktop validation, install/GUI/remove smoke test, release checksum, optional signed GitHub Pages APT feed |
+
+## Debian 13 installation
+
+Download the newest `advanced-ip-analyser_VERSION_all.deb` from the
+[Releases page](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/latest),
+then run:
 
 ```sh
-sudo apt install python3 python3-tk iputils-ping iproute2 pkexec iw
-python3 -m venv .venv
+cd ~/Downloads
+sudo apt install ./advanced-ip-analyser_2.0.0_all.deb
+```
+
+Launch it from the desktop application menu or run:
+
+```sh
+advanced-ip-analyser-gui
+```
+
+The package installs Python, Tk, hardened XML parsing, ping, IP-route tools,
+desktop integration, and PolicyKit dependencies. `iw` is recommended for Passive
+Wi-Fi Watch. Optional service launchers use Debian packages such as OpenSSH,
+FreeRDP, GVfs, Tracepath, and Telnet when installed.
+
+### Run from source
+
+```sh
+sudo apt update
+sudo apt install python3 python3-venv python3-tk python3-defusedxml \
+  iputils-ping iproute2 pkexec iw xdg-utils
+git clone https://github.com/2E0LXY/Advanced-IP-Analyser.git
+cd Advanced-IP-Analyser
+python3 -m venv --system-site-packages .venv
 .venv/bin/pip install -e .
 .venv/bin/advanced-ip-analyser-gui
 ```
 
-The CLI works without Tk:
+Raw packet capture and temporary Wi-Fi monitor interfaces require elevated Linux
+capabilities. The desktop remains unprivileged and asks PolicyKit to run only the
+installed, root-owned, narrowly validated helper when necessary. Do not launch
+the complete GUI with `sudo`.
 
-```sh
-.venv/bin/advanced-ip-analyser scan 192.168.1.0/24 --output inventory.csv
-.venv/bin/advanced-ip-analyser scan 192.168.1.10-192.168.1.30
-.venv/bin/advanced-ip-analyser wake AA:BB:CC:DD:EE:FF
-.venv/bin/advanced-ip-analyser capture 192.168.1.20 --interface enp1s0 --port 443
-.venv/bin/advanced-ip-analyser open-capture capture.pcapng --host 192.168.1.20
-.venv/bin/advanced-ip-analyser open-capture capture.pcap --filter 'dns && ip.addr == 192.168.1.20'
-.venv/bin/advanced-ip-analyser watch --interface any --duration 900 --report watch.html
-.venv/bin/advanced-ip-analyser analyse-capture capture.pcap --report analysis.json
-```
+## Scanning and service discovery
 
-## Debian package
+1. Select an interface subnet, enter one address/range/CIDR, or use the `/24`
+   shortcut.
+2. Choose Fast, Balanced, or Accurate, or set timeout/workers manually.
+3. Enter TCP ports and ranges. Right-click the field for common, web/application,
+   all-port, or clear presets.
+4. Press **Scan**. Reachable hosts and ports appear first; bounded service-detail
+   discovery follows as a separate phase.
+5. Expand a host to inspect ports and expand a port to inspect available metadata.
 
-Download `advanced-ip-analyser_2.0.0_all.deb` from the GitHub Release and install
-it with:
+Detected details can include HTTP status, Server and Powered-By headers, page
+title, content type, redirects, authentication realm, TLS protocol/cipher, and
+safe protocol greetings. Discovery is unauthenticated and does not exploit or
+log in to a service.
 
-```sh
-sudo apt install ./advanced-ip-analyser_2.0.0_all.deb
-```
+Supported targets are single IPv4/IPv6 addresses, CIDRs, and inclusive ranges.
+Each invocation is limited to 65,536 addresses. Full TCP-port scans should be
+restricted to a small number of authorized targets.
 
-Maintainers can reproduce the package locally with `./packaging/build-deb.sh`.
+## Favorites, inventories, and device actions
 
-Version 0.5.1 introduced automatic updates. Older releases do not contain the
-update checker, so install 0.5.1 or later manually once. Later releases are detected after
-startup: click the flashing update button to download the verified package,
-authorize Debian installation, close the current process, and reopen the updated
-application automatically. Help also includes a manual **Check for updates** action.
-
-Targets are limited to 65,536 addresses per invocation. The scanner checks a
-small, explicit set of common service ports. Fingerprinting is bounded and
-unauthenticated. Remote power is a separate, explicit, confirmed SSH-key action,
-and the application never attempts exploitation.
-
-## Current scope
-
-- IPv4/IPv6 single addresses, CIDRs, and inclusive ranges
-- Concurrent reachability and common-service checks
-- Two-stage scanning: show every host and open port first, then discover server
-  metadata with separate progress and a flashing please-wait indicator
-- Reverse DNS and local neighbour-table MAC lookup
-- Offline MAC manufacturer lookup from Debian's IEEE or Nmap OUI database
-- Clickable HTTP and HTTPS links for selected hosts
-- Ascending and descending sorting from every results-table heading
-- Reachable-host-only table and exports; down addresses remain progress-only
-- Live filtering across addresses, names, MACs, manufacturers, and services
-- Expandable host rows showing every detected TCP port and its service detail
-- Nested service fingerprints showing HTTP status, server software, page title,
-  content type, redirects, authentication realm, TLS details, and safe protocol greetings when exposed
-- Automatic GitHub release checks with a flashing update button, verified `.deb`
-  download, Debian authorization, application restart, and a manual Help-window check
-- Alternating white and light-blue inventory rows for easier scanning
-- Clickable HTTP, HTTPS, FTP, SMB, SSH, and RDP service rows
-- SSH username prompt before terminal launch, retaining the last username for the current session
-- Double-click, Enter, and right-click service activation plus expand/collapse-all controls
-- Keyboard shortcuts: F5 scan, Escape cancel, Ctrl+F filter, Ctrl+O import, Ctrl+S export, Ctrl+Shift+C copy detail
-- Custom TCP port ranges, timeout, and concurrency controls
-- Right-click TCP presets for common services, web/application ports, or all 65,535 TCP ports
-- Current-interface IPv4 subnet shortcut
-- Direct class-C-style `/24` subnet shortcut
-- Cancellable scans with partial-result retention
-- Persistent device favorites stored under the user's configuration directory
-- Atomic saved-device updates with MAC-first identity and IP refresh
-- Safe JSON and XML inventory import plus CSV, JSON, XML, and HTML export
-- Active-interface subnet and broadcast discovery
-- Non-interactive, confirmation-ready SSH shutdown and reboot operations
-- Delayed remote shutdown/reboot with an abort-shutdown action
-- Safe Ping, Tracepath, and Telnet launchers using fixed argument vectors
-- Built-in packet capture and analysis: capture selected host or service traffic,
-  list Linux interfaces, inspect saved PCAP/PCAPNG files, and filter IPv4/IPv6 traffic
-- Wireshark-style display filters for addresses/CIDRs, ports, DNS, HTTP, TLS,
-  ICMP, ARP, TCP flags and lengths, with comparisons, combinations, 20 presets,
-  validity feedback, and persistent named filters
-- Network Watch sessions up to 24 hours with timelines, conversations, device and
-  DNS history, traffic baselines, TCP health diagnostics, explainable findings,
-  optional desktop notifications, alert rules, bookmarks, retention, and reports
-- Passive Wi-Fi Watch for compatible monitor-mode adapters, showing access points,
-  channels, signal, advertised security, associated clients, probes, and observed
-  EAPOL traffic without deauthentication, injection, or password attempts
-- Copy-IP, selection-aware export, and confirmed Wake-on-LAN actions
-- Double-click a host row to open HTTPS, with HTTP as fallback
-
-Copyright © 2026 Daren Loxley (2E0LXY).
-
-## Desktop workflow
-
-1. Choose an active interface from the subnet list or enter an IP, range, or CIDR.
-2. Select the TCP ports to inspect, then press **Scan**. Address and open-port
-   results finish first; server-detail discovery then runs as a clearly labelled
-   second phase without delaying the initial host list.
-   Right-click the TCP-port field for common, web/application, and full-port presets.
-   Full-port scans use bounded concurrency but should still be limited to a small
-   number of authorized targets because filtered ports can take a long time.
-3. Select discovered rows to copy addresses, save favorites, send Wake-on-LAN,
-   open detected services, or export an inventory.
-   Expand a host to inspect individual ports, then expand a port to inspect any
-   server metadata it safely exposed. Open supported service rows with a
-   double-click, Enter, the right-click menu, or the links below the table.
-   Opening SSH asks for the remote username before the terminal asks for that
-   account's password. The username is retained only for the current app session.
-4. Use **Refresh favorites** to rescan saved addresses. Devices with a discovered
-   MAC address retain their identity, notes, and updated IP address.
-5. Use **Import** for inventories previously exported as JSON or XML. Imported
-   devices are merged into both the visible inventory and favorites.
-
-The **Shutdown**, **Reboot**, and **Abort shutdown** buttons require an explicit
-confirmation and use non-interactive SSH. Configure key-based SSH access and
-passwordless `sudo shutdown` permission on machines you administer. Shutdown and
-reboot are scheduled one minute ahead so the abort action remains useful. The
-application does not request, retain, or pass passwords.
-
-Wake-on-LAN and remote administration should only be used on devices and networks
-you own or are authorized to manage.
+- **Add favorite** stores selected devices under
+  `~/.config/advanced-ip-analyser/favorites.json`.
+- MAC-first identity retains the device note when DHCP changes an address.
+- **Refresh favorites** rescans saved addresses.
+- **Export** writes selected visible rows, or all visible rows when none are
+  selected, to CSV, JSON, XML, or escaped HTML.
+- **Import** accepts bounded Advanced IP Analyser JSON and XML inventories.
+- Double-click or press Enter on supported services to open them with Debian's
+  native application handlers.
+- Wake-on-LAN uses the matching active-interface broadcast where possible.
+- Shutdown/reboot/abort require confirmation and non-interactive SSH keys;
+  passwords are never requested or stored.
 
 ## Built-in packet analysis
 
-Wireshark is not required. Use **Packets → Capture selected host/service** after
-selecting a host or service row. Live capture is restricted to the selected IP
-addresses and, for a single selected service, its TCP or UDP port. Captures are
-bounded to 1–300 seconds and at most 100,000 packets. Debian may show a PolicyKit
-administrator prompt because raw packet access requires elevated permission; the
-desktop application itself remains unprivileged and should not be run as root.
+![Packet display filters](docs/images/packet-display-filters.png)
 
-**Open capture file for selection** reads Ethernet PCAP, PCAPNG, and gzip-compressed
-captures in the built-in viewer. It displays endpoints, TCP/UDP ports, common IP
-protocols, TCP flags, packet lengths, and a bounded byte preview. Its display-filter
-bar understands the common investigation filters documented in
-[`docs/DISPLAY_FILTERS.md`](docs/DISPLAY_FILTERS.md). Saved captures can also be
-restricted to selected IPv4/IPv6 hosts and a service port. Payload decryption,
-stream reassembly, and Wireshark's full dissector library remain outside this
-focused analyser's scope.
+Wireshark, tshark, tcpdump, libpcap, and third-party packet Python libraries are
+not required. **Packets → Capture selected host/service** records only the selected
+IP scope and optional selected port for 1-300 seconds and no more than 100,000
+packets. **Open capture file for selection** reads bounded Ethernet PCAP, PCAPNG,
+and gzip-compressed captures.
 
-## Network Watch and passive Wi-Fi
+The viewer shows packet number/time, endpoints, TCP/UDP ports, protocol, original
+length, summary, and the first 512 captured bytes. Supported summaries include
+VLAN, IPv4/IPv6 extension headers and fragments, ARP, TCP, UDP, DNS/mDNS, DHCP,
+SSDP, NTP, NBNS, ICMP/ICMPv6, GRE, ESP, AH and OSPF.
 
-Use **Packets → Network Watch** to watch an authorized interface over time. Header
-capture is the recommended privacy-preserving mode; protocol-detail and full-packet
-modes are explicit choices. Results include traffic-over-time, conversations,
-devices, DNS queries, protocol/service totals, TCP health estimates, findings,
-custom alert rules, local history, reports, and recording bookmarks. See
-[`docs/NETWORK_WATCH.md`](docs/NETWORK_WATCH.md).
+### Display-filter language
 
-Use **Packets → Passive Wi-Fi Watch** with a Linux adapter that supports monitor
-mode. The application creates a temporary virtual monitor interface through its
-narrow PolicyKit helper and observes radio headers without disturbing the adapter's
-managed interface. This feature is deliberately passive: it does not disconnect
-clients, inject frames, capture passwords, or crack keys. See
-[`docs/PASSIVE_WIFI.md`](docs/PASSIVE_WIFI.md).
+```text
+ip.addr == 192.168.1.10
+ip.addr == 192.168.1.0/24 && (http || dns)
+tcp.port == 443
+tcp.flags.syn == 1 && tcp.flags.ack == 0
+dns.flags.response == 0
+dns.qry.name contains "example.com"
+http.request.method == "GET"
+http.host contains "example.com"
+http.request.uri contains "/login"
+http.response.code == 404
+tls.handshake.type == 1
+frame.len > 1000
+```
 
-## Built-in help
+Operators: `==`, `!=`, `>`, `<`, `>=`, `<=`, `contains`, `matches`, `&&`,
+`||`, `!`, and parentheses. Filters alter displayed rows only, never the capture.
+The expression and regex parsers are bounded and do not call `eval`.
 
-Press **Help** beside the footer version number for illustrated guidance covering
-target selection, scanning, expandable port rows, clickable services, favorites,
-inventory import/export, Wake-on-LAN, SSH power actions, and every keyboard
-shortcut. The Help centre is included in the Debian package and works offline.
+See [the complete filter reference](docs/DISPLAY_FILTERS.md).
 
-## Independence and licensing
+## Network Watch
 
-This project is a clean implementation based on general network-administration
-requirements and public protocol behaviour. It is not affiliated with Angry IP
-Scanner or Famatech Advanced IP Scanner, and those projects' code, branding,
-documentation text, and assets are not included.
+![Network Watch dashboard](docs/images/network-watch-dashboard.png)
 
-Copyright (C) 2026 2E0LXY. Licensed under GPL-3.0-or-later; see `LICENSE`.
+Open **Packets → Network Watch** for continuous analysis. Choose an interface,
+duration, and capture detail:
 
-Feature-by-feature Linux parity and documented platform limitations are tracked
-in [`docs/FEATURE_PARITY.md`](docs/FEATURE_PARITY.md). Packet-analysis scope and
-safety boundaries are documented in
-[`docs/PACKET_ANALYSIS.md`](docs/PACKET_ANALYSIS.md).
-Instructions for the signed Debian 13 APT feed are in
-[`docs/APT_REPOSITORY.md`](docs/APT_REPOSITORY.md).
+- **Headers only (recommended):** retain 128 bytes per packet.
+- **Protocol details:** retain 512 bytes per packet.
+- **Full packets:** retain complete payloads within the global safety bounds.
+
+Network Watch provides:
+
+- per-minute packet and byte timeline;
+- bidirectional flows, duration, packets, bytes, and TCP health;
+- device traffic, peers, external peers, ports, protocols, and DNS names;
+- DNS query/response history and failure codes;
+- protocol and service totals;
+- handshake timing, resets, zero windows, and conservative retransmission and
+  out-of-order estimates;
+- new-device, fan-out, traffic-baseline, DNS-failure, regular-timing, reset,
+  retransmission and unanswered-SYN findings;
+- user rules for new devices, traffic, unanswered connections, destination,
+  port, and DNS text;
+- optional desktop notifications, reports, bookmarks, seven-day/250 MiB ordinary
+  capture retention, and SQLite history.
+
+Findings are explainable indicators for investigation, not declarations that a
+system is compromised. Encrypted payloads remain encrypted.
+
+See [Network Watch documentation](docs/NETWORK_WATCH.md).
+
+## Passive Wi-Fi Watch
+
+![Passive Wi-Fi Watch](docs/images/passive-wifi-watch.png)
+
+Open **Packets → Passive Wi-Fi Watch** with a compatible Linux wireless adapter.
+The helper creates a temporary virtual monitor interface and validates every
+adapter, monitor name, channel, and duration argument. The managed interface is
+left in place where the driver supports concurrent interfaces.
+
+Passive Wi-Fi Watch can display SSID, BSSID, channel, driver-provided signal,
+Open/WEP/WPA/WPA2/WPA3 advertisement, beacon/data counts, client MAC addresses,
+probe-request names, and passive EAPOL presence. Captures can be retained as
+radiotap PCAP and observations exported as JSON.
+
+It intentionally does **not** deauthenticate clients, inject frames, create rogue
+access points, capture credentials, crack passwords/keys, or perform denial of
+service. Signal and security labels depend on adapter metadata and advertised
+information elements.
+
+See [Passive Wi-Fi Watch documentation](docs/PASSIVE_WIFI.md).
+
+## Automatic verified updates
+
+After startup the application checks the latest GitHub release. If a newer tag
+contains the expected Debian package and GitHub SHA-256 digest, a button flashes
+in the footer. After confirmation the app:
+
+1. downloads from the exact project release URL with a 50 MiB limit;
+2. verifies SHA-256 and Debian package name/version;
+3. starts the detached updater and closes the current process;
+4. requests PolicyKit authorization for `apt-get install`; and
+5. reopens the installed application.
+
+Use **Help → Check for updates** for a manual check.
+
+## Command-line interface
+
+```sh
+# Scan and export
+advanced-ip-analyser scan 192.168.1.0/24 --output inventory.csv
+advanced-ip-analyser scan 192.168.1.10-192.168.1.30
+
+# Wake-on-LAN
+advanced-ip-analyser wake AA:BB:CC:DD:EE:FF
+
+# Interfaces and selected-host capture
+advanced-ip-analyser capture-interfaces
+advanced-ip-analyser capture 192.168.1.20 --interface enp1s0 --port 443 \
+  --duration 10 --output host.pcap
+
+# Read and display-filter a recording
+advanced-ip-analyser open-capture host.pcap \
+  --filter 'ip.addr == 192.168.1.20 && tcp.port == 443'
+
+# Watch and analyze over time
+advanced-ip-analyser watch --interface any --duration 900 --snaplen 128 \
+  --report watch.html
+advanced-ip-analyser analyse-capture host.pcap --report analysis.json
+```
+
+Run `advanced-ip-analyser COMMAND --help` for every option.
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+| --- | --- |
+| `F5` | Start scan |
+| `Escape` | Cancel active scan |
+| `Ctrl+F` | Focus results filter |
+| `Ctrl+O` | Import inventory |
+| `Ctrl+S` | Export inventory |
+| `Ctrl+Shift+C` | Copy selected host/service detail |
+| `Enter` | Open selected supported service |
+| Double-click | Open service or preferred web endpoint |
+| Right-click | Service action, copy, expand/collapse, or port preset |
+
+## Files and privacy
+
+| Path | Purpose |
+| --- | --- |
+| `~/.config/advanced-ip-analyser/favorites.json` | Saved devices and notes |
+| `~/.config/advanced-ip-analyser/packet-filters.json` | Named display filters |
+| `~/.config/advanced-ip-analyser/alert-rules.json` | Network Watch rules |
+| `~/.local/share/advanced-ip-analyser/network-watch.sqlite3` | Session history and baselines |
+| `~/.local/share/advanced-ip-analyser/captures/` | Ordinary Network Watch recordings |
+| `~/.local/share/advanced-ip-analyser/bookmarks/` | Bookmarked recordings and notes |
+| `~/.local/share/advanced-ip-analyser/wifi-captures/` | Passive Wi-Fi recordings |
+
+The application has no analytics or telemetry service. Network inventories,
+captures, rules, favorites, and reports stay on the computer unless the user
+explicitly exports or copies them. The update checker contacts this project's
+GitHub Releases API.
+
+## Troubleshooting
+
+- **No hosts:** verify the target/subnet and try Accurate; firewalls may block
+  ping while TCP ports remain reachable.
+- **Packet authorization unavailable:** install the `.deb`; source-tree helpers
+  are deliberately refused for privileged execution.
+- **No wireless adapters:** confirm `/sys/class/net/INTERFACE/wireless`, install
+  `iw`, and use an adapter/driver supporting virtual monitor interfaces.
+- **A Wi-Fi channel fails:** remove unsupported channels from the channel list.
+- **SSH action fails:** configure key authentication and required remote `sudo`
+  permission; interactive passwords are intentionally unsupported.
+- **Service will not open:** install its Debian client/desktop handler.
+- **Update fails:** download the package from Releases and use `sudo apt install
+  ./PACKAGE.deb`; verification failures should never be bypassed.
+
+## Build, test, and release
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m compileall -q src tests
+sh packaging/build-deb.sh
+```
+
+Tag CI runs the complete suite in Debian 13, builds the `.deb`, runs Lintian,
+validates desktop/AppStream metadata, installs and launches the GUI under Xvfb,
+removes the package, generates `SHA256SUMS`, and publishes release assets. The
+optional signed APT feed is described in [APT_REPOSITORY.md](docs/APT_REPOSITORY.md).
+
+## Documentation
+
+- [Complete instruction book (PDF)](output/pdf/Advanced-IP-Analyser-Instruction-Book.pdf)
+- [Instruction book source](docs/USER_GUIDE.md)
+- [Display filters](docs/DISPLAY_FILTERS.md)
+- [Network Watch](docs/NETWORK_WATCH.md)
+- [Passive Wi-Fi Watch](docs/PASSIVE_WIFI.md)
+- [Packet engine and safety boundaries](docs/PACKET_ANALYSIS.md)
+- [Feature parity](docs/FEATURE_PARITY.md)
+- [APT repository publishing](docs/APT_REPOSITORY.md)
+
+## Independence, license, and scope
+
+This is a clean, independent GPL-3.0-or-later implementation. It contains no
+Angry IP Scanner or Famatech Advanced IP Scanner source, history, branding, or
+assets and is not affiliated with those projects. Radmin is Windows-only and is
+not bundled; Debian-native SSH, RDP, SMB, HTTP(S), FTP and Telnet workflows are
+provided instead.
+
+Copyright © 2026 Daren Loxley (2E0LXY).

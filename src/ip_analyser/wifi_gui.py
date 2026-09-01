@@ -77,27 +77,34 @@ class WifiWatch(tk.Toplevel):
         panes.pack(fill="both", expand=True, padx=12)
         ap_frame = ttk.Frame(panes)
         client_frame = ttk.Frame(panes)
-        panes.add(ap_frame, weight=3)
+        panes.add(ap_frame, weight=4)
         panes.add(client_frame, weight=2)
 
         ap_columns = ("name", "bssid", "channel", "signal", "security",
                       "beacons", "data", "clients", "handshake")
         self.ap_table = ttk.Treeview(ap_frame, columns=ap_columns, show="headings", selectmode="browse")
-        ap_widths = (180, 150, 65, 65, 110, 75, 75, 65, 90)
+        ap_widths = (150, 140, 55, 55, 90, 60, 60, 55, 75)
         for column, width in zip(ap_columns, ap_widths):
             self.ap_table.heading(column, text=column.title())
             self.ap_table.column(column, width=width, anchor="w", stretch=column == "name")
+        ap_scroll = ttk.Scrollbar(ap_frame, orient="horizontal", command=self.ap_table.xview)
+        self.ap_table.configure(xscrollcommand=ap_scroll.set)
         self.ap_table.pack(fill="both", expand=True)
+        ap_scroll.pack(fill="x")
         self.ap_table.bind("<<TreeviewSelect>>", self._show_clients)
 
         ttk.Label(client_frame, text="Observed clients and probe requests",
                   padding=(8, 0, 8, 6)).pack(anchor="w")
         client_columns = ("mac", "signal", "packets", "probes")
         self.client_table = ttk.Treeview(client_frame, columns=client_columns, show="headings")
-        for column, width in zip(client_columns, (155, 70, 70, 300)):
+        for column, width in zip(client_columns, (135, 55, 55, 180)):
             self.client_table.heading(column, text=column.title())
             self.client_table.column(column, width=width, anchor="w", stretch=column == "probes")
+        client_scroll = ttk.Scrollbar(client_frame, orient="horizontal",
+                                      command=self.client_table.xview)
+        self.client_table.configure(xscrollcommand=client_scroll.set)
         self.client_table.pack(fill="both", expand=True)
+        client_scroll.pack(fill="x")
 
         footer = ttk.Frame(self, padding=12)
         footer.pack(fill="x")
