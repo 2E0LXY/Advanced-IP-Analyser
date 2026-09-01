@@ -1,4 +1,4 @@
-.TH ADVANCED-IP-ANALYSER 1 "August 2026" "Advanced IP Analyser 1.2.0" "User Commands"
+.TH ADVANCED-IP-ANALYSER 1 "September 2026" "Advanced IP Analyser 2.0.0" "User Commands"
 .SH NAME
 advanced-ip-analyser \- discover and inventory authorized network hosts
 .SH SYNOPSIS
@@ -48,6 +48,25 @@ advanced-ip-analyser \- discover and inventory authorized network hosts
 [
 .B --limit COUNT
 ]
+[
+.B --filter EXPRESSION
+]
+.br
+.B advanced-ip-analyser watch
+[
+.B --interface NAME
+]
+[
+.B --duration SECONDS
+]
+[
+.B --snaplen BYTES
+]
+[
+.B --report FILE
+]
+.br
+.B advanced-ip-analyser analyse-capture FILE --report FILE
 .SH DESCRIPTION
 Advanced IP Analyser scans an IPv4 or IPv6 address, CIDR, or inclusive range,
 identifies reachable devices and common TCP services, and exports inventories.
@@ -59,9 +78,25 @@ for the Debian desktop interface, saved devices, service launchers,
 Wake-on-LAN, SSH power actions, and automatic updates.
 The built-in Linux packet engine creates bounded live captures for selected
 hosts and services and inspects Ethernet PCAP, PCAPNG, and compressed capture files.
+Network Watch records bounded traffic over time, stores session history, and reports
+flows, devices, DNS activity, TCP health, baselines, findings, and user alert rules.
+The passive Wi-Fi window can observe access points and clients with a compatible
+monitor-mode adapter; it never transmits deauthentication or injected frames.
+.SH DISPLAY FILTERS
+The packet viewer and
+.B open-capture --filter
+support IP addresses, TCP/UDP ports, DNS, HTTP, TLS handshakes, TCP flags, frame
+lengths, comparisons, text matching, AND (&&), OR (||), NOT (!), and parentheses.
+Display filters do not change the saved capture.
 .SH FILES
 .I ~/.config/advanced-ip-analyser/favorites.json
 stores the current user's saved devices.
+.br
+.I ~/.config/advanced-ip-analyser/packet-filters.json
+stores named packet display filters.
+.br
+.I ~/.local/share/advanced-ip-analyser/network-watch.sqlite3
+stores Network Watch history.
 .SH SEE ALSO
 .BR ping (8),
 .BR tracepath (8),

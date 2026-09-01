@@ -6,8 +6,10 @@ import json
 import os
 import re
 import tempfile
-import xml.etree.ElementTree as ET
 from pathlib import Path
+import xml.etree.ElementTree as XMLWriter  # nosec B405
+
+from defusedxml import ElementTree as DefusedET
 
 from .models import Host
 
@@ -79,19 +81,19 @@ def export(path: Path, hosts: list[Host]) -> None:
                         "<th>Seen</th><th>Note</th></tr></thead>"
                         f"<tbody>{rows}</tbody></table>\n", encoding="utf-8")
     elif suffix == ".xml":
-        root = ET.Element("advanced-ip-analyser", {"format": "1"})
+        root = XMLWriter.Element("advanced-ip-analyser", {"format": "1"})
         for host in hosts:
-            device = ET.SubElement(root, "device")
+            device = XMLWriter.SubElement(root, "device")
             for key, value in host.to_dict().items():
-                child = ET.SubElement(device, key)
+                child = XMLWriter.SubElement(device, key)
                 if isinstance(value, list):
                     child.text = ",".join(str(item) for item in value)
                 elif isinstance(value, dict):
                     child.text = json.dumps(value, sort_keys=True)
                 else:
                     child.text = str(value if value is not None else "")
-        ET.indent(root)
-        ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
+        XMLWriter.indent(root)
+        XMLWriter.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
     else:
         raise ValueError("export filename must end in .csv, .json, .xml, or .html")
 
@@ -109,8 +111,8 @@ def import_inventory(path: Path, limit: int = 65_536) -> list[Host]:
         if re.search(r"<!\s*(?:DOCTYPE|ENTITY)\b", content, re.IGNORECASE):
             raise ValueError("inventory XML declarations and entities are not allowed")
         try:
-            root = ET.fromstring(content)
-        except ET.ParseError as error:
+            root = DefusedET.fromstring(content)
+        except DefusedET.ParseError as error:
             raise ValueError("inventory XML is malformed") from error
         if root.tag != "advanced-ip-analyser" or root.get("format") != "1":
             raise ValueError("unsupported inventory XML format")

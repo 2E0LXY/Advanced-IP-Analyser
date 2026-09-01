@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.0.0 - 2026-09-01
+
+- Add Network Watch for bounded captures up to 24 hours with minute timelines,
+  bidirectional conversations, device and DNS activity, protocol/service totals,
+  TCP handshake timing, resets, retransmission/out-of-order estimates, baselines,
+  findings, desktop alerts, custom alert rules, bookmarks, reports, and history.
+- Add passive Airgorah-inspired Wi-Fi observation for compatible monitor-mode
+  adapters: access points, channels, signal, security, clients, probe requests,
+  and passive EAPOL presence. No deauthentication, injection, or password cracking.
+- Add a safe Wireshark-style display-filter language for IPs and CIDRs, TCP/UDP
+  ports, DNS, HTTP, TLS, ICMP, ARP, TCP flags, payload/frame length, comparisons,
+  text matching, boolean combinations, 20 quick presets, and saved named filters.
+- Centre the green scan progress bar in the main-window footer.
+- Add CLI watch, deep capture analysis, display filtering, signed APT repository
+  generation, and expanded regression and packaging checks.
+
 ## 1.2.0 - 2026-08-29
 
 - Replace the optional Wireshark integration with a native Debian packet engine.

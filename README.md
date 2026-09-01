@@ -13,7 +13,7 @@ Use it only on networks and computers you own or are authorized to administer.
 Debian 13 needs Python 3 and Tk for the desktop interface:
 
 ```sh
-sudo apt install python3 python3-tk iputils-ping iproute2 pkexec
+sudo apt install python3 python3-tk iputils-ping iproute2 pkexec iw
 python3 -m venv .venv
 .venv/bin/pip install -e .
 .venv/bin/advanced-ip-analyser-gui
@@ -27,15 +27,18 @@ The CLI works without Tk:
 .venv/bin/advanced-ip-analyser wake AA:BB:CC:DD:EE:FF
 .venv/bin/advanced-ip-analyser capture 192.168.1.20 --interface enp1s0 --port 443
 .venv/bin/advanced-ip-analyser open-capture capture.pcapng --host 192.168.1.20
+.venv/bin/advanced-ip-analyser open-capture capture.pcap --filter 'dns && ip.addr == 192.168.1.20'
+.venv/bin/advanced-ip-analyser watch --interface any --duration 900 --report watch.html
+.venv/bin/advanced-ip-analyser analyse-capture capture.pcap --report analysis.json
 ```
 
 ## Debian package
 
-Download `advanced-ip-analyser_1.2.0_all.deb` from the GitHub Release and install
+Download `advanced-ip-analyser_2.0.0_all.deb` from the GitHub Release and install
 it with:
 
 ```sh
-sudo apt install ./advanced-ip-analyser_1.2.0_all.deb
+sudo apt install ./advanced-ip-analyser_2.0.0_all.deb
 ```
 
 Maintainers can reproduce the package locally with `./packaging/build-deb.sh`.
@@ -87,6 +90,15 @@ and the application never attempts exploitation.
 - Safe Ping, Tracepath, and Telnet launchers using fixed argument vectors
 - Built-in packet capture and analysis: capture selected host or service traffic,
   list Linux interfaces, inspect saved PCAP/PCAPNG files, and filter IPv4/IPv6 traffic
+- Wireshark-style display filters for addresses/CIDRs, ports, DNS, HTTP, TLS,
+  ICMP, ARP, TCP flags and lengths, with comparisons, combinations, 20 presets,
+  validity feedback, and persistent named filters
+- Network Watch sessions up to 24 hours with timelines, conversations, device and
+  DNS history, traffic baselines, TCP health diagnostics, explainable findings,
+  optional desktop notifications, alert rules, bookmarks, retention, and reports
+- Passive Wi-Fi Watch for compatible monitor-mode adapters, showing access points,
+  channels, signal, advertised security, associated clients, probes, and observed
+  EAPOL traffic without deauthentication, injection, or password attempts
 - Copy-IP, selection-aware export, and confirmed Wake-on-LAN actions
 - Double-click a host row to open HTTPS, with HTTP as fallback
 
@@ -133,10 +145,28 @@ desktop application itself remains unprivileged and should not be run as root.
 
 **Open capture file for selection** reads Ethernet PCAP, PCAPNG, and gzip-compressed
 captures in the built-in viewer. It displays endpoints, TCP/UDP ports, common IP
-protocols, TCP flags, packet lengths, and a bounded byte preview. Saved captures
-can be filtered to selected IPv4/IPv6 hosts and a service port. Payload decryption,
-stream reassembly, wireless monitor mode, and Wireshark's full dissector library
-are intentionally outside this lightweight analyser's scope.
+protocols, TCP flags, packet lengths, and a bounded byte preview. Its display-filter
+bar understands the common investigation filters documented in
+[`docs/DISPLAY_FILTERS.md`](docs/DISPLAY_FILTERS.md). Saved captures can also be
+restricted to selected IPv4/IPv6 hosts and a service port. Payload decryption,
+stream reassembly, and Wireshark's full dissector library remain outside this
+focused analyser's scope.
+
+## Network Watch and passive Wi-Fi
+
+Use **Packets → Network Watch** to watch an authorized interface over time. Header
+capture is the recommended privacy-preserving mode; protocol-detail and full-packet
+modes are explicit choices. Results include traffic-over-time, conversations,
+devices, DNS queries, protocol/service totals, TCP health estimates, findings,
+custom alert rules, local history, reports, and recording bookmarks. See
+[`docs/NETWORK_WATCH.md`](docs/NETWORK_WATCH.md).
+
+Use **Packets → Passive Wi-Fi Watch** with a Linux adapter that supports monitor
+mode. The application creates a temporary virtual monitor interface through its
+narrow PolicyKit helper and observes radio headers without disturbing the adapter's
+managed interface. This feature is deliberately passive: it does not disconnect
+clients, inject frames, capture passwords, or crack keys. See
+[`docs/PASSIVE_WIFI.md`](docs/PASSIVE_WIFI.md).
 
 ## Built-in help
 
@@ -158,3 +188,5 @@ Feature-by-feature Linux parity and documented platform limitations are tracked
 in [`docs/FEATURE_PARITY.md`](docs/FEATURE_PARITY.md). Packet-analysis scope and
 safety boundaries are documented in
 [`docs/PACKET_ANALYSIS.md`](docs/PACKET_ANALYSIS.md).
+Instructions for the signed Debian 13 APT feed are in
+[`docs/APT_REPOSITORY.md`](docs/APT_REPOSITORY.md).

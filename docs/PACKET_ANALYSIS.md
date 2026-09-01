@@ -24,14 +24,21 @@ applied in-process.
 
 The viewer summarizes Ethernet, VLAN, IPv4, IPv6, ARP, TCP, UDP, DNS, ICMP,
 ICMPv6, GRE, ESP, AH, and OSPF metadata. It shows only the first 512 bytes of a
-packet in the byte preview.
+packet in the byte preview. A bounded parser provides IP/CIDR, port, DNS, HTTP,
+TLS, TCP flag, frame-length, comparison, text, regular-expression, and boolean
+display filters. See [DISPLAY_FILTERS.md](DISPLAY_FILTERS.md).
+
+Network Watch extends the same engine to captures up to 24 hours with local
+session history, timelines, flows, DNS activity, device baselines, TCP diagnostics,
+findings, alerts, and reports. Passive Wi-Fi Watch separately handles radiotap PCAP
+from a temporary monitor-mode interface. Neither feature requires Wireshark.
 
 ## Deliberate limits
 
 This is a focused network-inventory companion, not a replacement for every
 Wireshark feature. It does not decrypt encrypted traffic, reconstruct streams,
-decode hundreds of application protocols, capture in wireless monitor mode, or
-edit packets. Captures can be saved and inspected with another tool if deeper
+decode hundreds of application protocols, reconstruct application objects, decrypt
+TLS, or edit/inject packets. Captures can be saved and inspected with another tool if deeper
 forensics are required.
 
 Capture only traffic you own or are authorized to inspect.

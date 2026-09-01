@@ -4,12 +4,12 @@ Section: net
 Priority: optional
 Architecture: all
 Maintainer: Daren Loxley <24845841+2E0LXY@users.noreply.github.com>
-Depends: python3 (>= 3.11), python3-tk, iputils-ping, iproute2, xdg-utils, pkexec
-Recommends: ieee-data, nmap-common, openssh-client, freerdp3-x11, gvfs-backends, iputils-tracepath, telnet, x-terminal-emulator
+Depends: python3 (>= 3.11), python3-tk, python3-defusedxml, iputils-ping, iproute2, xdg-utils, pkexec
+Recommends: ieee-data, iw, nmap-common, openssh-client, freerdp3-x11, gvfs-backends, iputils-tracepath, telnet, x-terminal-emulator
 Installed-Size: @INSTALLED_SIZE@
 Homepage: https://github.com/2E0LXY/Advanced-IP-Analyser
 Description: Debian network inventory and remote access utility
  Advanced IP Analyser discovers reachable hosts, identifies TCP services,
  stores saved devices, exchanges inventories, opens remote services, provides
  Wake-on-LAN, confirmed SSH power actions, built-in packet analysis,
- and verified updates.
+ long-running network monitoring, passive Wi-Fi observation, and verified updates.

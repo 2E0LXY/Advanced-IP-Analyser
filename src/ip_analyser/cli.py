@@ -5,7 +5,10 @@ import shutil
 from pathlib import Path
 
 from .actions import wake
-from .packet_tools import capture_live, list_capture_interfaces, read_capture
+from .monitoring import MonitorAnalyzer, MonitorStore, export_analysis
+from .packet_filters import compile_filter
+from .packet_tools import (capture_live, list_capture_interfaces, read_capture,
+                           start_monitor_capture)
 from .scanner import Scanner
 from .storage import export
 from .targets import parse_targets
@@ -34,7 +37,16 @@ def build_parser() -> argparse.ArgumentParser:
     open_packets.add_argument("--host", action="append", default=[])
     open_packets.add_argument("--port", type=int)
     open_packets.add_argument("--limit", type=int, default=1_000)
+    open_packets.add_argument("--filter", default="", help="display-filter expression")
     commands.add_parser("capture-interfaces", help="list Linux capture interfaces")
+    watch = commands.add_parser("watch", help="record and analyse network activity over time")
+    watch.add_argument("--interface", default="any")
+    watch.add_argument("--duration", type=int, default=300, help="seconds, up to 86400")
+    watch.add_argument("--snaplen", type=int, default=128, help="bytes retained per packet")
+    watch.add_argument("--report", type=Path)
+    analyse = commands.add_parser("analyse-capture", help="create a deep-analysis report")
+    analyse.add_argument("file", type=Path)
+    analyse.add_argument("--report", type=Path, required=True)
     return parser
 
 
@@ -60,6 +72,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "open-capture":
         records = read_capture(args.file, args.host or None, args.port, args.limit)
+        predicate = compile_filter(args.filter)
+        records = [record for record in records if predicate(record)]
         for record in records:
             source = f"{record.source}:{record.source_port}" if record.source_port else record.source
             destination = (f"{record.destination}:{record.destination_port}"
@@ -67,6 +81,33 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{record.number:>6} {record.time_text} {source} -> {destination} "
                   f"{record.protocol} {record.length} {record.info}".rstrip())
         print(f"Read {len(records)} matching packet(s) from {args.file}")
+        return 0
+    if args.command == "watch":
+        session = start_monitor_capture(args.interface, args.duration, snaplen=args.snaplen)
+        print(f"Watching {args.interface}; recording to {session.path}")
+        try:
+            session.process.wait()
+        except KeyboardInterrupt:
+            session.stop()
+        if session.error():
+            raise RuntimeError(session.error())
+        analysis = MonitorAnalyzer().analyze(read_capture(
+            session.path, limit=100_000, allow_incomplete=True))
+        store = MonitorStore(Path.home() / ".local" / "share" /
+                             "advanced-ip-analyser" / "network-watch.sqlite3")
+        try:
+            store.save(analysis, session.path)
+        finally:
+            store.close()
+        if args.report:
+            export_analysis(args.report, analysis)
+        print(f"Analysed {analysis.packet_count} packets, {len(analysis.flows)} conversations, "
+              f"and {len(analysis.findings)} findings")
+        return 0
+    if args.command == "analyse-capture":
+        analysis = MonitorAnalyzer().analyze(read_capture(args.file, limit=100_000))
+        export_analysis(args.report, analysis)
+        print(f"Saved analysis of {analysis.packet_count} packets to {args.report}")
         return 0
     targets = parse_targets(args.target)
     scanner = Scanner(args.timeout, args.workers)

@@ -85,13 +85,15 @@ def _helper_path() -> Path:
 
 
 def _capture_command(output: Path, interface: str, hosts: list[str], port: int | None,
-                     duration: int, max_packets: int, isolated: bool = False) -> list[str]:
+                     duration: int, max_packets: int, isolated: bool = False,
+                     snaplen: int = 65_535, linktype: int = 1) -> list[str]:
     executable = "/usr/bin/python3" if isolated else sys.executable
     command = [executable]
     if isolated:
         command.append("-I")
     command.extend([str(_helper_path()), "--output", str(output), "--interface", interface,
-                    "--duration", str(duration), "--max-packets", str(max_packets)])
+                    "--duration", str(duration), "--max-packets", str(max_packets),
+                    "--snaplen", str(snaplen), "--linktype", str(linktype)])
     for host in hosts:
         command.extend(["--host", host])
     if port is not None:
@@ -149,6 +151,81 @@ def capture_live(hosts: list[str], interface: str = "any", port: int | None = No
         raise
 
 
+@dataclass(slots=True)
+class CaptureSession:
+    path: Path
+    process: subprocess.Popen
+
+    @property
+    def running(self) -> bool:
+        return self.process.poll() is None
+
+    def stop(self, timeout: float = 5.0) -> None:
+        if self.process.poll() is not None:
+            return
+        self.process.terminate()
+        try:
+            self.process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            self.process.kill()
+            self.process.wait(timeout=2)
+
+    def error(self) -> str:
+        if self.running or self.process.returncode == 0:
+            return ""
+        output = self.process.communicate(timeout=1)
+        return (output[1] or output[0] or "native monitor capture failed").strip()
+
+
+def start_monitor_capture(interface: str = "any", duration: int = 3_600,
+                          max_packets: int = 100_000, snaplen: int = 128,
+                          hosts: list[str] | None = None,
+                          cache_dir: Path | None = None,
+                          linktype: int = 1) -> CaptureSession:
+    """Start a bounded header-focused capture that can be inspected while running."""
+    addresses = _addresses(hosts)
+    interface = validate_interface(interface)
+    if not 1 <= duration <= 86_400:
+        raise ValueError("monitor duration must be from 1 second to 24 hours")
+    if not 1 <= max_packets <= MAX_CAPTURE_PACKETS:
+        raise ValueError("monitor packet limit must be from 1 to 100,000")
+    if not 96 <= snaplen <= 65_535:
+        raise ValueError("monitor snapshot length must be from 96 to 65,535 bytes")
+    if linktype not in {1, 127} or (linktype == 127 and addresses):
+        raise ValueError("monitor capture link type is invalid")
+    directory = cache_dir or Path.home() / ".local" / "share" / "advanced-ip-analyser" / "captures"
+    directory.mkdir(parents=True, exist_ok=True)
+    descriptor, name = tempfile.mkstemp(prefix="watch-", suffix=".pcap", dir=directory)
+    os.close(descriptor)
+    output = Path(name).resolve()
+    command = _capture_command(output, interface, addresses, None, duration,
+                               max_packets, snaplen=snaplen, linktype=linktype)
+    try:
+        probe = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(3))
+        probe.close()
+    except (AttributeError, PermissionError, OSError):
+        helper_stat = _helper_path().stat()
+        if (os.name != "posix" or helper_stat.st_uid != 0 or
+                helper_stat.st_mode & (stat.S_IWGRP | stat.S_IWOTH)):
+            output.unlink(missing_ok=True)
+            raise RuntimeError(
+                "Network Watch authorization requires the installed Debian package")
+        pkexec = shutil.which("pkexec")
+        if not pkexec:
+            output.unlink(missing_ok=True)
+            raise RuntimeError("PolicyKit is unavailable; install the pkexec package")
+        command = [pkexec, *_capture_command(
+            output, interface, addresses, None, duration, max_packets,
+            isolated=True, snaplen=snaplen, linktype=linktype)]
+    try:
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   text=True)
+    except Exception:
+        output.unlink(missing_ok=True)
+        raise
+    return CaptureSession(output, process)
+
+
 def _parse_packet(data: bytes, number: int, timestamp: float, original_length: int,
                   link_type: int = 1) -> PacketRecord:
     source = destination = ""
@@ -163,25 +240,48 @@ def _parse_packet(data: bytes, number: int, timestamp: float, original_length: i
         source, destination = source_mac, destination_mac
         ether_type = struct.unpack("!H", data[12:14])[0]
         offset = 14
-        if ether_type in {0x8100, 0x88A8} and len(data) >= 18:
-            ether_type = struct.unpack("!H", data[16:18])[0]
-            offset = 18
+        for _ in range(2):
+            if ether_type not in {0x8100, 0x88A8} or len(data) < offset + 4:
+                break
+            ether_type = struct.unpack("!H", data[offset + 2:offset + 4])[0]
+            offset += 4
     if ether_type == 0x0800 and len(data) >= offset + 20:
         header_length = (data[offset] & 0x0F) * 4
         if header_length >= 20 and len(data) >= offset + header_length:
             source = str(ipaddress.ip_address(data[offset + 12:offset + 16]))
             destination = str(ipaddress.ip_address(data[offset + 16:offset + 20]))
             protocol_number = data[offset + 9]
+            fragment_offset = struct.unpack("!H", data[offset + 6:offset + 8])[0] & 0x1FFF
             offset += header_length
-            protocol, source_port, destination_port, info = _transport_details(
-                data, offset, protocol_number)
+            if fragment_offset:
+                protocol, info = "IPv4 fragment", f"fragment offset {fragment_offset * 8}"
+            else:
+                protocol, source_port, destination_port, info = _transport_details(
+                    data, offset, protocol_number)
     elif ether_type == 0x86DD and len(data) >= offset + 40:
         source = str(ipaddress.ip_address(data[offset + 8:offset + 24]))
         destination = str(ipaddress.ip_address(data[offset + 24:offset + 40]))
         protocol_number = data[offset + 6]
         offset += 40
-        protocol, source_port, destination_port, info = _transport_details(
-            data, offset, protocol_number)
+        fragment_offset = 0
+        for _ in range(8):
+            if protocol_number in {0, 43, 60} and len(data) >= offset + 2:
+                protocol_number, units = data[offset], data[offset + 1]
+                offset += (units + 1) * 8
+            elif protocol_number == 44 and len(data) >= offset + 8:
+                protocol_number = data[offset]
+                fragment_offset = (struct.unpack("!H", data[offset + 2:offset + 4])[0] >> 3) * 8
+                offset += 8
+            elif protocol_number == 51 and len(data) >= offset + 2:
+                protocol_number, units = data[offset], data[offset + 1]
+                offset += (units + 2) * 4
+            else:
+                break
+        if fragment_offset:
+            protocol, info = "IPv6 fragment", f"fragment offset {fragment_offset}"
+        else:
+            protocol, source_port, destination_port, info = _transport_details(
+                data, offset, protocol_number)
     elif ether_type == 0x0806 and len(data) >= offset + 28:
         protocol = "ARP"
         operation = struct.unpack("!H", data[offset + 6:offset + 8])[0]
@@ -201,7 +301,12 @@ def _transport_details(data: bytes, offset: int, protocol_number: int) -> tuple[
         return "TCP", source_port, destination_port, ",".join(name for bit, name in names if flags & bit)
     if protocol_number == 17 and len(data) >= offset + 8:
         source_port, destination_port = struct.unpack("!HH", data[offset:offset + 4])
-        return "DNS" if 53 in {source_port, destination_port} else "UDP", source_port, destination_port, ""
+        ports = {source_port, destination_port}
+        name = ("DNS" if 53 in ports else "mDNS" if 5353 in ports else
+                "DHCP" if ports & {67, 68, 546, 547} else
+                "SSDP" if 1900 in ports else "NTP" if 123 in ports else
+                "NBNS" if 137 in ports else "UDP")
+        return name, source_port, destination_port, ""
     if protocol_number in {1, 58} and len(data) >= offset + 2:
         return ("ICMPv6" if protocol_number == 58 else "ICMP", None, None,
                 f"type {data[offset]}, code {data[offset + 1]}")
@@ -215,7 +320,8 @@ def _matches(record: PacketRecord, hosts: set[str], port: int | None) -> bool:
 
 
 def read_capture(path: Path, hosts: list[str] | None = None, port: int | None = None,
-                 limit: int = MAX_CAPTURE_PACKETS) -> list[PacketRecord]:
+                 limit: int = MAX_CAPTURE_PACKETS,
+                 allow_incomplete: bool = False) -> list[PacketRecord]:
     """Read bounded Ethernet PCAP or PCAPNG data with optional host/service filtering."""
     capture = path.expanduser().resolve()
     if not capture.is_file():
@@ -235,11 +341,11 @@ def read_capture(path: Path, hosts: list[str] | None = None, port: int | None = 
         raise ValueError("expanded capture data exceeds the 512 MiB analysis limit")
     records = (_read_pcapng(content, MAX_CAPTURE_PACKETS)
                if content.startswith(b"\x0a\x0d\x0d\x0a")
-               else _read_pcap(content, MAX_CAPTURE_PACKETS))
+               else _read_pcap(content, MAX_CAPTURE_PACKETS, allow_incomplete))
     return [record for record in records if _matches(record, addresses, port)][:limit]
 
 
-def _read_pcap(content: bytes, limit: int) -> list[PacketRecord]:
+def _read_pcap(content: bytes, limit: int, allow_incomplete: bool = False) -> list[PacketRecord]:
     formats = {
         b"\xd4\xc3\xb2\xa1": ("<", 1_000_000), b"\xa1\xb2\xc3\xd4": (">", 1_000_000),
         b"\x4d\x3c\xb2\xa1": ("<", 1_000_000_000), b"\xa1\xb2\x3c\x4d": (">", 1_000_000_000),
@@ -256,13 +362,17 @@ def _read_pcap(content: bytes, limit: int) -> list[PacketRecord]:
         seconds, fraction, captured_length, original_length = struct.unpack(
             f"{endian}IIII", content[offset:offset + 16])
         offset += 16
-        if captured_length > 262_144 or offset + captured_length > len(content):
+        if captured_length > 262_144:
+            raise ValueError("capture contains a malformed packet record")
+        if offset + captured_length > len(content):
+            if allow_incomplete:
+                break
             raise ValueError("capture contains a malformed packet record")
         data = content[offset:offset + captured_length]
         offset += captured_length
         records.append(_parse_packet(data, len(records) + 1,
                                      seconds + fraction / precision, original_length, link_type))
-    if offset != len(content) and len(records) < limit:
+    if offset != len(content) and len(records) < limit and not allow_incomplete:
         raise ValueError("capture contains a truncated PCAP packet header")
     return records
 

@@ -10,7 +10,7 @@
   <summary>Discover, inventory, and access authorized network devices</summary>
   <description>
     <p>Advanced IP Analyser is a Debian network scanner and device inventory application. It discovers reachable hosts, TCP services, names, MAC addresses, manufacturers, and bounded service metadata.</p>
-    <p>Saved devices, safe inventory exchange, Wake-on-LAN, remote service launchers, built-in packet capture and analysis, confirmed SSH power actions, and verified in-application updates support routine network administration.</p>
+    <p>Saved devices, safe inventory exchange, Wake-on-LAN, remote service launchers, long-running Network Watch analysis, passive Wi-Fi observation, built-in packet display filters, confirmed SSH power actions, and verified in-application updates support routine network administration.</p>
   </description>
   <launchable type="desktop-id">advanced-ip-analyser.desktop</launchable>
   <icon type="stock">advanced-ip-analyser</icon>
@@ -21,6 +21,7 @@
   <url type="bugtracker">https://github.com/2E0LXY/Advanced-IP-Analyser/issues</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="2.0.0" date="2026-09-01"/>
     <release version="1.2.0" date="2026-08-29"/>
     <release version="1.1.0" date="2026-08-24"/>
     <release version="1.0.0" date="2026-08-21"/>

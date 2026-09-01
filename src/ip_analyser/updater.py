@@ -37,7 +37,8 @@ def check_for_update(current_version: str, timeout: float = 5.0) -> Update | Non
         "Accept": "application/vnd.github+json",
         "User-Agent": f"Advanced-IP-Analyser/{current_version}",
     })
-    with urllib.request.urlopen(request, timeout=timeout) as response:
+    # RELEASE_API is a fixed HTTPS GitHub API endpoint.
+    with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec B310
         payload = json.load(response)
     latest = str(payload.get("tag_name", "")).removeprefix("v")
     if not latest or version_key(latest) <= version_key(current_version):
@@ -71,7 +72,8 @@ def download_update(update: Update, cache_dir: Path | None = None, timeout: floa
     digest = hashlib.sha256()
     total = 0
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response, temporary.open("wb") as stream:
+        # The URL was matched exactly against this project's fixed HTTPS release prefix above.
+        with urllib.request.urlopen(request, timeout=timeout) as response, temporary.open("wb") as stream:  # nosec B310
             length = response.headers.get("Content-Length")
             if length and int(length) > MAX_PACKAGE_BYTES:
                 raise ValueError("update package exceeds the 50 MiB safety limit")

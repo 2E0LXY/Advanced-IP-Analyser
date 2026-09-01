@@ -10,6 +10,7 @@ from unittest.mock import patch
 from ip_analyser.packet_tools import (PacketRecord, capture_live, list_capture_interfaces,
                                       packet_hex_preview, read_capture,
                                       validate_interface)
+from ip_analyser.capture_helper import _matches as capture_matches
 
 
 def tcp_frame(source="192.0.2.5", destination="198.51.100.7",
@@ -125,6 +126,11 @@ class PacketToolTests(unittest.TestCase):
             capture_live(["192.0.2.5"], duration=0)
         with self.assertRaisesRegex(ValueError, "packet limit"):
             capture_live(["192.0.2.5"], max_packets=100_001)
+
+    def test_unscoped_network_watch_keeps_non_ip_frames(self):
+        arp_frame = bytes.fromhex("ffffffffffff0011223344550806") + b"\x00" * 28
+        self.assertTrue(capture_matches(arp_frame, set(), None))
+        self.assertFalse(capture_matches(arp_frame, {"192.0.2.5"}, None))
 
 
 if __name__ == "__main__":

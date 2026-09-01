@@ -17,10 +17,14 @@ from .models import Host
 from .network import active_ipv4_networks, broadcasts_for_host, current_ipv4_subnet, ipv4_24_target
 from .packet_tools import (PacketRecord, capture_live, list_capture_interfaces,
                            packet_hex_preview, read_capture, validate_interface)
+from .packet_filters import (FilterSyntaxError, QUICK_FILTERS, compile_filter,
+                             load_saved_filters, save_saved_filters)
 from .scanner import DEFAULT_PORTS, Scanner
 from .storage import export, import_inventory, load_favorites, merge_devices, save_favorites
 from .targets import parse_targets
 from .updater import Update, check_for_update, download_update, launch_installer
+from .watch_gui import NetworkWatch
+from .wifi_gui import WifiWatch
 
 OPENABLE_SERVICES = {"http", "https", "ftp", "smb", "ssh", "rdp", "telnet"}
 COMMON_PORTS = ",".join(str(port) for port in DEFAULT_PORTS)
@@ -42,16 +46,36 @@ class PacketViewer(tk.Toplevel):
         header.pack(fill="x")
         ttk.Label(header, text="Built-in packet analysis",
                   font=("TkDefaultFont", 14, "bold")).pack(side="left")
-        ttk.Label(header, text=f"{len(records):,} matching packet(s)").pack(side="left", padx=16)
+        self.match_count = ttk.Label(header, text=f"{len(records):,} displayed packet(s)")
+        self.match_count.pack(side="left", padx=16)
         ttk.Button(header, text="Save capture as…", command=self.save_capture).pack(side="right")
         ttk.Button(header, text="Close", command=self.destroy).pack(side="right", padx=(0, 8))
 
         filter_bar = ttk.Frame(self, padding=(12, 0, 12, 8))
         filter_bar.pack(fill="x")
-        ttk.Label(filter_bar, text="Filter packets").pack(side="left")
+        ttk.Label(filter_bar, text="Display filter").pack(side="left")
         self.filter_text = tk.StringVar()
-        self.filter_text.trace_add("write", lambda *_args: self.refresh())
-        ttk.Entry(filter_bar, textvariable=self.filter_text).pack(side="left", fill="x", expand=True, padx=8)
+        self.filter_predicate = compile_filter("")
+        self.saved_filters: dict[str, str] = {}
+        try:
+            self.saved_filters = load_saved_filters()
+        except (OSError, ValueError):
+            pass
+        self.filter_entry = tk.Entry(filter_bar, textvariable=self.filter_text, relief="solid",
+                                     borderwidth=1, background="#ffffff", foreground="#17324d")
+        self.filter_entry.pack(side="left", fill="x", expand=True, padx=(8, 4), ipady=3)
+        self.filter_entry.bind("<Return>", lambda _event: self.apply_filter())
+        ttk.Button(filter_bar, text="Apply", command=self.apply_filter).pack(side="left", padx=(0, 4))
+        ttk.Button(filter_bar, text="Clear", command=lambda: self.set_filter("")).pack(side="left", padx=(0, 4))
+        self.filter_button = ttk.Menubutton(filter_bar, text="Quick filters")
+        self.filter_menu = tk.Menu(self.filter_button, tearoff=False)
+        self.filter_button.configure(menu=self.filter_menu)
+        self.filter_button.pack(side="left", padx=(0, 4))
+        ttk.Button(filter_bar, text="Save filter…", command=self.save_filter).pack(side="left")
+        self.filter_status = ttk.Label(self, text="Filters change the display only; capture data is unchanged.",
+                                       padding=(12, 0, 12, 6))
+        self.filter_status.pack(fill="x")
+        self.rebuild_filter_menu()
 
         pane = ttk.Panedwindow(self, orient="vertical")
         pane.pack(fill="both", expand=True, padx=12, pady=(0, 12))
@@ -79,19 +103,85 @@ class PacketViewer(tk.Toplevel):
         self.refresh()
 
     def refresh(self) -> None:
-        term = self.filter_text.get().strip().casefold()
         self.table.delete(*self.table.get_children())
         self.records_by_item.clear()
+        displayed = 0
         for record in self.records:
-            searchable = " ".join((record.source, record.destination, record.protocol, record.info,
-                                   str(record.source_port or ""), str(record.destination_port or ""))).casefold()
-            if term and term not in searchable:
+            if not self.filter_predicate(record):
                 continue
             item = self.table.insert("", "end", values=(
                 record.number, record.time_text, record.source, record.source_port or "",
                 record.destination, record.destination_port or "", record.protocol,
                 record.length, record.info))
             self.records_by_item[item] = record
+            displayed += 1
+        self.match_count.configure(text=f"{displayed:,} of {len(self.records):,} displayed packet(s)")
+
+    def apply_filter(self) -> None:
+        expression = self.filter_text.get().strip()
+        try:
+            predicate = compile_filter(expression)
+        except FilterSyntaxError as error:
+            self.filter_entry.configure(background="#ffd7d7")
+            self.filter_status.configure(text=f"Filter error: {error}", foreground="#8b1a1a")
+            return
+        self.filter_predicate = predicate
+        self.filter_entry.configure(background="#d9f7d9")
+        self.filter_status.configure(
+            text="Valid display filter · capture data is unchanged.", foreground="#176b31")
+        self.refresh()
+
+    def set_filter(self, expression: str) -> None:
+        self.filter_text.set(expression)
+        self.apply_filter()
+
+    def rebuild_filter_menu(self) -> None:
+        self.filter_menu.delete(0, "end")
+        for name, expression in QUICK_FILTERS:
+            self.filter_menu.add_command(label=name, command=lambda value=expression: self.set_filter(value))
+        if self.saved_filters:
+            self.filter_menu.add_separator()
+            for name, expression in sorted(self.saved_filters.items(), key=lambda item: item[0].casefold()):
+                submenu = tk.Menu(self.filter_menu, tearoff=False)
+                submenu.add_command(label="Use", command=lambda value=expression: self.set_filter(value))
+                submenu.add_command(label="Delete", command=lambda value=name: self.delete_filter(value))
+                self.filter_menu.add_cascade(label=f"Saved · {name}", menu=submenu)
+
+    def save_filter(self) -> None:
+        expression = self.filter_text.get().strip()
+        try:
+            compile_filter(expression)
+        except FilterSyntaxError as error:
+            messagebox.showerror("Invalid filter", str(error), parent=self)
+            return
+        if not expression:
+            messagebox.showinfo("Nothing to save", "Enter a display filter first.", parent=self)
+            return
+        name = simpledialog.askstring("Save display filter", "Filter name:", parent=self)
+        if not name:
+            return
+        updated = dict(self.saved_filters)
+        updated[name.strip()] = expression
+        try:
+            save_saved_filters(updated)
+        except (OSError, ValueError) as error:
+            messagebox.showerror("Could not save filter", str(error), parent=self)
+            return
+        self.saved_filters = updated
+        self.rebuild_filter_menu()
+
+    def delete_filter(self, name: str) -> None:
+        if not messagebox.askyesno("Delete display filter", f"Delete {name!r}?", parent=self):
+            return
+        updated = dict(self.saved_filters)
+        updated.pop(name, None)
+        try:
+            save_saved_filters(updated)
+        except (OSError, ValueError) as error:
+            messagebox.showerror("Could not delete filter", str(error), parent=self)
+            return
+        self.saved_filters = updated
+        self.rebuild_filter_menu()
 
     def show_detail(self, _event=None) -> None:
         selected = self.table.selection()
@@ -169,6 +259,9 @@ class Application(tk.Tk):
                         font=("TkDefaultFont", 9, "bold"))
         style.configure("DiscoveryFlash.TButton", background="#c4ebff", foreground="#102f49",
                         font=("TkDefaultFont", 9, "bold"))
+        style.configure("Green.Horizontal.TProgressbar", troughcolor="#d9eee0",
+                        background="#31b85c", lightcolor="#54cd78", darkcolor="#249648",
+                        bordercolor="#8bc9a0")
         style.configure("Treeview", background="#ffffff", fieldbackground="#ffffff", foreground="#17324d", rowheight=25)
         style.configure("Treeview.Heading", background="#80c7e8", foreground="#102f49", font=("TkDefaultFont", 9, "bold"))
         style.map("Treeview", background=[("selected", "#4aa8d8")], foreground=[("selected", "#ffffff")])
@@ -237,6 +330,9 @@ class Application(tk.Tk):
         packet_button = ttk.Menubutton(actions, text="Packets ▾")
         packet_button.pack(side="left", padx=(8, 0))
         packet_menu = tk.Menu(packet_button, tearoff=False)
+        packet_menu.add_command(label="Network Watch…", command=self.open_network_watch)
+        packet_menu.add_command(label="Passive Wi-Fi Watch…", command=self.open_wifi_watch)
+        packet_menu.add_separator()
         packet_menu.add_command(label="Capture selected host/service",
                                 command=self.capture_selected_packets)
         packet_menu.add_command(label="Open capture file for selection…",
@@ -317,18 +413,23 @@ class Application(tk.Tk):
 
         footer = ttk.Frame(self, padding=12)
         footer.pack(fill="x")
+        footer.columnconfigure(0, weight=1, uniform="footer-side")
+        footer.columnconfigure(2, weight=1, uniform="footer-side")
         self.status = ttk.Label(footer, text="Only scan networks you are authorized to manage.")
-        self.status.pack(side="left")
-        self.progress = ttk.Progressbar(footer, mode="determinate", length=220)
-        self.progress.pack(side="right")
-        ttk.Label(footer, text="© 2026 Daren Loxley (2E0LXY)").pack(side="right", padx=18)
-        ttk.Label(footer, text=f"Version {__version__}").pack(side="right", padx=(0, 12))
-        ttk.Button(footer, text="Help", command=self.show_help).pack(side="right", padx=(0, 8))
-        self.discovery_button = ttk.Button(footer, text="Please wait · discovering details…",
+        self.status.grid(row=0, column=0, sticky="w")
+        self.progress = ttk.Progressbar(footer, mode="determinate", length=260,
+                                        style="Green.Horizontal.TProgressbar")
+        self.progress.grid(row=0, column=1, padx=18)
+        footer_actions = ttk.Frame(footer)
+        footer_actions.grid(row=0, column=2, sticky="e")
+        ttk.Label(footer_actions, text="© 2026 Daren Loxley (2E0LXY)").pack(side="right", padx=18)
+        ttk.Label(footer_actions, text=f"Version {__version__}").pack(side="right", padx=(0, 12))
+        ttk.Button(footer_actions, text="Help", command=self.show_help).pack(side="right", padx=(0, 8))
+        self.discovery_button = ttk.Button(footer_actions, text="Please wait · discovering details…",
                                            style="Discovery.TButton")
         self.discovery_button.pack(side="right", padx=(0, 8))
         self.discovery_button.pack_forget()
-        self.update_button = ttk.Button(footer, text="Update available", style="Update.TButton",
+        self.update_button = ttk.Button(footer_actions, text="Update available", style="Update.TButton",
                                         command=self.install_available_update)
         self.update_button.pack(side="right", padx=(0, 8))
         self.update_button.pack_forget()
@@ -412,7 +513,20 @@ class Application(tk.Tk):
                 "Select an individual service row to additionally limit capture to its TCP or UDP port. Choose the active interface when prompted; 'any' captures across Linux interfaces.\n\n"
                 "A live capture is bounded by time and packet count. Debian may show an administrator authorization prompt because raw packet capture requires elevated permission; the main application remains unprivileged. "
                 "Open capture file reads bounded Ethernet PCAP, PCAPNG, and gzip-compressed captures and displays packet endpoints, protocols, ports, flags, and a byte preview.\n\n"
+                "The display-filter bar supports IP addresses and CIDRs, TCP/UDP ports, DNS, HTTP, TLS, ICMP, ARP, TCP flags, frame length, comparisons, text matching, AND (&&), OR (||), NOT (!), and parentheses. "
+                "Quick filters provide 20 common starting points and named filters can be saved. These filters change only the displayed rows, never the recording.\n\n"
                 "Capture only traffic you are authorized to inspect. Encrypted payloads remain encrypted and this tool does not bypass authentication or encryption.")
+        add_tab("Network Watch",
+                "Packets → Network Watch opens continuous, time-based analysis. Start with Headers only unless complete payload retention is specifically required. "
+                "The dashboard shows traffic over time, devices, bidirectional conversations, DNS activity, protocol/service usage, TCP health, explainable findings, and saved session history.\n\n"
+                "Findings highlight new devices, connection fan-out, traffic increases, DNS failures, resets, retransmissions, unanswered connections, and unusually regular timing. "
+                "Alert rules can watch traffic thresholds, destinations, ports, domain text, failed connections, or new devices. Reports export to HTML, JSON, or CSV.\n\n"
+                "Recordings and analysis remain local. Old unbookmarked watch captures are limited by age and storage; bookmarked recordings are retained. Encrypted content is never decrypted.")
+        add_tab("Passive Wi-Fi Watch",
+                "Packets → Passive Wi-Fi Watch discovers nearby access points and observed clients using a compatible Linux wireless adapter. "
+                "It shows network name, BSSID, channel, approximate signal, security type, beacon/data counts, client addresses, probe names, and whether WPA authentication traffic was observed.\n\n"
+                "The adapter must support monitor mode. A temporary virtual monitor interface is created through PolicyKit and removed when the watch stops, leaving the normal interface unchanged where the driver supports concurrent interfaces. "
+                "The feature is passive: it does not send deauthentication frames, inject traffic, disconnect clients, or attempt password recovery.")
         add_tab("Shortcuts",
                 "F5 — start a scan\nEscape — cancel the active scan\nCtrl+F — focus the live filter\n"
                 "Ctrl+O — import JSON or XML inventory\nCtrl+S — export inventory\nCtrl+Shift+C — copy selected host or service detail\n"
@@ -808,6 +922,13 @@ class Application(tk.Tk):
                 path, addresses, port, GUI_PACKET_LIMIT)))
         except (OSError, RuntimeError, ValueError) as error:
             self.events.put(("packet_error", error))
+
+    def open_network_watch(self) -> None:
+        known = load_favorites(self.favorites_path)
+        NetworkWatch(self, known)
+
+    def open_wifi_watch(self) -> None:
+        WifiWatch(self)
 
     def open_packet_capture(self) -> None:
         name = filedialog.askopenfilename(filetypes=[

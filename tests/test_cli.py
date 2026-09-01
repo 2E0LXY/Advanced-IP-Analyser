@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from ip_analyser.cli import main
+from test_packet_filters import tcp_record
 
 
 class CliPacketTests(unittest.TestCase):
@@ -27,6 +28,14 @@ class CliPacketTests(unittest.TestCase):
         self.assertEqual(main(["open-capture", "sample.pcap", "--host", "192.0.2.1",
                                "--port", "53", "--limit", "12"]), 0)
         reader.assert_called_once_with(Path("sample.pcap"), ["192.0.2.1"], 53, 12)
+
+    @patch("ip_analyser.cli.read_capture")
+    def test_open_capture_applies_display_filter(self, reader):
+        reader.return_value = [tcp_record(destination_port=80), tcp_record(destination_port=22)]
+        with patch("builtins.print") as output:
+            self.assertEqual(main(["open-capture", "sample.pcap", "--filter",
+                                   "tcp.port == 80"]), 0)
+        self.assertIn("Read 1 matching packet", output.call_args_list[-1].args[0])
 
     @patch("ip_analyser.cli.capture_live")
     def test_capture_can_be_copied_to_requested_output(self, capture):

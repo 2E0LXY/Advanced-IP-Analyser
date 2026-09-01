@@ -21,6 +21,7 @@ mkdir -p "$package_root/usr/lib/advanced-ip-analyser" \
 cp -a "$project_root/src/ip_analyser" "$package_root/usr/lib/advanced-ip-analyser/"
 cp "$project_root/README.md" "$package_root/usr/share/doc/advanced-ip-analyser/README.md"
 cp "$project_root/CHANGELOG.md" "$package_root/usr/share/doc/advanced-ip-analyser/CHANGELOG.md"
+cp "$project_root"/docs/*.md "$package_root/usr/share/doc/advanced-ip-analyser/"
 cp "$project_root/packaging/copyright" "$package_root/usr/share/doc/advanced-ip-analyser/copyright"
 cp "$project_root/packaging/changelog.Debian" "$package_root/usr/share/doc/advanced-ip-analyser/changelog"
 cp "$project_root/packaging/advanced-ip-analyser.1" "$package_root/usr/share/man/man1/advanced-ip-analyser.1"
