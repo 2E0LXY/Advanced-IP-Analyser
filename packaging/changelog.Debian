@@ -1,3 +1,11 @@
+advanced-ip-analyser (2.1.0) stable; urgency=medium
+
+  * Add credential-free asset type, OS/version, model, and confidence profiling.
+  * Add scan exclusions and optional in-app recurring inventory scans.
+  * Add a bounded, authorized, read-only Web Security Audit and reports.
+
+ -- Daren Loxley <24845841+2E0LXY@users.noreply.github.com>  Wed, 02 Sep 2026 12:00:00 +0100
+
 advanced-ip-analyser (2.0.0) stable; urgency=medium
 
   * Add long-running Network Watch timelines, flows, baselines, DNS history,

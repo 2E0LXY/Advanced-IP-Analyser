@@ -12,4 +12,5 @@ Description: Debian network inventory and remote access utility
  Advanced IP Analyser discovers reachable hosts, identifies TCP services,
  stores saved devices, exchanges inventories, opens remote services, provides
  Wake-on-LAN, confirmed SSH power actions, built-in packet analysis,
- long-running network monitoring, passive Wi-Fi observation, and verified updates.
+ long-running network monitoring, passive Wi-Fi observation, bounded web
+ security auditing, detailed asset profiles, and verified updates.

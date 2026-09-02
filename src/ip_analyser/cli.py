@@ -12,6 +12,7 @@ from .packet_tools import (capture_live, list_capture_interfaces, read_capture,
 from .scanner import Scanner
 from .storage import export
 from .targets import parse_targets
+from .web_audit import audit_site, export_web_audit
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -47,6 +48,14 @@ def build_parser() -> argparse.ArgumentParser:
     analyse = commands.add_parser("analyse-capture", help="create a deep-analysis report")
     analyse.add_argument("file", type=Path)
     analyse.add_argument("--report", type=Path, required=True)
+    web = commands.add_parser("web-audit", help="run a bounded read-only web security audit")
+    web.add_argument("url")
+    web.add_argument("--max-pages", type=int, default=25)
+    web.add_argument("--max-depth", type=int, default=2)
+    web.add_argument("--timeout", type=float, default=5.0)
+    web.add_argument("--exclude", action="append", default=[], help="excluded URL path prefix")
+    web.add_argument("--allow-host", action="append", default=[], help="additional allowed hostname")
+    web.add_argument("--report", type=Path, required=True, help=".json or .html output")
     return parser
 
 
@@ -108,6 +117,15 @@ def main(argv: list[str] | None = None) -> int:
         analysis = MonitorAnalyzer().analyze(read_capture(args.file, limit=100_000))
         export_analysis(args.report, analysis)
         print(f"Saved analysis of {analysis.packet_count} packets to {args.report}")
+        return 0
+    if args.command == "web-audit":
+        report = audit_site(args.url, max_pages=args.max_pages, max_depth=args.max_depth,
+                            timeout=args.timeout, excluded_paths=tuple(args.exclude),
+                            allowed_hosts=tuple(args.allow_host),
+                            progress=lambda number, url: print(f"[{number}/{args.max_pages}] {url}"))
+        export_web_audit(args.report, report)
+        print(f"Audited {len(report.pages)} page(s), found {len(report.findings)} observation(s), "
+              f"and saved {args.report}")
         return 0
     targets = parse_targets(args.target)
     scanner = Scanner(args.timeout, args.workers)

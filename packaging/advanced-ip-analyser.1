@@ -1,4 +1,4 @@
-.TH ADVANCED-IP-ANALYSER 1 "September 2026" "Advanced IP Analyser 2.0.0" "User Commands"
+.TH ADVANCED-IP-ANALYSER 1 "September 2026" "Advanced IP Analyser 2.1.0" "User Commands"
 .SH NAME
 advanced-ip-analyser \- discover and inventory authorized network hosts
 .SH SYNOPSIS
@@ -67,6 +67,17 @@ advanced-ip-analyser \- discover and inventory authorized network hosts
 ]
 .br
 .B advanced-ip-analyser analyse-capture FILE --report FILE
+.br
+.B advanced-ip-analyser web-audit URL --report FILE
+[
+.B --max-pages COUNT
+]
+[
+.B --max-depth COUNT
+]
+[
+.B --exclude PATH
+]
 .SH DESCRIPTION
 Advanced IP Analyser scans an IPv4 or IPv6 address, CIDR, or inclusive range,
 identifies reachable devices and common TCP services, and exports inventories.
@@ -82,6 +93,9 @@ Network Watch records bounded traffic over time, stores session history, and rep
 flows, devices, DNS activity, TCP health, baselines, findings, and user alert rules.
 The passive Wi-Fi window can observe access points and clients with a compatible
 monitor-mode adapter; it never transmits deauthentication or injected frames.
+The Web Security Audit performs an explicitly authorized, same-host, bounded,
+read-only crawl and reports defensive HTTP, TLS, header, cookie, content, and
+form observations. It does not submit forms or send exploit payloads.
 .SH DISPLAY FILTERS
 The packet viewer and
 .B open-capture --filter

@@ -1,4 +1,4 @@
-# Advanced IP Analyser 2.0.0 Instruction Book
+# Advanced IP Analyser 2.1.0 Instruction Book
 
 Debian 13 edition
 
@@ -55,12 +55,12 @@ service, disconnect Wi-Fi clients, inject frames, or recover passwords.
 
 ### Install the release package
 
-Download `advanced-ip-analyser_2.0.0_all.deb` from the project release page.
+Download `advanced-ip-analyser_2.1.0_all.deb` from the project release page.
 In a terminal:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.0.0_all.deb
+sudo apt install ./advanced-ip-analyser_2.1.0_all.deb
 ```
 
 Use `apt install ./file.deb`, not `dpkg -i`, because APT resolves dependencies.
@@ -80,7 +80,7 @@ sudo apt remove advanced-ip-analyser
 ```
 
 APT removes application files but normally leaves per-user favorites, captures,
-rules, history, bookmarks, and reports. Review the file locations in chapter 16
+rules, history, bookmarks, and reports. Review the file locations in chapter 17
 before manually removing personal data.
 
 ## 4. Main window tour
@@ -93,6 +93,8 @@ The main window is arranged from setup to action:
 - **Interfaces:** refresh active IPv4 interface/subnet presets.
 - **/24:** use the current host's class-C-style subnet.
 - **TCP ports:** comma-separated ports and ranges.
+- **Exclude:** optional addresses, ranges, or CIDRs removed from the target scope.
+- **Repeat:** rescan every 5, 15, 30, or 60 minutes while the app remains open.
 - **Timeout and Workers:** tune connection patience and concurrency.
 - **Profile:** Fast, Balanced, or Accurate presets.
 - **Filter:** live result-table text search.
@@ -153,6 +155,12 @@ Expand a host to see detected ports. Expand a port to see metadata such as:
 - HTTP status, server/powered-by, content type, title, redirect, and realm;
 - TLS protocol and cipher; or
 - a bounded safe SSH, FTP, SMTP, POP3, or IMAP greeting.
+
+After metadata discovery, the main table also shows a conservative device type,
+operating system/version, and model when enough evidence is available. These are
+heuristic inventory hints derived from manufacturer, ports, HTTP metadata, and
+protocol banners. Exports include the values and confidence level; do not treat
+them as authenticated hardware or software evidence.
 
 Use the Filter field to search all visible host/service metadata. This is a table
 search; packet display filters are a separate language described in chapter 11.
@@ -389,7 +397,42 @@ JSON report if needed. Wi-Fi ordinary recordings use the same bounded retention.
 Passive Wi-Fi Watch deliberately has no deauthentication, injection, rogue AP,
 credential interception, key/password cracking, or denial-of-service capability.
 
-## 14. Automatic updates
+## 14. Web Security Audit
+
+![Web Security Audit](images/web-security-audit.png)
+
+Select a host with HTTP/HTTPS and press **Web audit**, or open the window and
+enter a URL. Before **Start audit** is enabled, confirm that you own or are
+explicitly authorized to test the site.
+
+The audit is intentionally bounded and read-only:
+
+- only `http://` and `https://` targets are accepted;
+- credentials embedded in URLs are rejected;
+- crawling remains on the initial hostname plus explicitly allowed hosts;
+- maximum depth is 5, maximum pages is 100, each page is capped at 1 MiB, and
+  the complete run is capped at 20 MiB;
+- path prefixes can be excluded;
+- custom headers can support an authorized test session, but unsafe transport
+  headers and line breaks are rejected;
+- `Authorization`, `Cookie`, and `Proxy-Authorization` remain bound to the
+  original scheme, hostname, and port and are removed on cross-origin links or
+  redirects; and
+- the crawler uses `GET` and never submits forms or sends exploit payloads.
+
+The **Findings** tab reports defensive observations such as cleartext HTTP,
+missing security headers, cookie attributes, permissive CORS, technology
+disclosure, mixed content, directory listing, and unsafe password-form methods.
+The **Crawled pages** tab inventories status, URL, title, technologies, bytes,
+links, and forms. **Errors and TLS** shows certificate validation, TLS protocol,
+cipher, certificate SHA-256 fingerprint, and bounded request errors.
+
+Save an escaped HTML report for people or structured JSON for other tools. This
+module is not a clone of Acunetix/Invicti. It deliberately excludes active SQL
+injection/XSS testing, credential attacks, forced browsing, file upload, malware
+execution, destructive validation, and out-of-band exploit callbacks.
+
+## 15. Automatic updates
 
 The app checks the latest project GitHub release after startup. A newer valid tag
 causes the footer button to flash. Click it and confirm to:
@@ -406,7 +449,7 @@ causes the footer button to flash. Click it and confirm to:
 Help contains a manual **Check for updates** action. Never bypass an update
 verification failure; use the Releases page and verify the checksum instead.
 
-## 15. Command-line reference
+## 16. Command-line reference
 
 ### Scan
 
@@ -443,7 +486,14 @@ advanced-ip-analyser watch [--interface NAME] [--duration SECONDS] \
 advanced-ip-analyser analyse-capture FILE --report FILE
 ```
 
-## 16. Files, data, and privacy
+### Web security audit
+
+```sh
+advanced-ip-analyser web-audit https://server.example \
+  --max-pages 25 --max-depth 2 --exclude /logout --report web-audit.html
+```
+
+## 17. Files, data, and privacy
 
 | Path | Contents |
 | --- | --- |
@@ -460,7 +510,7 @@ The app has no analytics/telemetry endpoint. Local data leaves the computer only
 through explicit export/copy or tools the user launches. Update checks contact
 this project's GitHub Releases API.
 
-## 17. Troubleshooting
+## 18. Troubleshooting
 
 ### Scan finds nothing
 
@@ -501,7 +551,15 @@ and narrowly scoped passwordless `sudo shutdown` permission.
 Use Help → Check for updates. Confirm GitHub connectivity. A release without the
 expected filename or SHA-256 digest is deliberately ignored/rejected.
 
-## 18. Keyboard and mouse reference
+### Web audit finds no pages
+
+Confirm the URL includes `http://` or `https://`, the hostname resolves, and the
+site permits the configured user agent. Check excluded paths and allowed hosts.
+An authentication redirect to another hostname requires that hostname to be
+explicitly allowed. Interpret certificate trust separately from the TLS
+protocol/cipher inventory; validation failures are shown as High findings.
+
+## 19. Keyboard and mouse reference
 
 | Input | Action |
 | --- | --- |
@@ -516,7 +574,7 @@ expected filename or SHA-256 digest is deliberately ignored/rejected.
 | Right-click result | Open, copy, expand/collapse |
 | Right-click TCP ports | Port presets |
 
-## 19. Security and interpretation notes
+## 20. Security and interpretation notes
 
 - Scan/fingerprint work is bounded and unauthenticated.
 - Network-derived strings are not passed through a shell.
@@ -528,13 +586,15 @@ expected filename or SHA-256 digest is deliberately ignored/rejected.
 - Packet files, records, filters, expressions, regex, reports, history, captures,
   notifications, and Wi-Fi channel plans have explicit bounds.
 - Elevated helpers validate fixed options and filesystem ownership.
+- Web audits require explicit authorization, enforce same-host/allowed-host
+  scope, bound pages/depth/bytes, and never submit forms or send exploit payloads.
 - Update packages require both cryptographic digest and Debian identity checks.
 
 Network Watch findings and Passive Wi-Fi security labels are observations. They
 can be affected by partial visibility and should be confirmed with configuration,
 logs, and authorized specialist tools before action.
 
-## 20. Getting help and contributing
+## 21. Getting help and contributing
 
 Use the in-app Help centre for offline guidance. For bugs, include Debian version,
 application version, steps, expected/actual result, and sanitized logs/captures:

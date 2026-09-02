@@ -25,6 +25,7 @@ from .targets import parse_targets
 from .updater import Update, check_for_update, download_update, launch_installer
 from .watch_gui import NetworkWatch
 from .wifi_gui import WifiWatch
+from .web_gui import WebSecurityAudit
 
 OPENABLE_SERVICES = {"http", "https", "ftp", "smb", "ssh", "rdp", "telnet"}
 COMMON_PORTS = ",".join(str(port) for port in DEFAULT_PORTS)
@@ -227,6 +228,7 @@ class Application(tk.Tk):
         self.update_flash_on = False
         self.discovery_active = False
         self.discovery_flash_on = False
+        self.scheduled_scan_id: str | None = None
         self.ssh_username = getpass.getuser()
         self.cancel_scan = threading.Event()
         self.network_presets = []
@@ -318,6 +320,19 @@ class Application(tk.Tk):
         self.filter_entry = ttk.Entry(settings, textvariable=self.filter_text)
         self.filter_entry.pack(side="left", fill="x", expand=True, padx=(6, 0))
 
+        scope_options = ttk.Frame(self, padding=(12, 0, 12, 8))
+        scope_options.pack(fill="x")
+        ttk.Label(scope_options, text="Exclude IP/range/CIDR").pack(side="left")
+        self.exclusions = ttk.Entry(scope_options)
+        self.exclusions.pack(side="left", fill="x", expand=True, padx=(6, 12))
+        ttk.Label(scope_options, text="Repeat").pack(side="left")
+        self.repeat_scan = ttk.Combobox(scope_options,
+                                        values=("Off", "Every 5 minutes", "Every 15 minutes",
+                                                "Every 30 minutes", "Every 60 minutes"),
+                                        state="readonly", width=18)
+        self.repeat_scan.set("Off")
+        self.repeat_scan.pack(side="left", padx=(6, 0))
+
         actions = ttk.Frame(self, padding=(12, 0, 12, 8))
         actions.pack(fill="x")
         ttk.Button(actions, text="Copy IP", command=self.copy_selected_ips).pack(side="left")
@@ -327,6 +342,7 @@ class Application(tk.Tk):
         ttk.Button(actions, text="Wake", command=self.wake_selected).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Ping", command=lambda: self.run_selected_tool("ping")).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Trace", command=lambda: self.run_selected_tool("trace")).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Web audit…", command=self.open_web_audit).pack(side="left", padx=(8, 0))
         packet_button = ttk.Menubutton(actions, text="Packets ▾")
         packet_button.pack(side="left", padx=(8, 0))
         packet_menu = tk.Menu(packet_button, tearoff=False)
@@ -358,16 +374,20 @@ class Application(tk.Tk):
         self.notebook.add(results_page, text="Scan results")
         self.notebook.add(self.favorites_page, text="Favorites")
 
-        columns = ("address", "state", "hostname", "latency", "mac", "manufacturer", "services")
+        columns = ("address", "state", "hostname", "latency", "mac", "manufacturer",
+                   "device_type", "operating_system", "model", "services")
         self.table = ttk.Treeview(results_page, columns=columns, show="tree headings", selectmode="extended")
         self.table.heading("#0", text="Ports")
         self.table.column("#0", width=70, minwidth=55, stretch=False, anchor="w")
-        widths = (130, 55, 190, 75, 135, 210, 260)
+        widths = (130, 55, 170, 75, 135, 170, 140, 150, 130, 260)
         for column, width in zip(columns, widths):
             self.table.heading(column, text=column.replace("_", " ").title(),
                                command=lambda selected=column: self._sort_column(selected))
             self.table.column(column, width=width, anchor="w")
+        table_scroll = ttk.Scrollbar(results_page, orient="horizontal", command=self.table.xview)
+        self.table.configure(xscrollcommand=table_scroll.set)
         self.table.pack(fill="both", expand=True)
+        table_scroll.pack(fill="x")
         self.table.tag_configure("even", background="#ffffff")
         self.table.tag_configure("odd", background="#e4f5ff")
         self.table.tag_configure("detail", background="#f1f9fe", foreground="#315c78")
@@ -390,7 +410,8 @@ class Application(tk.Tk):
         self.table_menu.add_command(label="Expand all ports", command=lambda: self.set_all_expanded(True))
         self.table_menu.add_command(label="Collapse all ports", command=lambda: self.set_all_expanded(False))
 
-        favorite_columns = ("address", "hostname", "mac", "manufacturer", "services", "seen", "note")
+        favorite_columns = ("address", "hostname", "mac", "manufacturer", "device_type",
+                            "operating_system", "model", "services", "seen", "note")
         self.favorites_table = ttk.Treeview(
             self.favorites_page, columns=favorite_columns, show="headings", selectmode="extended")
         for column in favorite_columns:
@@ -608,8 +629,19 @@ class Application(tk.Tk):
 
 
     def start_scan(self) -> None:
+        if self.scheduled_scan_id is not None:
+            try:
+                self.after_cancel(self.scheduled_scan_id)
+            except tk.TclError:
+                pass
+            self.scheduled_scan_id = None
         try:
             targets = parse_targets(self.target.get())
+            if self.exclusions.get().strip():
+                excluded = set(parse_targets(self.exclusions.get()))
+                targets = [target for target in targets if target not in excluded]
+                if not targets:
+                    raise ValueError("all scan targets were excluded")
             ports = parse_ports(self.ports.get(), limit=65_535)
             timeout = float(self.timeout.get())
             workers = int(self.workers.get())
@@ -714,6 +746,7 @@ class Application(tk.Tk):
                     suffix = " · discovery cancelled" if cancelled and candidates else (" · discovery complete" if candidates else "")
                     self.status.configure(text=f"{prefix}: {len(self.results)} reachable; {len(scanned)} of {total} checked{suffix}")
                     self._merge_results_into_favorites()
+                    self._schedule_next_scan()
                     return
                 elif event[0] == "power_done":
                     results = event[1]
@@ -739,6 +772,19 @@ class Application(tk.Tk):
                     return
         except queue.Empty:
             self.after(50, self._drain_events)
+
+    def _schedule_next_scan(self) -> None:
+        repeat = self.repeat_scan.get()
+        if repeat == "Off":
+            return
+        match = next((value for value in repeat.split() if value.isdigit()), "")
+        if not match:
+            return
+        minutes = int(match)
+        self.status.configure(text=f"{self.status.cget('text')} · next scan in {minutes} minutes")
+        if self.scheduled_scan_id is not None:
+            self.after_cancel(self.scheduled_scan_id)
+        self.scheduled_scan_id = self.after(minutes * 60_000, self.start_scan)
 
     def _start_discovery_indicator(self, total: int) -> None:
         self.discovery_active = True
@@ -766,7 +812,9 @@ class Application(tk.Tk):
         stripe = "even" if len(self.table.get_children("")) % 2 == 0 else "odd"
         item = self.table.insert("", "end", text=f"{len(host.ports)} port{'s' if len(host.ports) != 1 else ''}",
             values=(host.address, "Up", host.hostname, host.latency_ms or "", host.mac,
-                    host.manufacturer, ", ".join(web_services)), tags=(stripe,))
+                    host.manufacturer, host.device_type,
+                    " ".join(value for value in (host.operating_system, host.os_version) if value),
+                    host.model, ", ".join(web_services)), tags=(stripe,))
         self.hosts_by_item[item] = host
         for port, service in zip(host.ports, host.services):
             detail = service_url(service, host.address, port) if service in {"http", "https", "ftp"} else f"TCP {port} · {service}"
@@ -776,12 +824,12 @@ class Application(tk.Tk):
             summary = info.get("Page title") or info.get("Status") or detail
             clickable = service in OPENABLE_SERVICES
             child = self.table.insert(item, "end", text=str(port),
-                                      values=("", "Open", service_label, "", "", "", summary),
+                                      values=("", "Open", service_label, "", "", "", "", "", "", summary),
                                       tags=(("detail_click" if clickable else "detail"),))
             self.services_by_item[child] = (host, service, port)
             for label, value in info.items():
                 metadata = self.table.insert(child, "end", text="",
-                    values=("", "Detail", label, "", "", "", value), tags=("metadata",))
+                    values=("", "Detail", label, "", "", "", "", "", "", value), tags=("metadata",))
                 self.metadata_by_item[metadata] = (label, value)
 
     def _matches_filter(self, host: Host) -> bool:
@@ -789,7 +837,9 @@ class Application(tk.Tk):
         metadata = " ".join(f"{label} {value}" for details in host.service_info.values()
                             for label, value in details.items())
         return not term or term in " ".join((host.address, host.hostname, host.mac, host.manufacturer,
-                                              " ".join(host.services), metadata, host.note)).casefold()
+                                              host.device_type, host.operating_system, host.os_version,
+                                              host.model, " ".join(host.services), metadata,
+                                              host.note)).casefold()
 
     def _refresh_table(self) -> None:
         if not hasattr(self, "table"):
@@ -930,6 +980,16 @@ class Application(tk.Tk):
     def open_wifi_watch(self) -> None:
         WifiWatch(self)
 
+    def open_web_audit(self) -> None:
+        initial = ""
+        selected = self.selected_hosts()
+        if selected:
+            preferred = preferred_web_service(selected[0].services)
+            if preferred:
+                index = selected[0].services.index(preferred)
+                initial = service_url(preferred, selected[0].address, selected[0].ports[index])
+        WebSecurityAudit(self, initial)
+
     def open_packet_capture(self) -> None:
         name = filedialog.askopenfilename(filetypes=[
             ("Packet captures", "*.pcap *.pcapng *.cap *.pcap.gz *.pcapng.gz"),
@@ -1033,6 +1093,8 @@ class Application(tk.Tk):
         for host in favorites:
             item = self.favorites_table.insert("", "end", values=(
                 host.address, host.hostname, host.mac, host.manufacturer,
+                host.device_type, " ".join(value for value in (
+                    host.operating_system, host.os_version) if value), host.model,
                 ", ".join(host.services), host.seen_at, host.note))
             self.favorite_hosts_by_item[item] = host
 

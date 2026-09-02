@@ -22,6 +22,11 @@ class Host:
     latency_ms: float | None = None
     mac: str = ""
     manufacturer: str = ""
+    device_type: str = ""
+    operating_system: str = ""
+    os_version: str = ""
+    model: str = ""
+    profile_confidence: str = ""
     services: list[str] = field(default_factory=list)
     ports: list[int] = field(default_factory=list)
     service_info: dict[str, dict[str, str]] = field(default_factory=dict)
@@ -46,6 +51,11 @@ class Host:
             latency_ms=observed.latency_ms,
             mac=observed.mac or self.mac,
             manufacturer=observed.manufacturer or self.manufacturer,
+            device_type=observed.device_type or self.device_type,
+            operating_system=observed.operating_system or self.operating_system,
+            os_version=observed.os_version or self.os_version,
+            model=observed.model or self.model,
+            profile_confidence=observed.profile_confidence or self.profile_confidence,
             services=list(observed.services),
             ports=list(observed.ports),
             service_info={port: dict(details) for port, details in observed.service_info.items()},
@@ -135,6 +145,11 @@ class Host:
             latency_ms=latency,
             mac=mac,
             manufacturer=text("manufacturer", 1_024),
+            device_type=text("device_type", 128),
+            operating_system=text("operating_system", 128),
+            os_version=text("os_version", 128),
+            model=text("model", 256),
+            profile_confidence=text("profile_confidence", 32),
             services=list(services),
             ports=list(ports),
             service_info=service_info,

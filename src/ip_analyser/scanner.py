@@ -11,6 +11,7 @@ from dataclasses import replace
 
 from .models import Host
 from .fingerprints import probe_service
+from .asset_profiles import infer_asset_profile
 from .vendors import MacVendorLookup
 
 DEFAULT_PORTS = {
@@ -95,7 +96,12 @@ class Scanner:
                 for future in concurrent.futures.as_completed(probes):
                     if details := future.result():
                         service_info[str(probes[future])] = details
-        return replace(host, service_info=service_info)
+        enriched = replace(host, service_info=service_info)
+        profile = infer_asset_profile(enriched)
+        return replace(enriched, device_type=profile.device_type,
+                       operating_system=profile.operating_system,
+                       os_version=profile.os_version, model=profile.model,
+                       profile_confidence=profile.confidence)
 
     def discover_all(self, hosts: Iterable[Host],
                      progress: Callable[[int, int, Host], None] | None = None,

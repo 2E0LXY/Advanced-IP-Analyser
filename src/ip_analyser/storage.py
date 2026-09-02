@@ -64,20 +64,27 @@ def export(path: Path, hosts: list[Host]) -> None:
     elif suffix == ".csv":
         with path.open("w", newline="", encoding="utf-8") as stream:
             writer = csv.writer(stream)
-            writer.writerow(["address", "reachable", "hostname", "latency_ms", "mac", "manufacturer", "services", "ports", "service_info", "seen_at", "note"])
+            writer.writerow(["address", "reachable", "hostname", "latency_ms", "mac", "manufacturer",
+                             "device_type", "operating_system", "os_version", "model",
+                             "profile_confidence", "services", "ports", "service_info", "seen_at", "note"])
             for host in hosts:
                 writer.writerow([_csv_safe(value) for value in
                                  [host.address, host.reachable, host.hostname, host.latency_ms, host.mac, host.manufacturer,
+                                  host.device_type, host.operating_system, host.os_version, host.model,
+                                  host.profile_confidence,
                                   ",".join(host.services), ",".join(str(port) for port in host.ports),
                                   json.dumps(host.service_info, sort_keys=True), host.seen_at, host.note]])
     elif suffix in {".html", ".htm"}:
         rows = "".join("<tr>" + "".join(f"<td>{html.escape(str(value))}</td>" for value in
             [h.address, h.reachable, h.hostname, h.latency_ms if h.latency_ms is not None else "",
-             h.mac, h.manufacturer, ", ".join(h.services), ", ".join(str(port) for port in h.ports),
+             h.mac, h.manufacturer, h.device_type, h.operating_system, h.os_version, h.model,
+             h.profile_confidence, ", ".join(h.services), ", ".join(str(port) for port in h.ports),
              json.dumps(h.service_info, sort_keys=True), h.seen_at, h.note]) + "</tr>" for h in hosts)
         path.write_text("<!doctype html><meta charset=utf-8><title>Network inventory</title>"
                         "<table><thead><tr><th>Address</th><th>Reachable</th><th>Hostname</th><th>Latency ms</th>"
-                        "<th>MAC</th><th>Manufacturer</th><th>Services</th><th>Ports</th><th>Service details</th>"
+                        "<th>MAC</th><th>Manufacturer</th><th>Device type</th><th>Operating system</th>"
+                        "<th>OS version</th><th>Model</th><th>Profile confidence</th>"
+                        "<th>Services</th><th>Ports</th><th>Service details</th>"
                         "<th>Seen</th><th>Note</th></tr></thead>"
                         f"<tbody>{rows}</tbody></table>\n", encoding="utf-8")
     elif suffix == ".xml":

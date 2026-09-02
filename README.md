@@ -3,7 +3,7 @@
 ![Advanced IP Analyser icon](src/ip_analyser/assets/advanced-ip-analyser.png)
 
 Advanced IP Analyser is an original, Debian 13-only desktop and command-line
-network inventory, packet analysis, long-term monitoring, and passive Wi-Fi
+network inventory, bounded web security auditing, packet analysis, long-term monitoring, and passive Wi-Fi
 observation application. It is designed for home labs, support teams, system
 administrators, and authorized network troubleshooting without requiring
 Wireshark.
@@ -27,7 +27,8 @@ actions, packet tools, and verified updates in one interface.
 
 | Area | Features |
 | --- | --- |
-| Network discovery | IPv4/IPv6 addresses, CIDRs, inclusive ranges, active-interface presets, `/24` shortcut, reachability, latency, DNS names, local MAC addresses, offline vendor lookup |
+| Network discovery | IPv4/IPv6 addresses, CIDRs, inclusive ranges, exclusions, recurring scans, active-interface presets, `/24` shortcut, reachability, latency, DNS names, local MAC addresses, offline vendor lookup |
+| Asset profiles | Conservative device type, operating system/version, model, and confidence inferred from manufacturer, services, HTTP metadata, and protocol banners without credentials or agents |
 | TCP services | Custom ports/ranges, common and web presets, optional all-65,535-port scan, expandable port rows, safe HTTP/TLS/banner metadata, cancellable two-stage discovery |
 | Results workflow | Live filtering and sorting, alternating rows, clickable services, copy IP/detail, selection-aware export, keyboard and context-menu actions |
 | Favorites | Persistent saved devices, MAC-first identity, refreshed IP observations, editable notes, rescan, removal, import, selected export |
@@ -37,6 +38,7 @@ actions, packet tools, and verified updates in one interface.
 | Display filters | IP/CIDR, TCP/UDP ports, DNS, HTTP, TLS, ICMP, ARP, TCP flags, lengths, comparisons, text/regex matching, boolean expressions, 20 quick filters, saved named filters |
 | Network Watch | Up to 24-hour sessions, minute timeline, conversations, devices, DNS, protocols/services, TCP diagnostics, baselines, findings, alerts, bookmarks, reports, retention, history |
 | Passive Wi-Fi | Monitor-mode virtual interface, AP/client discovery, SSID/BSSID, channel, signal, security advertisement, beacons/data, probes, passive EAPOL observation, PCAP/JSON save |
+| Web Security Audit | Same-host bounded crawler, path exclusions, extra allowed hosts, custom headers, page/form/technology inventory, TLS fingerprint, security-header, cookie, cleartext, mixed-content, directory-listing, CORS, and password-form observations, HTML/JSON reports |
 | Updates | Automatic GitHub release check, flashing button, trusted release URL, SHA-256 verification, Debian package identity check, close/install/restart workflow |
 | Debian packaging | Reproducible `.deb`, Lintian/AppStream/desktop validation, install/GUI/remove smoke test, release checksum, optional signed GitHub Pages APT feed |
 
@@ -48,7 +50,7 @@ then run:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.0.0_all.deb
+sudo apt install ./advanced-ip-analyser_2.1.0_all.deb
 ```
 
 Launch it from the desktop application menu or run:
@@ -84,12 +86,14 @@ the complete GUI with `sudo`.
 
 1. Select an interface subnet, enter one address/range/CIDR, or use the `/24`
    shortcut.
-2. Choose Fast, Balanced, or Accurate, or set timeout/workers manually.
-3. Enter TCP ports and ranges. Right-click the field for common, web/application,
+2. Optionally enter excluded addresses/ranges/CIDRs and choose an in-app repeat
+   interval for scheduled inventory refreshes.
+3. Choose Fast, Balanced, or Accurate, or set timeout/workers manually.
+4. Enter TCP ports and ranges. Right-click the field for common, web/application,
    all-port, or clear presets.
-4. Press **Scan**. Reachable hosts and ports appear first; bounded service-detail
+5. Press **Scan**. Reachable hosts and ports appear first; bounded service-detail
    discovery follows as a separate phase.
-5. Expand a host to inspect ports and expand a port to inspect available metadata.
+6. Expand a host to inspect ports, asset type, inferred OS/model, and available metadata.
 
 Detected details can include HTTP status, Server and Powered-By headers, page
 title, content type, redirects, authentication realm, TLS protocol/cipher, and
@@ -113,7 +117,30 @@ restricted to a small number of authorized targets.
   native application handlers.
 - Wake-on-LAN uses the matching active-interface broadcast where possible.
 - Shutdown/reboot/abort require confirmation and non-interactive SSH keys;
-  passwords are never requested or stored.
+passwords are never requested or stored.
+
+## Native Web Security Audit
+
+![Web Security Audit](docs/images/web-security-audit.png)
+
+Select a discovered HTTP/HTTPS host and press **Web audit**, or open the tool and
+enter an authorized URL. The audit requires an explicit authorization checkbox.
+It uses read-only `GET` requests, remains on the initial/allowed hosts, follows at
+most five link levels, reads at most 100 pages and 20 MiB total, and supports path
+exclusions, custom request headers, and additional allowed hostnames.
+Credential-bearing headers (`Authorization`, `Cookie`, and `Proxy-Authorization`)
+are confined to the original scheme, hostname, and port and are stripped from
+cross-origin links and redirects.
+
+The results include crawled pages, titles, links, forms, disclosed technologies,
+TLS certificate validation, protocol/cipher/certificate fingerprint, errors, and prioritized observations
+for transport, headers, cookies, framing, CORS, mixed content, directory indexes,
+and password forms. Reports export as escaped HTML or structured JSON.
+
+This is a defensive configuration and exposure review. It does not send SQL
+injection/XSS payloads, brute-force credentials, exploit vulnerabilities, upload
+files, change server data, bypass authentication, or claim Acunetix/Invicti
+commercial scanner parity. See the [feature comparison](docs/FEATURE_PARITY.md).
 
 ## Built-in packet analysis
 
@@ -243,6 +270,10 @@ advanced-ip-analyser open-capture host.pcap \
 advanced-ip-analyser watch --interface any --duration 900 --snaplen 128 \
   --report watch.html
 advanced-ip-analyser analyse-capture host.pcap --report analysis.json
+
+# Bounded read-only website audit
+advanced-ip-analyser web-audit https://server.example \
+  --max-pages 25 --max-depth 2 --exclude /logout --report web-audit.html
 ```
 
 Run `advanced-ip-analyser COMMAND --help` for every option.

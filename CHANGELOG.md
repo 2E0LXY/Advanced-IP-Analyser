@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.1.0 - 2026-09-02
+
+- Add conservative device type, operating system/version, model, and confidence
+  profiling from credential-free manufacturer, service, HTTP, and banner facts.
+- Add target exclusions and optional 5/15/30/60-minute recurring scans.
+- Add a native bounded Web Security Audit with explicit authorization, same-host
+  crawling, exclusions, allowed hosts, custom headers, TLS fingerprinting,
+  configuration/session/form observations, and HTML/JSON reports.
+- Keep credential-bearing custom headers on their original web origin, strip
+  them from cross-origin links/redirects, and report TLS certificate validation.
+- Add the `web-audit` CLI workflow and an honest Lansweeper/Acunetix capability
+  matrix that distinguishes implemented defensive checks from deliberately
+  excluded exploit automation and commercial platform functions.
+
 ## 2.0.0 - 2026-09-01
 
 - Add Network Watch for bounded captures up to 24 hours with minute timelines,
