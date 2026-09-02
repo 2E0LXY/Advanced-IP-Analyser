@@ -1,0 +1,26 @@
+Description: Use Debian's package manager for application updates
+ Official Debian packages must receive updates from configured Debian archives.
+ Disable the automatic GitHub release check and its manual GUI control in this
+ build. This also avoids an unsolicited network request during application
+ startup. The standalone upstream build retains its verified updater.
+Author: Daren Loxley <24845841+2E0LXY@users.noreply.github.com>
+Forwarded: not-needed
+Last-Update: 2026-09-02
+---
+--- a/src/ip_analyser/gui.py
++++ b/src/ip_analyser/gui.py
+@@ -461,6 +461,5 @@ class Application(tk.Tk):
+         self.bind_all("<Control-Shift-C>", lambda _event: self.copy_selected_detail())
+         self.refresh_subnets(show_errors=False)
+-        self.after(1500, self.check_updates)
+ 
+     def show_help(self) -> None:
+         window = tk.Toplevel(self)
+@@ -475,7 +474,5 @@ class Application(tk.Tk):
+                   font=("TkDefaultFont", 16, "bold")).pack(side="left")
+         ttk.Button(heading, text="Close", command=window.destroy).pack(side="right", padx=(12, 0))
+-        ttk.Button(heading, text="Check for updates",
+-                   command=lambda: self.check_updates(manual=True)).pack(side="right", padx=(12, 0))
+         ttk.Label(heading, text=f"Version {__version__}").pack(side="right")
+ 
+         notebook = ttk.Notebook(window)

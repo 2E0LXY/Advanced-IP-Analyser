@@ -338,6 +338,12 @@ removes the package, generates `SHA256SUMS`, publishes release assets, and
 deploys the public signed APT feed described in
 [APT_REPOSITORY.md](docs/APT_REPOSITORY.md).
 
+The separate official-Debian candidate uses a non-native `3.0 (quilt)` source
+package and Debian unstable CI. It builds source and binary artifacts, runs
+Lintian and autopkgtest, and disables the upstream self-updater so archive
+packages remain managed by APT. See the [official Debian inclusion
+guide](docs/DEBIAN_INCLUSION.md) for the ITP and sponsorship stages.
+
 ## Documentation
 
 - [Complete instruction book (PDF)](output/pdf/Advanced-IP-Analyser-Instruction-Book.pdf)
@@ -348,6 +354,7 @@ deploys the public signed APT feed described in
 - [Packet engine and safety boundaries](docs/PACKET_ANALYSIS.md)
 - [Feature parity](docs/FEATURE_PARITY.md)
 - [APT repository publishing](docs/APT_REPOSITORY.md)
+- [Official Debian inclusion and sponsorship](docs/DEBIAN_INCLUSION.md)
 
 ## Independence, license, and scope
 

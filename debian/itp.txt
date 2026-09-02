@@ -1,0 +1,25 @@
+Package: wnpp
+Severity: wishlist
+Owner: Daren Loxley <24845841+2E0LXY@users.noreply.github.com>
+X-Debbugs-Cc: debian-devel@lists.debian.org
+
+* Package name    : advanced-ip-analyser
+  Version         : 2.1.0
+  Upstream Author : Daren Loxley <24845841+2E0LXY@users.noreply.github.com>
+* URL             : https://github.com/2E0LXY/Advanced-IP-Analyser
+* License         : GPL-3.0-or-later
+  Programming Lang: Python
+  Description     : network inventory, packet analysis, and monitoring utility
+
+ Advanced IP Analyser discovers authorized IPv4 and IPv6 hosts, identifies
+ TCP services, records device inventories, and launches common remote-access
+ clients. It also provides Wake-on-LAN and confirmed SSH power actions.
+ .
+ The application includes bounded packet capture and display filtering,
+ long-running network observation, passive Wi-Fi monitoring with compatible
+ adapters, and a read-only same-host web security audit. A graphical desktop
+ interface and command-line tools are included.
+ .
+ I plan to maintain this package and am seeking a sponsor for its initial
+ upload. The application is intended only for networks and systems the user is
+ authorized to administer.

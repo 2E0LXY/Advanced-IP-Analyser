@@ -1,0 +1,16 @@
+#!/usr/bin/make -f
+
+export PYBUILD_NAME=advanced-ip-analyser
+
+%:
+	dh $@ --buildsystem=pybuild
+
+override_dh_auto_test:
+	PYTHONPATH=src python3 -m unittest discover -s tests -v
+
+override_dh_install:
+	dh_install
+	mv debian/advanced-ip-analyser/usr/share/applications/advanced-ip-analyser.desktop \
+		debian/advanced-ip-analyser/usr/share/applications/io.github._2E0LXY.AdvancedIPAnalyser.desktop
+	mv debian/advanced-ip-analyser/usr/share/metainfo/advanced-ip-analyser.metainfo.xml \
+		debian/advanced-ip-analyser/usr/share/metainfo/io.github._2E0LXY.AdvancedIPAnalyser.metainfo.xml

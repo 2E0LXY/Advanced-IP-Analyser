@@ -1,0 +1,3 @@
+use-shared-assets.patch
+disable-self-updater.patch
+appstream-developer-id.patch

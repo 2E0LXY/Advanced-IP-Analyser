@@ -1,0 +1,5 @@
+Version: 5
+
+Source: https://github.com/2E0LXY/Advanced-IP-Analyser/tags
+Matching-Pattern: (?:.*?/)?v?(\d[\d.]*)\.tar\.gz
+Filenamemangle: s%(?:.*?)?v?(\d[\d.]*)\.tar\.gz%advanced-ip-analyser-$1.tar.gz%

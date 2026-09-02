@@ -1,0 +1,101 @@
+name: Debian source package
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'debian/**'
+      - '.github/workflows/debian-source.yml'
+  pull_request:
+    paths:
+      - 'debian/**'
+      - '.github/workflows/debian-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-package:
+    runs-on: ubuntu-24.04
+    container: debian:sid-slim
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Install Debian packaging tools and build dependencies
+        run: |
+          apt-get update
+          apt-get install --yes --no-install-recommends \
+            appstream autopkgtest build-essential ca-certificates debhelper \
+            desktop-file-utils devscripts dh-python fakeroot git lintian \
+            pybuild-plugin-pyproject python3-all python3-defusedxml \
+            python3-setuptools python3-tk xauth xvfb
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Assemble pristine upstream and Debian packaging
+        run: |
+          version="$(dpkg-parsechangelog -S Version | sed 's/-[^-]*$//')"
+          test "$version" = "2.1.0"
+          mkdir -p build-area
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git archive --format=tar --prefix="advanced-ip-analyser-$version/" \
+            --output="build-area/advanced-ip-analyser_${version}.orig.tar" "v$version"
+          gzip -n "build-area/advanced-ip-analyser_${version}.orig.tar"
+          tar -C build-area -xzf "build-area/advanced-ip-analyser_${version}.orig.tar.gz"
+          cp -a debian "build-area/advanced-ip-analyser-$version/"
+
+      - name: Validate Debian metadata
+        working-directory: build-area/advanced-ip-analyser-2.1.0
+        run: |
+          desktop-file-validate packaging/debian/usr/share/applications/advanced-ip-analyser.desktop
+          set +e
+          uscan --report-status
+          uscan_status=$?
+          set -e
+          test "$uscan_status" -le 1
+
+      - name: Build source and binary packages
+        working-directory: build-area/advanced-ip-analyser-2.1.0
+        run: |
+          dpkg-buildpackage --no-sign -S
+          dpkg-buildpackage --no-sign -b
+
+      - name: Run Lintian policy checks
+        working-directory: build-area
+        run: |
+          appstreamcli validate-tree --no-net advanced-ip-analyser-2.1.0/debian/advanced-ip-analyser
+          lintian --display-info --pedantic --fail-on error \
+            advanced-ip-analyser_2.1.0-1_source.changes \
+            advanced-ip-analyser_2.1.0-1_all.deb
+
+      - name: Run installed-package tests
+        working-directory: build-area
+        run: |
+          set +e
+          autopkgtest \
+            advanced-ip-analyser_2.1.0-1.dsc \
+            advanced-ip-analyser_2.1.0-1_all.deb \
+            -- null > autopkgtest.log 2>&1
+          autopkgtest_status=$?
+          set -e
+          cat autopkgtest.log
+          grep -Eq '^cli[[:space:]]+PASS' autopkgtest.log
+          grep -Eq '^gui[[:space:]]+PASS' autopkgtest.log
+          test "$autopkgtest_status" -eq 0 || test "$autopkgtest_status" -eq 8
+
+      - name: Upload sponsor-ready unsigned source package
+        uses: actions/upload-artifact@v7
+        with:
+          name: advanced-ip-analyser-debian-source-unsigned
+          path: |
+            build-area/advanced-ip-analyser_2.1.0-1.debian.tar.xz
+            build-area/advanced-ip-analyser_2.1.0-1.dsc
+            build-area/advanced-ip-analyser_2.1.0-1_source.buildinfo
+            build-area/advanced-ip-analyser_2.1.0-1_source.changes
+            build-area/advanced-ip-analyser_2.1.0.orig.tar.gz
+            build-area/advanced-ip-analyser_2.1.0-1_all.deb
+            build-area/advanced-ip-analyser_2.1.0-1_amd64.buildinfo
+            build-area/advanced-ip-analyser_2.1.0-1_amd64.changes

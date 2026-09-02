@@ -1,0 +1,5 @@
+Tests: cli
+Depends: @
+
+Tests: gui
+Depends: @, xauth, xvfb

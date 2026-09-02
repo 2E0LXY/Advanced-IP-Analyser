@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+
+set +e
+timeout 10s xvfb-run -a advanced-ip-analyser-gui
+status=$?
+set -e
+test "$status" -eq 124
