@@ -1,35 +1,47 @@
-# Publishing the Debian 13 APT repository
+# Signed Debian 13 APT repository
+
+The public repository is live at:
+
+`https://2e0lxy.github.io/Advanced-IP-Analyser`
+
+Archive signing-key fingerprint:
+
+`6A28 5F7A 209A A948 09E7 7BAD 8EB4 FBAB A4FD EB99`
+
+The dedicated RSA-3072 key is valid until 1 September 2031. Verify this
+fingerprint before trusting a downloaded keyring.
 
 Tagged releases can publish a signed APT repository through GitHub Pages. The
 release workflow builds and tests the `.deb`, creates Debian `Packages`, `Release`,
 `InRelease`, and detached signature metadata, and deploys the repository only
 when a dedicated signing key is configured.
 
-## One-time maintainer setup
+## Maintainer configuration
 
-Create a dedicated, non-expiring repository key on a protected maintainer system:
+The repository uses a dedicated archive-signing key stored in the encrypted
+GitHub Actions secrets `APT_SIGNING_KEY_B64` and `APT_SIGNING_KEY_ID`. GitHub
+Pages uses the Actions deployment source, and the `github-pages` environment
+allows `main` plus version tags matching `v*`.
+
+For a future key rotation, create a replacement on a protected maintainer system:
 
 ```sh
-gpg --batch --quick-generate-key "Advanced IP Analyser Archive <24845841+2E0LXY@users.noreply.github.com>" rsa3072 sign 0
+gpg --batch --quick-generate-key "Advanced IP Analyser Archive <2E0LXY@users.noreply.github.com>" rsa3072 sign 5y
 gpg --armor --export-secret-keys "Advanced IP Analyser Archive" | base64 -w0
 gpg --with-colons --list-secret-keys "Advanced IP Analyser Archive"
 ```
 
-Add the base64 output as the GitHub Actions secret `APT_SIGNING_KEY_B64`. Add the
-key ID from the `sec` record as the optional secret `APT_SIGNING_KEY_ID`. Restrict
-access to these secrets and retain an encrypted offline backup of the key and its
-revocation certificate.
-
-In the GitHub repository settings, open **Pages**, choose **GitHub Actions** as
-the deployment source, and allow the `github-pages` environment to deploy.
+Replace `APT_SIGNING_KEY_B64` with the base64 output and `APT_SIGNING_KEY_ID`
+with the full fingerprint. Restrict access to these secrets and retain an
+encrypted offline backup and revocation certificate when rotating the key.
 
 Pushing a version tag then performs all package tests before publishing the APT
-metadata. If the signing secret is absent, the normal `.deb` release still
+metadata. If the signing secret is ever absent, the normal `.deb` release still
 succeeds and the APT deployment is safely skipped.
 
 ## Debian 13 user installation
 
-After the first signed Pages deployment, users install the archive key and source:
+Install the archive key and source on Debian 13:
 
 ```sh
 curl -fsSL https://2e0lxy.github.io/Advanced-IP-Analyser/advanced-ip-analyser-archive-keyring.gpg \

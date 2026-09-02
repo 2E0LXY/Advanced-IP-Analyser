@@ -334,8 +334,9 @@ sh packaging/build-deb.sh
 
 Tag CI runs the complete suite in Debian 13, builds the `.deb`, runs Lintian,
 validates desktop/AppStream metadata, installs and launches the GUI under Xvfb,
-removes the package, generates `SHA256SUMS`, and publishes release assets. The
-optional signed APT feed is described in [APT_REPOSITORY.md](docs/APT_REPOSITORY.md).
+removes the package, generates `SHA256SUMS`, publishes release assets, and
+deploys the public signed APT feed described in
+[APT_REPOSITORY.md](docs/APT_REPOSITORY.md).
 
 ## Documentation
 
