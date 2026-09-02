@@ -6,11 +6,7 @@ Last-Update: 2026-09-02
 ---
 --- a/packaging/debian/usr/share/metainfo/advanced-ip-analyser.metainfo.xml
 +++ b/packaging/debian/usr/share/metainfo/advanced-ip-analyser.metainfo.xml
-@@ -1,10 +1,10 @@
- <?xml version="1.0" encoding="UTF-8"?>
- <component type="desktop-application">
--  <id>io.github._2E0LXY.AdvancedIPAnalyser</id>
-+  <id>advanced-ip-analyser</id>
+@@ -4,7 +4,7 @@
    <metadata_license>CC0-1.0</metadata_license>
    <project_license>GPL-3.0-or-later</project_license>
    <name>Advanced IP Analyser</name>
@@ -19,3 +15,12 @@ Last-Update: 2026-09-02
      <name>Daren Loxley</name>
    </developer>
    <summary>Discover, inventory, and access authorized network devices</summary>
+@@ -12,7 +12,7 @@
+     <p>Advanced IP Analyser is a Debian network scanner and device inventory application. It discovers reachable hosts, TCP services, names, MAC addresses, manufacturers, and bounded service metadata.</p>
+     <p>Saved devices, safe inventory exchange, Wake-on-LAN, remote service launchers, long-running Network Watch analysis, passive Wi-Fi observation, built-in packet display filters, confirmed SSH power actions, and verified in-application updates support routine network administration.</p>
+   </description>
+-  <launchable type="desktop-id">advanced-ip-analyser.desktop</launchable>
++  <launchable type="desktop-id">io.github._2E0LXY.AdvancedIPAnalyser.desktop</launchable>
+   <icon type="stock">advanced-ip-analyser</icon>
+   <categories>
+     <category>Network</category>
