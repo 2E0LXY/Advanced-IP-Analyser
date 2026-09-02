@@ -74,10 +74,17 @@ jobs:
       - name: Run installed-package tests
         working-directory: build-area
         run: |
+          set +e
           autopkgtest \
             advanced-ip-analyser_2.1.0-1.dsc \
             advanced-ip-analyser_2.1.0-1_all.deb \
-            -- null
+            -- null > autopkgtest.log 2>&1
+          autopkgtest_status=$?
+          set -e
+          cat autopkgtest.log
+          grep -Eq '^cli[[:space:]]+PASS' autopkgtest.log
+          grep -Eq '^gui[[:space:]]+PASS' autopkgtest.log
+          test "$autopkgtest_status" -eq 0 || test "$autopkgtest_status" -eq 8
 
       - name: Upload sponsor-ready unsigned source package
         uses: actions/upload-artifact@v7

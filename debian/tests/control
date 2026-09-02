@@ -1,7 +1,5 @@
 Tests: cli
 Depends: @
-Restrictions: superficial
 
 Tests: gui
 Depends: @, xauth, xvfb
-Restrictions: superficial

@@ -1,0 +1,17 @@
+Description: Add a stable AppStream developer identifier
+ Current AppStream metadata expects the developer element to have an ID.
+Author: Daren Loxley <24845841+2E0LXY@users.noreply.github.com>
+Forwarded: no
+Last-Update: 2026-09-02
+---
+--- a/packaging/debian/usr/share/metainfo/advanced-ip-analyser.metainfo.xml
++++ b/packaging/debian/usr/share/metainfo/advanced-ip-analyser.metainfo.xml
+@@ -4,7 +4,7 @@
+   <metadata_license>CC0-1.0</metadata_license>
+   <project_license>GPL-3.0-or-later</project_license>
+   <name>Advanced IP Analyser</name>
+-  <developer>
++  <developer id="io.github.2e0lxy">
+     <name>Daren Loxley</name>
+   </developer>
+   <summary>Discover, inventory, and access authorized network devices</summary>
