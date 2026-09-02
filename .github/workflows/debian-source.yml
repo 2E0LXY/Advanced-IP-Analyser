@@ -52,7 +52,11 @@ jobs:
         run: |
           desktop-file-validate packaging/debian/usr/share/applications/advanced-ip-analyser.desktop
           appstreamcli validate --no-net packaging/debian/usr/share/metainfo/advanced-ip-analyser.metainfo.xml
+          set +e
           uscan --report-status
+          uscan_status=$?
+          set -e
+          test "$uscan_status" -le 1
 
       - name: Build source and binary packages
         working-directory: build-area/advanced-ip-analyser-2.1.0
