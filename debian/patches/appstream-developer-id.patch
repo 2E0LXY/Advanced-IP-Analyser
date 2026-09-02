@@ -6,7 +6,11 @@ Last-Update: 2026-09-02
 ---
 --- a/packaging/debian/usr/share/metainfo/advanced-ip-analyser.metainfo.xml
 +++ b/packaging/debian/usr/share/metainfo/advanced-ip-analyser.metainfo.xml
-@@ -4,7 +4,7 @@
+@@ -1,10 +1,10 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+ <component type="desktop-application">
+-  <id>io.github._2E0LXY.AdvancedIPAnalyser</id>
++  <id>advanced-ip-analyser</id>
    <metadata_license>CC0-1.0</metadata_license>
    <project_license>GPL-3.0-or-later</project_license>
    <name>Advanced IP Analyser</name>
