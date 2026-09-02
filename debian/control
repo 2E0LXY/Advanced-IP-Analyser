@@ -1,0 +1,48 @@
+Source: advanced-ip-analyser
+Section: net
+Priority: optional
+Maintainer: Daren Loxley <24845841+2E0LXY@users.noreply.github.com>
+Build-Depends:
+ debhelper-compat (= 13),
+ dh-sequence-python3,
+ pybuild-plugin-pyproject,
+ python3-all,
+ python3-defusedxml,
+ python3-setuptools,
+ python3-tk,
+Rules-Requires-Root: no
+Standards-Version: 4.7.4.1
+Homepage: https://github.com/2E0LXY/Advanced-IP-Analyser
+Vcs-Browser: https://github.com/2E0LXY/Advanced-IP-Analyser
+Vcs-Git: https://github.com/2E0LXY/Advanced-IP-Analyser.git
+
+Package: advanced-ip-analyser
+Architecture: all
+Depends:
+ ${misc:Depends},
+ ${python3:Depends},
+ iproute2,
+ iputils-ping,
+ pkexec,
+ python3-defusedxml,
+ python3-tk,
+ xdg-utils,
+Recommends:
+ freerdp3-x11,
+ gvfs-backends,
+ ieee-data,
+ iputils-tracepath,
+ iw,
+ nmap-common,
+ openssh-client,
+ telnet,
+ x-terminal-emulator,
+Description: network inventory, packet analysis, and monitoring utility
+ Advanced IP Analyser discovers authorized IPv4 and IPv6 hosts, identifies
+ TCP services, records device inventories, and launches common remote-access
+ clients. It also provides Wake-on-LAN and confirmed SSH power actions.
+ .
+ The application includes bounded packet capture and display filtering,
+ long-running network observation, passive Wi-Fi monitoring with compatible
+ adapters, and a read-only same-host web security audit. A graphical desktop
+ interface and command-line tools are included.

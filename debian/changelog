@@ -1,0 +1,8 @@
+advanced-ip-analyser (2.1.0-1) UNRELEASED; urgency=medium
+
+  * Initial Debian release.
+  * Build the Python application with pybuild and PEP 517.
+  * Install the desktop launcher, AppStream metadata, icon, manual page,
+    documentation, and autopkgtest smoke tests.
+
+ -- Daren Loxley <24845841+2E0LXY@users.noreply.github.com>  Wed, 02 Sep 2026 12:00:00 +0100

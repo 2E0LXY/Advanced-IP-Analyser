@@ -1,0 +1,3 @@
+packaging/debian/usr/share/applications/advanced-ip-analyser.desktop usr/share/applications/
+packaging/debian/usr/share/metainfo/advanced-ip-analyser.metainfo.xml usr/share/metainfo/
+src/ip_analyser/assets/advanced-ip-analyser.svg usr/share/icons/hicolor/scalable/apps/

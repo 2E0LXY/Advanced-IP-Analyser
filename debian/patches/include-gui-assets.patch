@@ -1,0 +1,19 @@
+Description: Include GUI image assets in the Python package
+ The upstream binary-package builder copies the complete module tree, but a
+ standard PEP 517 build otherwise omits the images loaded by the GUI.
+Author: Daren Loxley <24845841+2E0LXY@users.noreply.github.com>
+Forwarded: no
+Last-Update: 2026-09-02
+---
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -20,6 +20,9 @@ advanced-ip-analyser-gui = "ip_analyser.gui:main"
+ [tool.setuptools.packages.find]
+ where = ["src"]
+ 
++[tool.setuptools.package-data]
++ip_analyser = ["assets/*.png", "assets/*.svg"]
++
+ [tool.pytest.ini_options]
+ pythonpath = ["src"]
+ testpaths = ["tests"]
