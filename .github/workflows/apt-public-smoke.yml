@@ -1,0 +1,26 @@
+name: Public APT feed smoke test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  install-from-public-feed:
+    runs-on: ubuntu-24.04
+    container: debian:13-slim
+    steps:
+      - name: Add signed repository and install package
+        run: |
+          apt-get update
+          apt-get install --yes --no-install-recommends ca-certificates curl
+          curl --fail --silent --show-error --location \
+            https://2e0lxy.github.io/Advanced-IP-Analyser/advanced-ip-analyser-archive-keyring.gpg \
+            --output /usr/share/keyrings/advanced-ip-analyser-archive-keyring.gpg
+          echo "deb [arch=all signed-by=/usr/share/keyrings/advanced-ip-analyser-archive-keyring.gpg] https://2e0lxy.github.io/Advanced-IP-Analyser trixie main" \
+            > /etc/apt/sources.list.d/advanced-ip-analyser.list
+          apt-get update
+          apt-get install --yes advanced-ip-analyser
+          test "$(dpkg-query --show --showformat='${Version}' advanced-ip-analyser)" = "2.1.0"
+          advanced-ip-analyser --help >/dev/null
