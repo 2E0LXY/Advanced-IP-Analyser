@@ -91,8 +91,10 @@ class UpdaterTests(unittest.TestCase):
     @patch("ip_analyser.update_helper.subprocess.Popen")
     @patch("ip_analyser.update_helper.subprocess.run")
     @patch("ip_analyser.update_helper.shutil.which")
+    @patch("ip_analyser.update_helper._trusted_helper_path")
     def test_helper_waits_for_old_process_then_installs_and_relaunches(
-            self, which, run, popen, kill, _sleep):
+            self, trusted_helper, which, run, popen, kill, _sleep):
+        trusted_helper.return_value = Path(update_helper.__file__).resolve()
         which.side_effect = ["/usr/bin/pkexec", "/usr/bin/advanced-ip-analyser-gui"]
         run.side_effect = [Mock(returncode=0, stdout="Package: advanced-ip-analyser\nVersion: 0.5.1\n"),
                            Mock(returncode=0)]
