@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.2 - 2026-09-04
+
+- Make the updater-helper ownership test independent of unpacked source-tree
+  ownership so Debian source packages build reproducibly under non-root build
+  users and current Debian Python.
+
 ## 2.1.1 - 2026-09-04
 
 - Harden the automatic updater against package replacement races by installing

@@ -4,7 +4,7 @@ Owner: Daren Loxley <24845841+2E0LXY@users.noreply.github.com>
 X-Debbugs-Cc: debian-devel@lists.debian.org
 
 * Package name    : advanced-ip-analyser
-  Version         : 2.1.1
+  Version         : 2.1.2
   Upstream Author : Daren Loxley <24845841+2E0LXY@users.noreply.github.com>
 * URL             : https://github.com/2E0LXY/Advanced-IP-Analyser
 * License         : GPL-3.0-or-later
