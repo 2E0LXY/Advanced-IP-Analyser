@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.1.1 - 2026-09-04
+
+- Harden the automatic updater against package replacement races by installing
+  only a root-owned staged copy that is revalidated after privilege escalation.
+- Bound and validate GitHub release metadata, versions, assets, downloads, and
+  Debian package identity before installation.
+- Pin release workflow actions, reduce job permissions, and remove stale
+  hard-coded package versions from Debian and public APT checks.
+- Expand updater regression coverage and resolve Python correctness-lint issues.
+
 ## 2.1.0 - 2026-09-02
 
 - Add conservative device type, operating system/version, model, and confidence

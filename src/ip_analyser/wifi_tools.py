@@ -7,7 +7,6 @@ import shutil
 import stat
 import struct
 import subprocess
-import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 

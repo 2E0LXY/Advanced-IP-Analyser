@@ -26,6 +26,10 @@ class UpdaterTests(unittest.TestCase):
     def test_version_comparison_is_numeric(self):
         self.assertGreater(version_key("0.10.0"), version_key("0.9.9"))
 
+    def test_non_release_version_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "X.Y.Z"):
+            version_key("2.1.0rc1")
+
     @patch("ip_analyser.updater.urllib.request.urlopen")
     def test_latest_debian_asset_is_selected(self, urlopen):
         digest = "a" * 64
@@ -50,7 +54,8 @@ class UpdaterTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             result = download_update(update, Path(directory))
             self.assertEqual(result.read_bytes(), package)
-            self.assertFalse((Path(directory) / "advanced-ip-analyser_0.5.1_all.deb.part").exists())
+            self.assertFalse(list(Path(directory).glob("*.part")))
+        self.assertEqual(run.call_args.args[0][0], "/usr/bin/dpkg-deb")
 
     @patch("ip_analyser.updater.urllib.request.urlopen")
     def test_release_without_valid_digest_is_not_installable(self, urlopen):
@@ -61,6 +66,12 @@ class UpdaterTests(unittest.TestCase):
         }]}
         urlopen.return_value = _Response(json.dumps(payload).encode())
         with self.assertRaisesRegex(ValueError, "SHA-256"):
+            check_for_update("0.5.0")
+
+    @patch("ip_analyser.updater.urllib.request.urlopen")
+    def test_invalid_release_document_is_rejected(self, urlopen):
+        urlopen.return_value = _Response(b"[]")
+        with self.assertRaisesRegex(ValueError, "release record"):
             check_for_update("0.5.0")
 
     @patch("ip_analyser.updater.subprocess.run")
@@ -94,10 +105,39 @@ class UpdaterTests(unittest.TestCase):
                 self.assertEqual(update_helper.main(), 0)
         kill.assert_called_once_with(1234, 0)
         self.assertEqual(run.call_args_list[0].args[0],
-                         ["dpkg-deb", "--field", str(package.resolve()), "Package", "Version"])
+                         ["/usr/bin/dpkg-deb", "--field", str(package.resolve()), "Package", "Version"])
         self.assertEqual(run.call_args_list[1].args[0],
-                         ["/usr/bin/pkexec", "apt-get", "install", "-y", str(package.resolve())])
+                         ["/usr/bin/pkexec", "/usr/bin/python3", "-I",
+                          str(Path(update_helper.__file__).resolve()), "--install",
+                          str(package.resolve()), "0.5.1", digest])
         popen.assert_called_once_with(["/usr/bin/advanced-ip-analyser-gui"], start_new_session=True, close_fds=True)
+
+    @patch("ip_analyser.update_helper.os.geteuid", return_value=0, create=True)
+    @patch("ip_analyser.update_helper.subprocess.run")
+    def test_privileged_install_uses_root_owned_staged_copy(self, run, _geteuid):
+        run.side_effect = [Mock(returncode=0, stdout="Package: advanced-ip-analyser\nVersion: 0.5.1\n"),
+                           Mock(returncode=0)]
+        with tempfile.TemporaryDirectory() as directory:
+            package = Path(directory) / "download.deb"
+            package.write_bytes(b"verified package")
+            digest = hashlib.sha256(package.read_bytes()).hexdigest()
+            result = update_helper._install_as_root(
+                package, "0.5.1", digest, Path(directory))
+        self.assertEqual(result, 0)
+        install_command = run.call_args_list[1].args[0]
+        self.assertEqual(install_command[:3], ["/usr/bin/apt-get", "install", "-y"])
+        self.assertNotEqual(Path(install_command[3]), package)
+        self.assertIn("advanced-ip-analyser-update-", install_command[3])
+
+    @patch("ip_analyser.update_helper.os.geteuid", return_value=0, create=True)
+    def test_privileged_install_rejects_path_like_version(self, _geteuid):
+        with tempfile.TemporaryDirectory() as directory:
+            package = Path(directory) / "download.deb"
+            package.write_bytes(b"package")
+            with self.assertRaisesRegex(ValueError, "metadata"):
+                update_helper._install_as_root(
+                    package, "../../escape", "0" * 64, Path(directory))
+            self.assertEqual({path.name for path in Path(directory).iterdir()}, {"download.deb"})
 
 
 if __name__ == "__main__":

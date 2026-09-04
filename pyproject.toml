@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "advanced-ip-analyser"
-version = "2.1.0"
+version = "2.1.1"
 description = "An original Debian network inventory and host access utility"
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "GPL-3.0-or-later"}
+license = "GPL-3.0-or-later"
 authors = [{name = "2E0LXY"}]
 dependencies = ["defusedxml>=0.7.1"]
 classifiers = ["Environment :: X11 Applications", "Programming Language :: Python :: 3"]

@@ -22,5 +22,9 @@ jobs:
             > /etc/apt/sources.list.d/advanced-ip-analyser.list
           apt-get update
           apt-get install --yes advanced-ip-analyser
-          test "$(dpkg-query --show --showformat='${Version}' advanced-ip-analyser)" = "2.1.0"
+          installed="$(dpkg-query --show --showformat='${Version}' advanced-ip-analyser)"
+          candidate="$(apt-cache policy advanced-ip-analyser | awk '/Candidate:/ {print $2; exit}')"
+          test -n "$candidate"
+          test "$candidate" != "(none)"
+          test "$installed" = "$candidate"
           advanced-ip-analyser --help >/dev/null
