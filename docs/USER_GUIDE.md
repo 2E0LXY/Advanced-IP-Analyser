@@ -1,4 +1,4 @@
-# Advanced IP Analyser 2.1.0 Instruction Book
+# Advanced IP Analyser 2.1.1 Instruction Book
 
 Debian 13 edition
 
@@ -55,12 +55,12 @@ service, disconnect Wi-Fi clients, inject frames, or recover passwords.
 
 ### Install the release package
 
-Download `advanced-ip-analyser_2.1.0_all.deb` from the project release page.
+Download `advanced-ip-analyser_2.1.1_all.deb` from the project release page.
 In a terminal:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.1.0_all.deb
+sudo apt install ./advanced-ip-analyser_2.1.1_all.deb
 ```
 
 Use `apt install ./file.deb`, not `dpkg -i`, because APT resolves dependencies.

@@ -3,5 +3,5 @@ set -eu
 
 advanced-ip-analyser --help >/dev/null
 advanced-ip-analyser capture-interfaces >/dev/null
-python3 -c 'import ip_analyser; print(ip_analyser.__version__)' | grep -Fx 2.1.0
+python3 -c 'import ip_analyser; print(ip_analyser.__version__)' | grep -Fx 2.1.1
 test -f /usr/share/icons/hicolor/scalable/apps/advanced-ip-analyser.svg

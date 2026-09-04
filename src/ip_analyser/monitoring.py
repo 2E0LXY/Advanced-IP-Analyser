@@ -432,7 +432,7 @@ class MonitorAnalyzer:
             for address, sent, peer in ((record.source, True, record.destination),
                                         (record.destination, False, record.source)):
                 try:
-                    ip = ipaddress.ip_address(address)
+                    ipaddress.ip_address(address)
                 except ValueError:
                     continue
                 device = devices.setdefault(address, DeviceActivity(
