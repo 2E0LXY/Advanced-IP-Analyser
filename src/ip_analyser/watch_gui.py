@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import queue
 import shutil
 import sqlite3
@@ -8,16 +9,28 @@ import subprocess
 import threading
 import time
 import tkinter as tk
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from .models import Host
-from .monitoring import (AlertRule, Analysis, MonitorAnalyzer, MonitorStore,
-                         enforce_capture_retention, export_analysis, load_rules,
-                         save_rules)
-from .packet_tools import (CaptureSession, list_capture_interfaces, read_capture,
-                           start_monitor_capture, validate_interface)
+from .monitoring import (
+    AlertRule,
+    Analysis,
+    MonitorAnalyzer,
+    MonitorStore,
+    enforce_capture_retention,
+    export_analysis,
+    load_rules,
+    save_rules,
+)
+from .packet_tools import (
+    CaptureSession,
+    list_capture_interfaces,
+    read_capture,
+    start_monitor_capture,
+    validate_interface,
+)
 
 
 class NetworkWatch(tk.Toplevel):
@@ -318,11 +331,11 @@ class NetworkWatch(tk.Toplevel):
             ", ".join(f"{name} {count}" for name, count in device.protocols.most_common(8)))
             for device in analysis.devices])
         self._replace(self.dns, [(
-            datetime.fromtimestamp(event.timestamp).strftime("%H:%M:%S"), event.device,
+            datetime.fromtimestamp(event.timestamp, UTC).astimezone().strftime("%H:%M:%S"), event.device,
             event.server, event.name, "OK" if not event.rcode else f"Error {event.rcode}")
             for event in reversed(analysis.dns[-5_000:])])
         self._replace(self.findings, [(
-            datetime.fromtimestamp(item.timestamp).strftime("%H:%M:%S"), item.severity,
+            datetime.fromtimestamp(item.timestamp, UTC).astimezone().strftime("%H:%M:%S"), item.severity,
             item.category, item.subject, item.explanation) for item in analysis.findings])
         protocol_total = max(1, sum(analysis.protocols.values()))
         protocol_rows = [("Protocol", name, count, f"{count / protocol_total:.1%}")
@@ -368,9 +381,9 @@ class NetworkWatch(tk.Toplevel):
                                fill="#1587bd")
         canvas.create_text(margin, 18, anchor="w", text=f"Peak {self._size(peak)} per minute")
         canvas.create_text(margin, height - 18, anchor="w",
-                           text=datetime.fromtimestamp(buckets[0].started).strftime("%H:%M"))
+                           text=datetime.fromtimestamp(buckets[0].started, UTC).astimezone().strftime("%H:%M"))
         canvas.create_text(width - margin, height - 18, anchor="e",
-                           text=datetime.fromtimestamp(buckets[-1].started).strftime("%H:%M"))
+                           text=datetime.fromtimestamp(buckets[-1].started, UTC).astimezone().strftime("%H:%M"))
 
     @staticmethod
     def _flow_health(flow) -> str:
@@ -442,16 +455,27 @@ class NetworkWatch(tk.Toplevel):
             return
         note = simpledialog.askstring("Bookmark recording", "Optional note:", parent=self) or ""
         bookmarks = self.data_dir / "bookmarks"
-        bookmarks.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        bookmarks.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if os.name == "posix":
+            bookmarks.chmod(0o700)
+        stamp = datetime.now(UTC).astimezone().strftime("%Y%m%d-%H%M%S")
         destination = bookmarks / f"bookmark-{stamp}{self.capture_path.suffix}"
+        note_path = destination.with_suffix(destination.suffix + ".json")
         try:
-            shutil.copyfile(self.capture_path, destination)
-            destination.with_suffix(destination.suffix + ".json").write_text(
-                json.dumps({"created": time.time(), "note": note[:4096]}, indent=2) + "\n",
-                encoding="utf-8")
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            descriptor = os.open(destination, flags, 0o600)
+            with self.capture_path.open("rb") as source, os.fdopen(descriptor, "wb") as output:
+                shutil.copyfileobj(source, output, length=64 * 1024)
+            note_descriptor = os.open(note_path, flags, 0o600)
+            with os.fdopen(note_descriptor, "w", encoding="utf-8") as stream:
+                json.dump({"created": time.time(), "note": note[:4096]}, stream, indent=2)
+                stream.write("\n")
             self.status.configure(text=f"Bookmarked recording as {destination.name}")
         except OSError as error:
+            destination.unlink(missing_ok=True)
+            note_path.unlink(missing_ok=True)
             messagebox.showerror("Bookmark failed", str(error), parent=self)
 
     def edit_rules(self) -> None:
@@ -507,7 +531,7 @@ class NetworkWatch(tk.Toplevel):
 
     def _refresh_history(self) -> None:
         self._replace(self.history, [(
-            session_id, datetime.fromtimestamp(started).strftime("%Y-%m-%d %H:%M"),
+            session_id, datetime.fromtimestamp(started, UTC).astimezone().strftime("%Y-%m-%d %H:%M"),
             f"{max(0, ended - started):.0f}s", f"{packets:,}", self._size(size), capture)
             for session_id, started, ended, packets, size, capture in self.store.recent_sessions()])
 

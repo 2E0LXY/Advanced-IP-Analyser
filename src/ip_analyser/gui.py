@@ -12,6 +12,11 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from . import __version__
 from .actions import open_network_tool, open_service, preferred_web_service, remote_power, service_url, wake
+from .ai_analysis import ANALYSIS_MODES, SYSTEM_INSTRUCTION, build_analysis_preview
+from .ai_providers import AIProviderError, generate_text, list_models
+from .ai_settings import (AISettings, PROVIDERS, SecretStoreError, clear_api_key,
+                          load_ai_settings, load_api_key,
+                          save_ai_settings, save_api_key)
 from .config import parse_ports
 from .models import Host
 from .network import active_ipv4_networks, broadcasts_for_host, current_ipv4_subnet, ipv4_24_target
@@ -20,6 +25,7 @@ from .packet_tools import (PacketRecord, capture_live, list_capture_interfaces,
 from .packet_filters import (FilterSyntaxError, QUICK_FILTERS, compile_filter,
                              load_saved_filters, save_saved_filters)
 from .scanner import DEFAULT_PORTS, Scanner
+from .scan_history import latest_evidence, latest_network_watch_evidence, record_scan
 from .storage import export, import_inventory, load_favorites, merge_devices, save_favorites
 from .targets import parse_targets
 from .updater import Update, check_for_update, download_update, launch_installer
@@ -229,6 +235,7 @@ class Application(tk.Tk):
         self.discovery_active = False
         self.discovery_flash_on = False
         self.scheduled_scan_id: str | None = None
+        self.active_scan_target = ""
         self.ssh_username = getpass.getuser()
         self.cancel_scan = threading.Event()
         self.network_presets = []
@@ -309,7 +316,7 @@ class Application(tk.Tk):
         self.workers.set("64")
         self.workers.pack(side="left", padx=(6, 12))
         ttk.Label(settings, text="Profile").pack(side="left")
-        self.profile = ttk.Combobox(settings, values=("Fast", "Balanced", "Accurate"),
+        self.profile = ttk.Combobox(settings, values=("Fast", "Balanced", "Accurate", "Adaptive"),
                                     state="readonly", width=9)
         self.profile.set("Balanced")
         self.profile.pack(side="left", padx=(6, 12))
@@ -343,6 +350,7 @@ class Application(tk.Tk):
         ttk.Button(actions, text="Ping", command=lambda: self.run_selected_tool("ping")).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Trace", command=lambda: self.run_selected_tool("trace")).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Web audit…", command=self.open_web_audit).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="AI analysis…", command=self.show_ai_analysis).pack(side="left", padx=(8, 0))
         packet_button = ttk.Menubutton(actions, text="Packets ▾")
         packet_button.pack(side="left", padx=(8, 0))
         packet_menu = tk.Menu(packet_button, tearoff=False)
@@ -446,6 +454,8 @@ class Application(tk.Tk):
         ttk.Label(footer_actions, text="© 2026 Daren Loxley (2E0LXY)").pack(side="right", padx=18)
         ttk.Label(footer_actions, text=f"Version {__version__}").pack(side="right", padx=(0, 12))
         ttk.Button(footer_actions, text="Help", command=self.show_help).pack(side="right", padx=(0, 8))
+        ttk.Button(footer_actions, text="AI Settings", command=self.show_ai_settings).pack(
+            side="right", padx=(0, 8))
         self.discovery_button = ttk.Button(footer_actions, text="Please wait · discovering details…",
                                            style="Discovery.TButton")
         self.discovery_button.pack(side="right", padx=(0, 8))
@@ -462,6 +472,326 @@ class Application(tk.Tk):
         self.bind_all("<Control-Shift-C>", lambda _event: self.copy_selected_detail())
         self.refresh_subnets(show_errors=False)
         self.after(1500, self.check_updates)
+
+    def show_ai_analysis(self) -> None:
+        try:
+            settings = load_ai_settings()
+        except (OSError, ValueError) as error:
+            messagebox.showerror("AI settings unavailable", str(error), parent=self)
+            return
+        model_name = settings.selected_model()
+        if not model_name:
+            messagebox.showinfo(
+                "Configure AI first",
+                "Open AI Settings, select a provider, refresh its live models, and save a model.",
+                parent=self)
+            return
+        selected = self.selected_hosts()
+        hosts = selected or list(self.results)
+        if not hosts:
+            messagebox.showinfo("No evidence available", "Run a scan or select discovered assets first.", parent=self)
+            return
+        try:
+            history = {
+                "scan_history": latest_evidence(),
+                "network_watch": latest_network_watch_evidence(),
+            }
+        except (OSError, ValueError):
+            history = {"unavailable": "Scan history could not be read."}
+
+        window = tk.Toplevel(self)
+        window.title("AI Evidence Analysis")
+        window.geometry("980x760")
+        window.minsize(760, 600)
+        window.transient(self)
+        preview_holder = {"preview": None}
+        result_events: queue.Queue = queue.Queue()
+
+        controls = ttk.Frame(window, padding=14)
+        controls.pack(fill="x")
+        ttk.Label(controls, text="AI Evidence Analysis",
+                  font=("TkDefaultFont", 15, "bold")).grid(row=0, column=0, columnspan=4, sticky="w")
+        ttk.Label(controls, text=f"Provider: {settings.provider} · Model: {model_name} · Assets: {len(hosts)}",
+                  wraplength=900).grid(row=1, column=0, columnspan=4, sticky="w", pady=(3, 10))
+        ttk.Label(controls, text="Analysis").grid(row=2, column=0, sticky="w")
+        mode = tk.StringVar(value=next(iter(ANALYSIS_MODES)))
+        mode_box = ttk.Combobox(controls, textvariable=mode, values=tuple(ANALYSIS_MODES),
+                                state="readonly", width=43)
+        mode_box.grid(row=2, column=1, sticky="ew", padx=(8, 12))
+        include_identifiers = tk.BooleanVar(value=False)
+        include_metadata = tk.BooleanVar(value=True)
+        ttk.Checkbutton(controls, text="Include IP/MAC/hostnames",
+                        variable=include_identifiers).grid(row=2, column=2, sticky="w")
+        ttk.Checkbutton(controls, text="Include safe service metadata",
+                        variable=include_metadata).grid(row=3, column=2, sticky="w")
+        ttk.Label(controls, text="Question (optional)").grid(row=3, column=0, sticky="w", pady=(8, 0))
+        question = ttk.Entry(controls)
+        question.grid(row=3, column=1, sticky="ew", padx=(8, 12), pady=(8, 0))
+        controls.columnconfigure(1, weight=1)
+
+        notebook = ttk.Notebook(window)
+        notebook.pack(fill="both", expand=True, padx=14, pady=(0, 8))
+        preview_page, result_page = ttk.Frame(notebook), ttk.Frame(notebook)
+        notebook.add(preview_page, text="Outbound data preview")
+        notebook.add(result_page, text="Advisory result")
+        preview_text = tk.Text(preview_page, wrap="none", font=("TkFixedFont", 9), state="disabled")
+        result_text = tk.Text(result_page, wrap="word", font=("TkDefaultFont", 10), state="disabled")
+        preview_text.pack(fill="both", expand=True)
+        result_text.pack(fill="both", expand=True)
+
+        status = ttk.Label(window, text="Build and inspect the exact outbound preview before running AI.",
+                           padding=(14, 4), wraplength=930)
+        status.pack(fill="x")
+        confirmed = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            window,
+            text="I reviewed this preview and approve sending it to the selected provider.",
+            variable=confirmed).pack(anchor="w", padx=14, pady=(2, 6))
+
+        def set_text(widget: tk.Text, value: str) -> None:
+            widget.configure(state="normal")
+            widget.delete("1.0", "end")
+            widget.insert("1.0", value)
+            widget.configure(state="disabled")
+
+        def invalidate(_event=None) -> None:
+            preview_holder["preview"] = None
+            confirmed.set(False)
+            run_button.configure(state="disabled")
+            status.configure(text="Options changed. Build and review a new outbound preview.")
+
+        def build_preview() -> None:
+            try:
+                preview = build_analysis_preview(
+                    hosts, history, mode=mode.get(), provider=settings.provider, model=model_name,
+                    question=question.get(), include_identifiers=include_identifiers.get(),
+                    include_service_metadata=include_metadata.get(),
+                    max_chars=settings.max_request_chars)
+            except ValueError as error:
+                messagebox.showerror("Could not build preview", str(error), parent=window)
+                return
+            preview_holder["preview"] = preview
+            confirmed.set(False)
+            set_text(preview_text, preview.payload)
+            notebook.select(preview_page)
+            run_button.configure(state="normal")
+            status.configure(text=(f"Preview ready: {len(preview.payload):,} characters and "
+                                   f"{preview.asset_count} asset(s). Review it before approval."))
+
+        def drain_results() -> None:
+            if not window.winfo_exists():
+                return
+            try:
+                outcome, value = result_events.get_nowait()
+            except queue.Empty:
+                window.after(75, drain_results)
+                return
+            run_button.configure(state="normal")
+            if outcome == "error":
+                status.configure(text=str(value))
+                messagebox.showerror("AI analysis failed", str(value), parent=window)
+                return
+            set_text(result_text, value)
+            notebook.select(result_page)
+            status.configure(text="Advisory analysis complete. Confirm important findings from primary evidence.")
+
+        def run_analysis() -> None:
+            preview = preview_holder["preview"]
+            if preview is None:
+                messagebox.showinfo("Preview required", "Build and inspect the outbound preview first.", parent=window)
+                return
+            if not confirmed.get():
+                messagebox.showinfo("Approval required", "Approve the reviewed preview before sending it.", parent=window)
+                return
+            run_button.configure(state="disabled")
+            status.configure(text=f"Waiting for {settings.provider}…")
+
+            def worker() -> None:
+                try:
+                    key = load_api_key(settings.provider)
+                    answer = generate_text(settings.provider, model_name, key, SYSTEM_INSTRUCTION,
+                                           preview.prompt)
+                    result_events.put(("result", answer))
+                except (ValueError, SecretStoreError, AIProviderError) as error:
+                    result_events.put(("error", error))
+
+            threading.Thread(target=worker, daemon=True).start()
+            window.after(75, drain_results)
+
+        def copy_result() -> None:
+            value = result_text.get("1.0", "end-1c")
+            if not value:
+                return
+            self.clipboard_clear()
+            self.clipboard_append(value)
+            status.configure(text="Advisory result copied to the clipboard.")
+
+        for variable in (mode, include_identifiers, include_metadata):
+            variable.trace_add("write", invalidate)
+        question.bind("<KeyRelease>", invalidate)
+        buttons = ttk.Frame(window, padding=(14, 0, 14, 14))
+        buttons.pack(fill="x")
+        ttk.Button(buttons, text="Close", command=window.destroy).pack(side="right")
+        run_button = ttk.Button(buttons, text="Run approved analysis", command=run_analysis,
+                                style="Accent.TButton", state="disabled")
+        run_button.pack(side="right", padx=(0, 8))
+        ttk.Button(buttons, text="Build preview", command=build_preview).pack(side="right", padx=(0, 8))
+        ttk.Button(buttons, text="Copy result", command=copy_result).pack(side="left")
+
+    def show_ai_settings(self) -> None:
+        window = tk.Toplevel(self)
+        window.title("AI Settings")
+        window.geometry("700x570")
+        window.minsize(620, 520)
+        window.transient(self)
+
+        try:
+            saved = load_ai_settings()
+            settings_error = ""
+        except (OSError, ValueError) as error:
+            saved = AISettings()
+            settings_error = f"Existing settings could not be loaded: {error}"
+
+        content = ttk.Frame(window, padding=18)
+        content.pack(fill="both", expand=True)
+        ttk.Label(content, text="AI Settings", font=("TkDefaultFont", 16, "bold")).pack(anchor="w")
+        ttk.Label(
+            content,
+            text=("Choose OpenAI, Gemini, or OpenRouter and load the models currently available "
+                  "to your own account. Each provider has a separate key. Nothing is sent to an "
+                  "AI service until you explicitly approve an analysis preview."),
+            justify="left", wraplength=610).pack(anchor="w", fill="x", pady=(6, 16))
+
+        form = ttk.Frame(content)
+        form.pack(fill="x")
+        form.columnconfigure(1, weight=1)
+        provider = tk.StringVar(value=saved.provider)
+        selected_models = dict(saved.models)
+        model = tk.StringVar(value=saved.selected_model())
+        api_key = tk.StringVar()
+
+        ttk.Label(form, text="Provider").grid(row=0, column=0, sticky="w", pady=5)
+        provider_box = ttk.Combobox(form, textvariable=provider, values=PROVIDERS,
+                                    state="readonly")
+        provider_box.grid(row=0, column=1, sticky="ew", padx=(12, 0), pady=5)
+        ttk.Label(form, text="Model").grid(row=1, column=0, sticky="w", pady=5)
+        model_box = ttk.Combobox(form, textvariable=model, values=(), state="normal")
+        model_box.grid(row=1, column=1, sticky="ew", padx=(12, 0), pady=5)
+        refresh_button = ttk.Button(form, text="Refresh models")
+        refresh_button.grid(row=1, column=2, padx=(8, 0), pady=5)
+        ttk.Label(form, text="API key").grid(row=2, column=0, sticky="w", pady=5)
+        ttk.Entry(form, textvariable=api_key, show="•").grid(
+            row=2, column=1, sticky="ew", padx=(12, 0), pady=5)
+        ttk.Label(form, text="Leave blank to use the saved key for this provider.",
+                  font=("TkDefaultFont", 8)).grid(row=3, column=1, sticky="w", padx=(12, 0))
+
+        status = ttk.Label(content, text=settings_error, justify="left", wraplength=610)
+        status.pack(anchor="w", fill="x", pady=(14, 8))
+
+        status.configure(text=settings_error or "Choose a provider, then save a key or refresh its live model list.")
+
+        ttk.Separator(content).pack(fill="x", pady=8)
+        ttk.Label(content, text="Safe AI feature direction", font=("TkDefaultFont", 11, "bold")).pack(anchor="w")
+        ttk.Label(
+            content,
+            text=("• Explain selected ports, services, and configuration findings\n"
+                  "• Summarize a scan or Network Watch session after a preview and confirmation\n"
+                  "• Suggest display filters from plain language, then validate them locally\n"
+                  "• Draft a redacted troubleshooting, topology, or inventory report\n"
+                  "• Prioritize evidence-backed anomalies and defensive remediation drafts\n\n"
+                  "AI output would be advisory and must not trigger scans, exploits, remote actions, "
+                  "or configuration changes."),
+            justify="left", wraplength=610).pack(anchor="w", fill="x", pady=(5, 10))
+
+        model_events: queue.Queue = queue.Queue()
+
+        def update_provider(_event=None) -> None:
+            model.set(selected_models.get(provider.get(), ""))
+            model_box.configure(values=())
+            status.configure(
+                text=f"{provider.get()} selected. Enter a key or use its saved key, then refresh models.")
+
+        provider_box.bind("<<ComboboxSelected>>", update_provider)
+
+        def drain_model_events() -> None:
+            if not window.winfo_exists():
+                return
+            try:
+                outcome, value = model_events.get_nowait()
+            except queue.Empty:
+                window.after(75, drain_model_events)
+                return
+            refresh_button.configure(state="normal")
+            if outcome == "error":
+                messagebox.showerror("Could not load models", str(value), parent=window)
+                status.configure(text=str(value))
+                return
+            requested_provider, choices = value
+            if provider.get() != requested_provider:
+                status.configure(text=f"Loaded {len(choices)} {requested_provider} models; select that provider to view them.")
+                return
+            identifiers = tuple(choice.identifier for choice in choices)
+            model_box.configure(values=identifiers)
+            if model.get() not in identifiers:
+                model.set(identifiers[0])
+            status.configure(text=f"Loaded {len(identifiers)} live {requested_provider} text-generation models.")
+
+        def refresh_models() -> None:
+            requested_provider = provider.get()
+            supplied_key = api_key.get()
+            refresh_button.configure(state="disabled")
+            status.configure(text=f"Loading live models from {requested_provider}…")
+
+            def worker() -> None:
+                try:
+                    key = supplied_key or load_api_key(requested_provider)
+                    choices = list_models(requested_provider, key)
+                    model_events.put(("models", (requested_provider, choices)))
+                except (ValueError, SecretStoreError, AIProviderError) as error:
+                    model_events.put(("error", error))
+
+            threading.Thread(target=worker, daemon=True).start()
+            window.after(75, drain_model_events)
+
+        refresh_button.configure(command=refresh_models)
+
+        def save() -> None:
+            try:
+                selected_models[provider.get()] = model.get()
+                clean = AISettings(provider.get(), selected_models, saved.max_request_chars)
+                save_ai_settings(clean)
+                if api_key.get():
+                    save_api_key(provider.get(), api_key.get())
+                    api_key.set("")
+                    message = f"Settings saved. The {provider.get()} key is stored in the desktop keyring."
+                else:
+                    message = f"Settings saved. The {provider.get()} key was left unchanged."
+            except (OSError, ValueError, SecretStoreError) as error:
+                messagebox.showerror("Could not save AI settings", str(error), parent=window)
+                return
+            status.configure(text=message)
+
+        def delete_key() -> None:
+            if not messagebox.askyesno(
+                    "Delete saved API key", f"Delete the {provider.get()} API key from your desktop keyring?",
+                    parent=window):
+                return
+            try:
+                clear_api_key(provider.get())
+            except SecretStoreError as error:
+                messagebox.showerror("Could not delete API key", str(error), parent=window)
+                return
+            api_key.set("")
+            status.configure(text=f"The saved {provider.get()} API key was deleted from the desktop keyring.")
+
+        buttons = ttk.Frame(content)
+        buttons.pack(fill="x", side="bottom", pady=(8, 0))
+        ttk.Button(buttons, text="Close", command=window.destroy).pack(side="right")
+        ttk.Button(buttons, text="Save settings", command=save,
+                   style="Accent.TButton").pack(side="right", padx=(0, 8))
+        ttk.Button(buttons, text="Delete saved key", command=delete_key,
+                   style="Danger.TButton").pack(side="left")
+        update_provider()
 
     def show_help(self) -> None:
         window = tk.Toplevel(self)
@@ -500,7 +830,7 @@ class Application(tk.Tk):
         add_tab("Getting started",
                 "1. Choose an active interface preset or enter one IP, an inclusive range, or a CIDR.\n"
                 "2. Set the TCP ports, timeout, and worker count. The defaults cover common network services.\n"
-                "   Fast, Balanced, and Accurate profiles provide useful timeout/concurrency presets.\n"
+                "   Fast, Balanced, Accurate, and Adaptive profiles provide useful timeout/concurrency presets.\n"
                 "3. Press Scan (F5). Reachable devices appear as they are found; press Escape to cancel safely.\n"
                 "   The fast address/port scan completes first. A separate flashing discovery indicator then shows progress while server details are collected.\n"
                 "4. Use Filter (Ctrl+F) to search addresses, names, MACs, manufacturers, services, and notes.\n\n"
@@ -548,6 +878,13 @@ class Application(tk.Tk):
                 "It shows network name, BSSID, channel, approximate signal, security type, beacon/data counts, client addresses, probe names, and whether WPA authentication traffic was observed.\n\n"
                 "The adapter must support monitor mode. A temporary virtual monitor interface is created through PolicyKit and removed when the watch stops, leaving the normal interface unchanged where the driver supports concurrent interfaces. "
                 "The feature is passive: it does not send deauthentication frames, inject traffic, disconnect clients, or attempt password recovery.")
+        add_tab("AI settings",
+                "AI Settings supports OpenAI, Gemini, and OpenRouter with a separate key for each provider. "
+                "Refresh models securely retrieves the live text-generation choices available to that key from the supplier's own API. "
+                "Non-secret preferences are saved in ~/.config/advanced-ip-analyser/ai-settings.json; Debian's Secret Service keyring stores the keys through secret-tool.\n\n"
+                "AI analysis builds a bounded evidence payload for classification, changes, exposure priorities, unknown services, rogue-infrastructure indicators, topology, natural-language search, defensive drafts, or capacity review. "
+                "The exact outbound JSON is shown first. Identifiers are excluded by default, sensitive fields are removed, raw packet payloads are never included, and the request requires explicit approval. "
+                "Results are advisory and cannot start scans, run privileged helpers, execute remote actions, or apply generated rules.")
         add_tab("Shortcuts",
                 "F5 — start a scan\nEscape — cancel the active scan\nCtrl+F — focus the live filter\n"
                 "Ctrl+O — import JSON or XML inventory\nCtrl+S — export inventory\nCtrl+Shift+C — copy selected host or service detail\n"
@@ -664,8 +1001,11 @@ class Application(tk.Tk):
         self.scan_button.configure(state="disabled")
         self.cancel_button.configure(state="normal")
         self.cancel_scan = threading.Event()
+        self.active_scan_target = self.target.get().strip()
         self.progress.configure(maximum=len(targets), value=0)
-        threading.Thread(target=self._scan_worker, args=(targets, ports, timeout, workers), daemon=True).start()
+        adaptive = self.profile.get() == "Adaptive"
+        threading.Thread(target=self._scan_worker,
+                         args=(targets, ports, timeout, workers, adaptive), daemon=True).start()
         self.after(50, self._drain_events)
 
     def _show_ports_menu(self, event) -> None:
@@ -684,15 +1024,16 @@ class Application(tk.Tk):
 
     def apply_scan_profile(self, _event=None) -> None:
         profiles = {"Fast": ("0.15", "128"), "Balanced": ("0.35", "64"),
-                    "Accurate": ("1.00", "32")}
+                    "Accurate": ("1.00", "32"), "Adaptive": ("0.50", "32")}
         timeout, workers = profiles[self.profile.get()]
         self.timeout.set(timeout)
         self.workers.set(workers)
         self.status.configure(text=f"{self.profile.get()} scan profile selected")
 
-    def _scan_worker(self, targets: list[str], ports: dict[int, str], timeout: float, workers: int) -> None:
+    def _scan_worker(self, targets: list[str], ports: dict[int, str], timeout: float,
+                     workers: int, adaptive: bool = False) -> None:
         try:
-            scanner = Scanner(timeout, workers, ports)
+            scanner = Scanner(timeout, workers, ports, adaptive=adaptive)
             results = scanner.scan(
                 targets, lambda done, total, host: self.events.put(("host", done, total, host)),
                 self.cancel_scan, discover_services=False)
@@ -745,6 +1086,10 @@ class Application(tk.Tk):
                     prefix = "Cancelled" if cancelled else "Finished"
                     suffix = " · discovery cancelled" if cancelled and candidates else (" · discovery complete" if candidates else "")
                     self.status.configure(text=f"{prefix}: {len(self.results)} reachable; {len(scanned)} of {total} checked{suffix}")
+                    if not cancelled:
+                        threading.Thread(
+                            target=self._save_scan_history,
+                            args=(list(self.results), self.active_scan_target), daemon=True).start()
                     self._merge_results_into_favorites()
                     self._schedule_next_scan()
                     return
@@ -772,6 +1117,14 @@ class Application(tk.Tk):
                     return
         except queue.Empty:
             self.after(50, self._drain_events)
+
+    @staticmethod
+    def _save_scan_history(hosts: list[Host], target: str) -> None:
+        try:
+            record_scan(hosts, target)
+        except (OSError, ValueError):
+            # Optional history must never turn a successful network scan into a failure.
+            return
 
     def _schedule_next_scan(self) -> None:
         repeat = self.repeat_scan.get()
@@ -1074,7 +1427,9 @@ class Application(tk.Tk):
         self.cancel_scan = threading.Event()
         self.progress.configure(maximum=len(targets), value=0)
         self.status.configure(text=f"Refreshing {len(targets)} saved device(s)…")
-        threading.Thread(target=self._scan_worker, args=(targets, ports, timeout, workers), daemon=True).start()
+        adaptive = self.profile.get() == "Adaptive"
+        threading.Thread(target=self._scan_worker,
+                         args=(targets, ports, timeout, workers, adaptive), daemon=True).start()
         self.after(50, self._drain_events)
 
     def show_favorites(self) -> None:

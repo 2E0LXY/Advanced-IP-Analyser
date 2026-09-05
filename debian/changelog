@@ -1,3 +1,12 @@
+advanced-ip-analyser (2.2.0-1) UNRELEASED; urgency=medium
+
+  * Add multi-provider, consent-gated AI evidence analysis.
+  * Add bounded scan history and adaptive low-noise scanning.
+  * Detect multiple DHCP responders and conflicting Wi-Fi security advertisements.
+  * Harden web crawling, capture parsing, local data permissions, and release gates.
+
+ -- Daren Loxley <24845841+2E0LXY@users.noreply.github.com>  Sat, 05 Sep 2026 18:00:00 +0100
+
 advanced-ip-analyser (2.1.2-1) UNRELEASED; urgency=medium
 
   * Make the updater ownership test portable across Debian source-build users.

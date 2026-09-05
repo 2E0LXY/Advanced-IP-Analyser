@@ -1,24 +1,28 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
-from html import escape
-from html.parser import HTMLParser
 import hashlib
 import json
-from pathlib import Path
 import re
 import socket
 import ssl
-from typing import Callable
+from collections import deque
+from collections.abc import Callable
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
+from html import escape
+from html.parser import HTMLParser
+from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urldefrag, urljoin, urlsplit, urlunsplit
-from urllib.request import HTTPSHandler, HTTPRedirectHandler, Request, build_opener
-
+from urllib.request import HTTPRedirectHandler, HTTPSHandler, Request, build_opener
 
 MAX_PAGES = 100
 MAX_PAGE_BYTES = 1_048_576
 MAX_TOTAL_BYTES = 20 * 1_048_576
+MAX_PAGE_LINKS = 10_000
+MAX_PAGE_FORMS = 1_000
+MAX_PAGE_RESOURCES = 10_000
+MAX_DISCOVERED_URLS = 10_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,11 +75,11 @@ class _Document(HTMLParser):
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         values = {name.casefold(): value or "" for name, value in attrs}
         tag = tag.casefold()
-        if tag == "a" and values.get("href"):
+        if tag == "a" and values.get("href") and len(self.links) < MAX_PAGE_LINKS:
             self.links.append(values["href"])
         if tag in {"script", "img", "iframe", "link", "source", "video", "audio"}:
             resource = values.get("src") or values.get("href")
-            if resource:
+            if resource and len(self.resources) < MAX_PAGE_RESOURCES:
                 self.resources.append(resource)
         if tag == "meta" and values.get("name", "").casefold() == "generator":
             self.generator = values.get("content", "")[:200]
@@ -95,7 +99,8 @@ class _Document(HTMLParser):
         if tag.casefold() == "title":
             self._in_title = False
         if tag.casefold() == "form" and self._form is not None:
-            self.forms.append(self._form)
+            if len(self.forms) < MAX_PAGE_FORMS:
+                self.forms.append(self._form)
             self._form = None
 
     def handle_data(self, data: str) -> None:
@@ -110,7 +115,7 @@ def _origin(value: str) -> tuple[str, str, int | None]:
 
 
 class _SameHostRedirect(HTTPRedirectHandler):
-    _SENSITIVE_HEADERS = ("Authorization", "Cookie", "Proxy-Authorization")
+    _CROSS_ORIGIN_HEADERS = frozenset({"user-agent", "accept", "connection"})
 
     def __init__(self, allowed_hosts: set[str]):
         super().__init__()
@@ -121,8 +126,9 @@ class _SameHostRedirect(HTTPRedirectHandler):
             raise HTTPError(newurl, code, "redirect leaves the allowed host scope", headers, fp)
         redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
         if redirected is not None and _origin(req.full_url) != _origin(newurl):
-            for name in self._SENSITIVE_HEADERS:
-                redirected.remove_header(name)
+            for name, _value in redirected.header_items():
+                if name.casefold() not in self._CROSS_ORIGIN_HEADERS:
+                    redirected.remove_header(name)
         return redirected
 
 
@@ -162,25 +168,25 @@ def _technologies(headers: dict[str, str], document: _Document) -> list[str]:
 def _tls_details(host: str, port: int, timeout: float) -> dict[str, str]:
     validation = "Valid"
     try:
-        with socket.create_connection((host, port), timeout=timeout) as raw:
-            with ssl.create_default_context().wrap_socket(raw, server_hostname=host):
-                pass
+        with socket.create_connection((host, port), timeout=timeout) as raw, \
+                ssl.create_default_context().wrap_socket(raw, server_hostname=host):
+            pass
     except ssl.SSLCertVerificationError as error:
         validation = f"Failed: {error.verify_message or error}"
 
+    # The crawler never bypasses TLS verification. The separate metadata probe
+    # can report an invalid certificate without sending HTTP headers or bodies.
     context = ssl.create_default_context()
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
-    with socket.create_connection((host, port), timeout=timeout) as raw:
-        with context.wrap_socket(raw, server_hostname=host) as secure:
-            certificate = secure.getpeercert(binary_form=True) or b""
-            cipher = secure.cipher()
-            return {
-                "Certificate validation": validation,
-                "Protocol": secure.version() or "",
-                "Cipher": cipher[0] if cipher else "",
-                "Certificate SHA-256": hashlib.sha256(certificate).hexdigest() if certificate else "",
-            }
+    with socket.create_connection((host, port), timeout=timeout) as raw, \
+            context.wrap_socket(raw, server_hostname=host) as secure:
+        certificate = secure.getpeercert(binary_form=True) or b""
+        cipher = secure.cipher()
+        return {
+            "Certificate validation": validation,
+            "Protocol": secure.version() or "",
+            "Cipher": cipher[0] if cipher else "",
+            "Certificate SHA-256": hashlib.sha256(certificate).hexdigest() if certificate else "",
+        }
 
 
 def audit_site(target: str, *, max_pages: int = 25, max_depth: int = 2,
@@ -199,7 +205,7 @@ def audit_site(target: str, *, max_pages: int = 25, max_depth: int = 2,
     excludes = tuple(path.strip() for path in excluded_paths if path.strip())
     if len(scope) > 20 or len(excludes) > 100:
         raise ValueError("web audit scope is too large")
-    report = WebAuditReport(target=target, started_at=datetime.now(timezone.utc).isoformat())
+    report = WebAuditReport(target=target, started_at=datetime.now(UTC).isoformat())
     context = ssl.create_default_context()
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
@@ -215,14 +221,15 @@ def audit_site(target: str, *, max_pages: int = 25, max_depth: int = 2,
             raise ValueError(f"custom {name} header is not allowed")
         headers[name] = value
 
-    sensitive_headers = {"authorization", "cookie", "proxy-authorization"}
+    cross_origin_headers = {"user-agent", "accept", "connection"}
     initial_origin = _origin(target)
 
     def headers_for(url: str) -> dict[str, str]:
         """Keep credentials scoped to the original host, even for explicitly allowed neighbours."""
         if _origin(url) == initial_origin:
             return headers
-        return {name: value for name, value in headers.items() if name.casefold() not in sensitive_headers}
+        return {name: value for name, value in headers.items()
+                if name.casefold() in cross_origin_headers}
 
     if initial.scheme == "https":
         try:
@@ -230,7 +237,8 @@ def audit_site(target: str, *, max_pages: int = 25, max_depth: int = 2,
         except (OSError, ssl.SSLError) as error:
             report.errors.append(f"TLS metadata: {error}")
 
-    queued: list[tuple[str, int]] = [(target, 0)]
+    queued = deque([(target, 0)])
+    queued_urls = {target}
     seen: set[str] = set()
     finding_keys: set[tuple[str, str]] = set()
     total_bytes = 0
@@ -248,7 +256,7 @@ def audit_site(target: str, *, max_pages: int = 25, max_depth: int = 2,
                 "Install a valid, trusted certificate whose name matches the target host.", "Transport")
 
     while queued and len(report.pages) < max_pages and total_bytes < MAX_TOTAL_BYTES:
-        url, depth = queued.pop(0)
+        url, depth = queued.popleft()
         url, _fragment = urldefrag(url)
         try:
             url = _normal_url(url)
@@ -360,12 +368,17 @@ def audit_site(target: str, *, max_pages: int = 25, max_depth: int = 2,
             for link in document.links:
                 candidate = urljoin(final_url, link)
                 link_parts = urlsplit(candidate)
-                if (link_parts.hostname or "").casefold() in scope and link_parts.scheme in {"http", "https"}:
+                candidate, _fragment = urldefrag(candidate)
+                if ((link_parts.hostname or "").casefold() in scope and
+                        link_parts.scheme in {"http", "https"} and
+                        candidate not in queued_urls and
+                        len(queued_urls) < MAX_DISCOVERED_URLS):
+                    queued_urls.add(candidate)
                     queued.append((candidate, depth + 1))
 
     severity_order = {"High": 0, "Medium": 1, "Low": 2, "Info": 3}
     report.findings.sort(key=lambda item: (severity_order.get(item.severity, 9), item.title, item.url))
-    report.completed_at = datetime.now(timezone.utc).isoformat()
+    report.completed_at = datetime.now(UTC).isoformat()
     return report
 
 

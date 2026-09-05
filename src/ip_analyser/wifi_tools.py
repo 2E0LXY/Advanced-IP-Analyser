@@ -40,6 +40,7 @@ class AccessPoint:
     first_seen: float = 0
     last_seen: float = 0
     handshake_seen: bool = False
+    indicators: list[str] = field(default_factory=list)
     clients: dict[str, WifiClient] = field(default_factory=dict)
 
 
@@ -251,8 +252,29 @@ def analyze_wifi_capture(path: Path) -> tuple[list[AccessPoint], list[WifiClient
             payload = frame[header_length:]
             if b"\xaa\xaa\x03\x00\x00\x00\x88\x8e" in payload[:32]:
                 ap.handshake_seen = True
+    rogue_wifi_indicators(aps.values())
     return (sorted(aps.values(), key=lambda ap: (ap.signal_dbm or -999), reverse=True),
             sorted(unlinked.values(), key=lambda client: client.packets, reverse=True))
+
+
+def rogue_wifi_indicators(access_points) -> int:
+    """Mark conflicting same-SSID security as an indicator, never as proof of an evil twin."""
+    access_points = list(access_points)
+    by_name: dict[str, list[AccessPoint]] = {}
+    for ap in access_points:
+        if ap.name and ap.name != "<hidden>":
+            by_name.setdefault(ap.name.casefold(), []).append(ap)
+    count = 0
+    for same_name in by_name.values():
+        security = {ap.security for ap in same_name}
+        if len(same_name) > 1 and len(security) > 1:
+            detail = (f"SSID has conflicting security advertisements across {len(same_name)} BSSIDs; "
+                      "verify against the authorized access-point inventory.")
+            for ap in same_name:
+                if detail not in ap.indicators:
+                    ap.indicators.append(detail)
+                    count += 1
+    return count
 
 
 def save_wifi_report(path: Path, aps: list[AccessPoint], unlinked: list[WifiClient]) -> None:

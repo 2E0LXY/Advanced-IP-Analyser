@@ -1,4 +1,4 @@
-.TH ADVANCED-IP-ANALYSER 1 "September 2026" "Advanced IP Analyser 2.1.2" "User Commands"
+.TH ADVANCED-IP-ANALYSER 1 "September 2026" "Advanced IP Analyser 2.2.0" "User Commands"
 .SH NAME
 advanced-ip-analyser \- discover and inventory authorized network hosts
 .SH SYNOPSIS
@@ -96,6 +96,11 @@ monitor-mode adapter; it never transmits deauthentication or injected frames.
 The Web Security Audit performs an explicitly authorized, same-host, bounded,
 read-only crawl and reports defensive HTTP, TLS, header, cookie, content, and
 form observations. It does not submit forms or send exploit payloads.
+.PP
+AI Settings stores separate OpenAI, Gemini, and OpenRouter keys in the desktop
+Secret Service keyring and retrieves live model choices from each provider.
+AI analysis requires an exact outbound-data preview and explicit approval.
+Results and remediation rules are advisory and are never executed automatically.
 .SH DISPLAY FILTERS
 The packet viewer and
 .B open-capture --filter
@@ -108,6 +113,12 @@ stores the current user's saved devices.
 .br
 .I ~/.config/advanced-ip-analyser/packet-filters.json
 stores named packet display filters.
+.br
+.I ~/.config/advanced-ip-analyser/ai-settings.json
+stores non-secret provider and model preferences. API keys remain in Secret Service.
+.br
+.I ~/.local/share/advanced-ip-analyser/scan-history.sqlite3
+stores bounded completed-scan snapshots and change evidence.
 .br
 .I ~/.local/share/advanced-ip-analyser/network-watch.sqlite3
 stores Network Watch history.

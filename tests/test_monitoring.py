@@ -1,14 +1,20 @@
 import json
-from pathlib import Path
 import socket
 import struct
 import tempfile
 import time
 import unittest
+from pathlib import Path
 
-from ip_analyser.monitoring import (AlertRule, MonitorAnalyzer, MonitorStore,
-                                    enforce_capture_retention, export_analysis,
-                                    load_rules, save_rules)
+from ip_analyser.monitoring import (
+    AlertRule,
+    MonitorAnalyzer,
+    MonitorStore,
+    enforce_capture_retention,
+    export_analysis,
+    load_rules,
+    save_rules,
+)
 from ip_analyser.packet_tools import PacketRecord
 
 
@@ -39,6 +45,18 @@ def dns_record(timestamp: float, rcode: int = 0) -> PacketRecord:
                         len(frame), "", frame)
 
 
+def dhcp_reply(source: str, timestamp: float) -> PacketRecord:
+    ethernet = bytes.fromhex("ffffffffffff66778899aabb0800")
+    payload = b"\x02" + b"\x00" * 239
+    udp = struct.pack("!HHHH", 67, 68, 8 + len(payload), 0) + payload
+    destination = "255.255.255.255"
+    ip = struct.pack("!BBHHHBBH4s4s", 0x45, 0, 20 + len(udp), 1, 0, 64, 17, 0,
+                     socket.inet_aton(source), socket.inet_aton(destination))
+    frame = ethernet + ip + udp
+    return PacketRecord(1, timestamp, source, destination, "UDP", 67, 68,
+                        len(frame), "DHCP", frame)
+
+
 class MonitoringTests(unittest.TestCase):
     def test_analysis_builds_timeline_flow_device_and_tcp_findings(self):
         started = 1_700_000_000.0
@@ -59,6 +77,14 @@ class MonitoringTests(unittest.TestCase):
         self.assertEqual(analysis.dns[0].name, "example.com")
         self.assertEqual(analysis.dns[0].rcode, 3)
         self.assertTrue(any(item.category == "DNS failures" for item in analysis.findings))
+
+    def test_multiple_dhcp_servers_are_flagged_for_authorization_review(self):
+        analysis = MonitorAnalyzer().analyze([
+            dhcp_reply("192.168.1.1", 1_700_000_000),
+            dhcp_reply("192.168.1.2", 1_700_000_001),
+        ])
+        finding = next(item for item in analysis.findings if item.category == "Multiple DHCP servers")
+        self.assertIn("legitimate", finding.explanation)
 
     def test_configured_rules_are_validated_and_trigger(self):
         rule = AlertRule.from_dict({"name": "Large session", "kind": "traffic_bytes",

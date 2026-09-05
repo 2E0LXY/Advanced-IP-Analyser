@@ -1,16 +1,21 @@
 import gzip
-from pathlib import Path
 import socket
 import struct
 import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from ip_analyser.packet_tools import (PacketRecord, capture_live, list_capture_interfaces,
-                                      packet_hex_preview, read_capture,
-                                      validate_interface)
 from ip_analyser.capture_helper import _matches as capture_matches
+from ip_analyser.packet_tools import (
+    PacketRecord,
+    capture_live,
+    list_capture_interfaces,
+    packet_hex_preview,
+    read_capture,
+    validate_interface,
+)
 
 
 def tcp_frame(source="192.0.2.5", destination="198.51.100.7",
@@ -77,6 +82,17 @@ class PacketToolTests(unittest.TestCase):
             records = read_capture(capture, ["198.51.100.7"])
             self.assertEqual(len(records), 1)
             self.assertEqual(records[0].protocol, "TCP")
+
+    def test_rejects_excessive_pcapng_block_count(self):
+        section = pcapng_bytes(tcp_frame())
+        # A valid 12-byte unknown block exercises the global block budget.
+        unknown = b"\x99\x00\x00\x00\x0c\x00\x00\x00\x0c\x00\x00\x00"
+        with tempfile.TemporaryDirectory() as directory:
+            capture = Path(directory) / "blocks.pcapng"
+            capture.write_bytes(section + unknown * 4)
+            with patch("ip_analyser.packet_tools.MAX_PCAPNG_BLOCKS", 3), \
+                    self.assertRaisesRegex(ValueError, "too many blocks"):
+                read_capture(capture)
 
     def test_rejects_invalid_inputs_and_malformed_capture(self):
         with self.assertRaises(ValueError):

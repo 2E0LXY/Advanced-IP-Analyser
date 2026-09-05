@@ -12,13 +12,15 @@ import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
-
 
 MAX_CAPTURE_HOSTS = 64
 MAX_CAPTURE_BYTES = 512 * 1024 * 1024
 MAX_CAPTURE_PACKETS = 100_000
+MAX_PCAPNG_BLOCKS = 200_000
+MAX_PCAPNG_INTERFACES = 4_096
+MAX_PCAPNG_SECTIONS = 1_024
 _INTERFACE = re.compile(r"[A-Za-z0-9_.:@-]{1,64}")
 
 
@@ -38,7 +40,7 @@ class PacketRecord:
     @property
     def time_text(self) -> str:
         try:
-            return datetime.fromtimestamp(self.timestamp).strftime("%H:%M:%S.%f")[:-3]
+            return datetime.fromtimestamp(self.timestamp, UTC).astimezone().strftime("%H:%M:%S.%f")[:-3]
         except (OSError, OverflowError, ValueError):
             return "invalid time"
 
@@ -122,7 +124,7 @@ def capture_live(hosts: list[str], interface: str = "any", port: int | None = No
     try:
         direct = subprocess.run(
             _capture_command(output, interface, addresses, port, duration, max_packets),
-            capture_output=True, text=True, timeout=duration + 15)
+            capture_output=True, text=True, timeout=duration + 15, check=False)
         if direct.returncode == 13:
             helper = _helper_path()
             helper_stat = helper.stat()
@@ -136,7 +138,7 @@ def capture_live(hosts: list[str], interface: str = "any", port: int | None = No
             elevated = subprocess.run(
                 [pkexec, *_capture_command(output, interface, addresses, port, duration,
                                             max_packets, isolated=True)],
-                capture_output=True, text=True, timeout=duration + 30)
+                capture_output=True, text=True, timeout=duration + 30, check=False)
             if elevated.returncode:
                 detail = (elevated.stderr or elevated.stdout).strip()
                 raise RuntimeError(detail or "capture authorization was cancelled or failed")
@@ -383,8 +385,16 @@ def _read_pcapng(content: bytes, limit: int) -> list[PacketRecord]:
     saw_interface = False
     offset = 0
     endian = "<"
+    block_count = 0
+    section_count = 0
     while offset + 12 <= len(content) and len(records) < limit:
+        block_count += 1
+        if block_count > MAX_PCAPNG_BLOCKS:
+            raise ValueError("PCAPNG capture contains too many blocks")
         if content[offset:offset + 4] == b"\x0a\x0d\x0d\x0a":
+            section_count += 1
+            if section_count > MAX_PCAPNG_SECTIONS:
+                raise ValueError("PCAPNG capture contains too many sections")
             byte_order = content[offset + 8:offset + 12]
             if byte_order == b"\x4d\x3c\x2b\x1a":
                 endian = "<"
@@ -416,6 +426,8 @@ def _read_pcapng(content: bytes, limit: int) -> list[PacketRecord]:
                     timestamp_divisor = (2 ** (resolution & 0x7F)
                                          if resolution & 0x80 else 10 ** resolution)
                 option_offset += (option_length + 3) & ~3
+            if len(interfaces) >= MAX_PCAPNG_INTERFACES:
+                raise ValueError("PCAPNG capture contains too many interfaces")
             interfaces.append((link_type, timestamp_divisor))
             saw_interface = True
         elif block_type == 6 and len(body) >= 20:

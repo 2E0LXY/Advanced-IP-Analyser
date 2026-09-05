@@ -12,16 +12,21 @@ import struct
 import tempfile
 import time
 from collections import Counter, defaultdict
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Iterable
 
 from .packet_tools import PacketRecord
-
 
 MAX_MONITOR_RECORDS = 100_000
 MAX_RULES = 256
 MAX_REPORT_ITEMS = 10_000
+
+
+def _secure_private_path(path: Path, *, directory: bool = False) -> None:
+    if os.name != "posix" or not path.exists():
+        return
+    path.chmod(0o700 if directory else 0o600)
 
 
 @dataclass(slots=True)
@@ -114,9 +119,9 @@ class AlertRule:
     enabled: bool = True
 
     @classmethod
-    def from_dict(cls, value: dict) -> "AlertRule":
+    def from_dict(cls, value: dict) -> AlertRule:
         if not isinstance(value, dict):
-            raise ValueError("alert rule must be an object")
+            raise TypeError("alert rule must be an object")
         name = value.get("name", "")
         kind = value.get("kind", "")
         threshold = value.get("threshold", 0)
@@ -359,6 +364,7 @@ class MonitorAnalyzer:
         flows: dict[tuple, Flow] = {}
         devices: dict[str, DeviceActivity] = {}
         dns_events: list[DnsEvent] = []
+        dhcp_servers: set[str] = set()
         protocols: Counter = Counter()
         services: Counter = Counter()
         arp_owners: dict[str, set[str]] = defaultdict(set)
@@ -427,6 +433,12 @@ class MonitorAnalyzer:
                 if dns_event:
                     dns_events.append(dns_event)
             hint = _application_hint(record, payload)
+            if record.protocol == "UDP" and record.source_port == 67 and record.destination_port == 68:
+                try:
+                    if not ipaddress.ip_address(record.source).is_unspecified:
+                        dhcp_servers.add(record.source)
+                except ValueError:
+                    pass
             if hint and hint not in record.info:
                 protocols[hint.split(" ", 1)[0]] += 1
             for address, sent, peer in ((record.source, True, record.destination),
@@ -457,7 +469,7 @@ class MonitorAnalyzer:
             if dns_event and dns_event.device in devices:
                 devices[dns_event.device].dns_names.add(dns_event.name)
         findings = self._findings(list(flows.values()), list(devices.values()),
-                                  dns_events, arp_owners)
+                                  dns_events, arp_owners, dhcp_servers)
         return Analysis(min(record.timestamp for record in records),
                         max(record.timestamp for record in records),
                         len(records), sum(max(0, record.length) for record in records),
@@ -467,10 +479,17 @@ class MonitorAnalyzer:
                                reverse=True), dns_events, findings, dict(protocols), dict(services))
 
     def _findings(self, flows: list[Flow], devices: list[DeviceActivity],
-                  dns: list[DnsEvent], arp_owners: dict[str, set[str]]) -> list[Finding]:
+                  dns: list[DnsEvent], arp_owners: dict[str, set[str]],
+                  dhcp_servers: set[str]) -> list[Finding]:
         findings: list[Finding] = []
         now = max((device.last_seen for device in devices), default=time.time())
         dns_failures = Counter(event.device for event in dns if event.response and event.rcode)
+        if len(dhcp_servers) > 1:
+            findings.append(Finding(
+                now, "alert", "Multiple DHCP servers", "Local broadcast domain",
+                "Observed DHCP replies from multiple source addresses: "
+                + ", ".join(sorted(dhcp_servers))
+                + ". Redundant DHCP can be legitimate; verify every server is authorized."))
         for address, owners in arp_owners.items():
             if len(owners) > 1:
                 findings.append(Finding(now, "alert", "ARP ownership changed", address,
@@ -544,8 +563,12 @@ class MonitorAnalyzer:
 class MonitorStore:
     def __init__(self, path: Path):
         self.path = path.expanduser()
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        _secure_private_path(self.path.parent, directory=True)
+        if self.path.is_symlink():
+            raise ValueError("Network Watch database must not be a symbolic link")
         self.connection = sqlite3.connect(self.path)
+        _secure_private_path(self.path)
         self.connection.execute("PRAGMA journal_mode=WAL")
         self.connection.execute("PRAGMA foreign_keys=ON")
         self.connection.executescript("""
@@ -575,6 +598,11 @@ class MonitorStore:
                 timestamp REAL NOT NULL, severity TEXT NOT NULL, category TEXT NOT NULL,
                 subject TEXT NOT NULL, explanation TEXT NOT NULL);
         """)
+        self._secure_database_files()
+
+    def _secure_database_files(self) -> None:
+        for candidate in (self.path, Path(str(self.path) + "-wal"), Path(str(self.path) + "-shm")):
+            _secure_private_path(candidate)
 
     def save(self, analysis: Analysis, capture: Path | None = None) -> int:
         with self.connection:
@@ -608,6 +636,7 @@ class MonitorStore:
                 "INSERT INTO findings VALUES(?,?,?,?,?,?)",
                 [(session_id, f.timestamp, f.severity, f.category, f.subject, f.explanation)
                  for f in analysis.findings])
+        self._secure_database_files()
         return session_id
 
     def recent_sessions(self, limit: int = 100) -> list[tuple]:
@@ -636,7 +665,8 @@ class MonitorStore:
 
 def save_rules(path: Path, rules: Iterable[AlertRule]) -> None:
     values = [asdict(rule) for rule in list(rules)[:MAX_RULES]]
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    _secure_private_path(path.parent, directory=True)
     descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent, text=True)
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as stream:

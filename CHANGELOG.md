@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.2.0 - 2026-09-05
+
+- Add provider-isolated OpenAI, Gemini, and OpenRouter keyring settings.
+- Retrieve live text-generation model choices with each supplier's native API.
+- Add explicit, redacted AI evidence previews and eleven advisory analysis modes.
+- Record bounded scan snapshots for change and address-capacity evidence.
+- Add an adaptive low-noise profile driven by sustained connection timeout pressure.
+- Flag multiple DHCP responders and conflicting same-SSID security advertisements for review.
+- Require verified TLS for web-audit requests, strip every custom cross-origin header, and bound link queues.
+- Bound PCAPNG blocks, interfaces, and sections; harden monitoring-file permissions and CLI retention.
+- Gate tagged publishing on trusted-default-branch ancestry and protected GitHub environments.
+- Add AI-provider, privacy, history, model parsing, and adaptive-throttle tests.
+
 ## 2.1.2 - 2026-09-04
 
 - Make the updater-helper ownership test independent of unpacked source-tree
