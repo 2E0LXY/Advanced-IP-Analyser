@@ -5,17 +5,18 @@ Description: Use Debian's package manager for application updates
  startup. The standalone upstream build retains its verified updater.
 Author: Daren Loxley <24845841+2E0LXY@users.noreply.github.com>
 Forwarded: not-needed
-Last-Update: 2026-09-02
+Last-Update: 2026-09-05
 ---
 --- a/src/ip_analyser/gui.py
 +++ b/src/ip_analyser/gui.py
-@@ -471,6 +471,5 @@ class Application(tk.Tk):
+@@ -471,7 +471,6 @@ class Application(tk.Tk):
+         self.bind_all("<Control-s>", lambda _event: self.save_export())
          self.bind_all("<Control-Shift-C>", lambda _event: self.copy_selected_detail())
          self.refresh_subnets(show_errors=False)
 -        self.after(1500, self.check_updates)
  
-     def show_help(self) -> None:
-         window = tk.Toplevel(self)
+     def show_ai_analysis(self) -> None:
+         try:
 @@ -805,7 +804,5 @@ class Application(tk.Tk):
                    font=("TkDefaultFont", 16, "bold")).pack(side="left")
          ttk.Button(heading, text="Close", command=window.destroy).pack(side="right", padx=(12, 0))
