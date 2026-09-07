@@ -107,6 +107,7 @@ class PacketToolTests(unittest.TestCase):
 
     @patch("ip_analyser.packet_tools.socket.if_nameindex",
            return_value=[(1, "lo"), (2, "enp1s0")])
+    @patch("ip_analyser.packet_tools.sys.platform", "linux")
     def test_lists_native_linux_interfaces(self, _interfaces):
         self.assertEqual(list_capture_interfaces(), [
             ("any", "All Linux interfaces"), ("lo", "Loopback"),
@@ -121,6 +122,7 @@ class PacketToolTests(unittest.TestCase):
         self.assertEqual(invalid.time_text, "invalid time")
 
     @patch("ip_analyser.packet_tools.subprocess.run")
+    @patch("ip_analyser.packet_tools.sys.platform", "linux")
     def test_live_capture_uses_validated_fixed_arguments(self, run):
         def complete(command, **_kwargs):
             output = Path(command[command.index("--output") + 1])
@@ -137,11 +139,17 @@ class PacketToolTests(unittest.TestCase):
         self.assertIn("enp1s0", command)
         self.assertEqual(command[-4:], ["--host", "192.0.2.5", "--port", "443"])
 
+    @patch("ip_analyser.packet_tools.sys.platform", "linux")
     def test_live_capture_limits_are_validated_before_launch(self):
         with self.assertRaisesRegex(ValueError, "duration"):
             capture_live(["192.0.2.5"], duration=0)
         with self.assertRaisesRegex(ValueError, "packet limit"):
             capture_live(["192.0.2.5"], max_packets=100_001)
+
+    @patch("ip_analyser.packet_tools.sys.platform", "win32")
+    def test_windows_live_capture_is_explicitly_unavailable(self):
+        with self.assertRaisesRegex(RuntimeError, "Debian 13"):
+            list_capture_interfaces()
 
     def test_unscoped_network_watch_keeps_non_ip_frames(self):
         arp_frame = bytes.fromhex("ffffffffffff0011223344550806") + b"\x00" * 28

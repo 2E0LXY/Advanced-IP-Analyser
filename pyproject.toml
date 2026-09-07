@@ -4,14 +4,23 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "advanced-ip-analyser"
-version = "2.2.0"
-description = "An original Debian network inventory and host access utility"
+version = "2.3.0"
+description = "An original Windows and Debian network inventory and host access utility"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "GPL-3.0-or-later"
 authors = [{name = "2E0LXY"}]
 dependencies = ["defusedxml>=0.7.1"]
-classifiers = ["Environment :: X11 Applications", "Programming Language :: Python :: 3"]
+classifiers = [
+    "Environment :: X11 Applications",
+    "Operating System :: Microsoft :: Windows :: Windows 10",
+    "Operating System :: Microsoft :: Windows :: Windows 11",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+]
+
+[project.optional-dependencies]
+windows = ["keyring>=25,<26"]
 
 [project.scripts]
 advanced-ip-analyser = "ip_analyser.cli:main"

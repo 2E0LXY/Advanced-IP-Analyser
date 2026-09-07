@@ -2,9 +2,10 @@
 
 ![Advanced IP Analyser icon](src/ip_analyser/assets/advanced-ip-analyser.png)
 
-Advanced IP Analyser is an original, Debian 13-only desktop and command-line
-network inventory, bounded web security auditing, packet analysis, long-term monitoring, and passive Wi-Fi
-observation application. It is designed for home labs, support teams, system
+Advanced IP Analyser is an original Windows 10/11 and Debian 13 desktop
+network inventory, bounded web security auditing, and packet-file analysis
+application. Debian additionally provides native live packet capture, long-term
+Network Security Monitor sessions, and passive Wi-Fi observation. It is designed for home labs, support teams, system
 administrators, and authorized network troubleshooting without requiring
 Wireshark.
 
@@ -39,9 +40,24 @@ actions, packet tools, and verified updates in one interface.
 | Network Security Monitor | Up to 24-hour sessions across all observed ports and both directions, minute timeline, conversations, devices, DNS, TCP diagnostics, behavioural baselines, colour-coded findings, alerts, bookmarks, reports, retention, history |
 | Passive Wi-Fi | Monitor-mode virtual interface, AP/client discovery, SSID/BSSID, channel, signal, security advertisement, beacons/data, probes, passive EAPOL observation, PCAP/JSON save |
 | Web Security Audit | Same-host bounded crawler, path exclusions, extra allowed hosts, custom headers, page/form/technology inventory, TLS fingerprint, security-header, cookie, cleartext, mixed-content, directory-listing, CORS, and password-form observations, HTML/JSON reports |
-| AI intelligence | Separate OpenAI, Gemini, and OpenRouter keys in Debian's Secret Service keyring; supplier-native live model lists; exact outbound preview; redaction; explicit consent; evidence-backed advisory analysis |
-| Updates | Automatic GitHub release check, flashing button, trusted release URL, SHA-256 verification, Debian package identity check, close/install/restart workflow |
+| AI intelligence | Separate OpenAI, Gemini, and OpenRouter keys in Debian Secret Service or Windows Credential Manager; supplier-native live model lists; exact outbound preview; redaction; explicit consent; evidence-backed advisory analysis |
+| Updates | Automatic GitHub release check, flashing button, platform-specific asset selection, trusted release URL, SHA-256 verification, package/installer checks, close/install/restart workflow |
 | Debian packaging | Reproducible `.deb`, Lintian/AppStream/desktop validation, install/GUI/remove smoke test, release checksum, optional signed GitHub Pages APT feed |
+| Windows packaging | Self-contained x64 application, per-user Inno Setup installer, native launcher adaptations, smoke test, checksum, and GitHub build-provenance attestation |
+
+## Windows 10/11 installation
+
+Download `Advanced-IP-Analyser-Setup-VERSION.exe` from the
+[latest release](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/latest)
+and run it. The per-user installer does not require Python and normally does not
+require administrator rights. It adds Start-menu and optional desktop shortcuts.
+
+Windows supports scanning, inventory, fingerprinting, Wake-on-LAN, web auditing,
+AI analysis, saved PCAP/PCAPNG inspection, display filters, reports, and Windows-native
+Ping, Traceroute, SMB, SSH, and Remote Desktop launchers. Linux `AF_PACKET` live
+capture, Network Security Monitor live capture, and monitor-mode Passive Wi-Fi are
+shown as Debian 13-only because the Windows build does not bundle a third-party
+packet-capture driver. See [Windows edition details](docs/WINDOWS.md).
 
 ## Debian 13 installation
 
@@ -51,7 +67,7 @@ then run:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.2.0_all.deb
+sudo apt install ./advanced-ip-analyser_2.3.0_all.deb
 ```
 
 Launch it from the desktop application menu or run:
@@ -403,13 +419,14 @@ guide](docs/DEBIAN_INCLUSION.md) for the ITP and sponsorship stages.
 - [Feature parity](docs/FEATURE_PARITY.md)
 - [APT repository publishing](docs/APT_REPOSITORY.md)
 - [Official Debian inclusion and sponsorship](docs/DEBIAN_INCLUSION.md)
+- [Windows 10/11 edition](docs/WINDOWS.md)
 
 ## Independence, license, and scope
 
 This is a clean, independent GPL-3.0-or-later implementation. It contains no
 Angry IP Scanner or Famatech Advanced IP Scanner source, history, branding, or
-assets and is not affiliated with those projects. Radmin is Windows-only and is
-not bundled; Debian-native SSH, RDP, SMB, HTTP(S), FTP and Telnet workflows are
-provided instead.
+assets and is not affiliated with those projects. Radmin is not bundled; the
+application uses operating-system-provided or separately installed SSH, RDP,
+SMB, HTTP(S), FTP, and Telnet clients.
 
 Copyright © 2026 Daren Loxley (2E0LXY).

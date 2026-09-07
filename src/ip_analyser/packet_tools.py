@@ -72,6 +72,8 @@ def validate_interface(interface: str) -> str:
 
 def list_capture_interfaces() -> list[tuple[str, str]]:
     """List Linux interfaces without depending on Wireshark or another program."""
+    if not sys.platform.startswith("linux"):
+        raise RuntimeError("live packet capture is available in the Debian 13 edition only")
     interfaces = [("any", "All Linux interfaces")]
     try:
         for _index, name in socket.if_nameindex():
@@ -107,6 +109,8 @@ def capture_live(hosts: list[str], interface: str = "any", port: int | None = No
                  duration: int = 10, max_packets: int = 5_000,
                  cache_dir: Path | None = None) -> Path:
     """Capture bounded Linux traffic, requesting PolicyKit only when required."""
+    if not sys.platform.startswith("linux"):
+        raise RuntimeError("live packet capture is available in the Debian 13 edition only")
     addresses = _addresses(hosts)
     if not addresses:
         raise ValueError("select at least one host for live capture")
@@ -185,6 +189,8 @@ def start_monitor_capture(interface: str = "any", duration: int = 3_600,
                           cache_dir: Path | None = None,
                           linktype: int = 1) -> CaptureSession:
     """Start a bounded header-focused capture that can be inspected while running."""
+    if not sys.platform.startswith("linux"):
+        raise RuntimeError("Network Security Monitor live capture requires Debian 13")
     addresses = _addresses(hosts)
     interface = validate_interface(interface)
     if not 1 <= duration <= 86_400:

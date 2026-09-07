@@ -4,6 +4,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -13,6 +14,7 @@ SECRET_TOOL = Path("/usr/bin/secret-tool")
 SECRET_LABEL_PREFIX = "Advanced IP Analyser AI API key"
 PROVIDERS = ("OpenAI", "Gemini", "OpenRouter")
 PROVIDER_SLUGS = {"OpenAI": "openai", "Gemini": "gemini", "OpenRouter": "openrouter"}
+WINDOWS_KEYRING_SERVICE = "Advanced IP Analyser AI"
 _MODEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}")
 
 
@@ -55,7 +57,7 @@ def validate_settings(settings: AISettings) -> AISettings:
     for name, model in settings.models.items():
         validate_provider(name)
         if not isinstance(model, str):
-            raise ValueError("AI model selections must be text")  # noqa: TRY004
+            raise ValueError("AI model selections must be text")
         clean = validate_model(model)
         if clean:
             models[name] = clean
@@ -124,9 +126,25 @@ def _run_secret_tool(provider: str, arguments: list[str], *, input_text: str | N
         raise SecretStoreError("The desktop keyring did not respond.") from error
 
 
+def _windows_keyring():
+    try:
+        import keyring
+    except ImportError as error:
+        raise SecretStoreError("Windows Credential Manager support is unavailable.") from error
+    return keyring
+
+
 def save_api_key(provider: str, api_key: str, *, tool: Path = SECRET_TOOL) -> None:
     provider = validate_provider(provider)
     key = validate_api_key(api_key)
+    if sys.platform == "win32" and tool == SECRET_TOOL:
+        try:
+            _windows_keyring().set_password(
+                WINDOWS_KEYRING_SERVICE, PROVIDER_SLUGS[provider], key)
+            return
+        except Exception as error:
+            raise SecretStoreError(
+                f"Windows Credential Manager could not save the {provider} API key.") from error
     result = _run_secret_tool(
         provider, ["store", f"--label={SECRET_LABEL_PREFIX} · {provider}"],
         input_text=key, tool=tool)
@@ -135,6 +153,12 @@ def save_api_key(provider: str, api_key: str, *, tool: Path = SECRET_TOOL) -> No
 
 
 def has_api_key(provider: str, *, tool: Path = SECRET_TOOL) -> bool:
+    if sys.platform == "win32" and tool == SECRET_TOOL:
+        try:
+            return _windows_keyring().get_password(
+                WINDOWS_KEYRING_SERVICE, PROVIDER_SLUGS[validate_provider(provider)]) is not None
+        except Exception as error:
+            raise SecretStoreError("Windows Credential Manager could not read the API key status.") from error
     result = _run_secret_tool(validate_provider(provider), ["lookup"], tool=tool)
     if result.returncode not in {0, 1}:
         raise SecretStoreError("The desktop keyring could not read the API key status.")
@@ -142,6 +166,20 @@ def has_api_key(provider: str, *, tool: Path = SECRET_TOOL) -> bool:
 
 
 def load_api_key(provider: str, *, tool: Path = SECRET_TOOL) -> str:
+    if sys.platform == "win32" and tool == SECRET_TOOL:
+        provider = validate_provider(provider)
+        try:
+            value = _windows_keyring().get_password(
+                WINDOWS_KEYRING_SERVICE, PROVIDER_SLUGS[provider])
+        except Exception as error:
+            raise SecretStoreError(
+                f"Windows Credential Manager could not read the {provider} API key.") from error
+        if value is None:
+            raise SecretStoreError(f"No {provider} API key is saved in Windows Credential Manager.")
+        try:
+            return validate_api_key(value)
+        except ValueError as error:
+            raise SecretStoreError(f"The saved {provider} API key is invalid.") from error
     result = _run_secret_tool(validate_provider(provider), ["lookup"], tool=tool)
     if result.returncode != 0 or not result.stdout:
         raise SecretStoreError(f"No {provider} API key is saved in the desktop keyring.")
@@ -154,6 +192,16 @@ def load_api_key(provider: str, *, tool: Path = SECRET_TOOL) -> str:
 
 
 def clear_api_key(provider: str, *, tool: Path = SECRET_TOOL) -> None:
+    if sys.platform == "win32" and tool == SECRET_TOOL:
+        provider = validate_provider(provider)
+        try:
+            keyring = _windows_keyring()
+            if keyring.get_password(WINDOWS_KEYRING_SERVICE, PROVIDER_SLUGS[provider]) is not None:
+                keyring.delete_password(WINDOWS_KEYRING_SERVICE, PROVIDER_SLUGS[provider])
+            return
+        except Exception as error:
+            raise SecretStoreError(
+                f"Windows Credential Manager could not delete the {provider} API key.") from error
     result = _run_secret_tool(validate_provider(provider), ["clear"], tool=tool)
     if result.returncode != 0:
         raise SecretStoreError(f"The desktop keyring could not delete the {provider} API key.")

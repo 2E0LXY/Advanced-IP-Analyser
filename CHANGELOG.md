@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.3.0 - 2026-09-07
+
+- Add a self-contained Windows 10/11 x64 application and per-user Inno Setup installer.
+- Add Windows network-interface discovery, ping, traceroute, ARP lookup, SMB, SSH,
+  and Remote Desktop launchers.
+- Store Windows AI keys in Windows Credential Manager through the maintained
+  Python keyring backend.
+- Select, verify, install, and relaunch platform-specific Windows update assets.
+- Keep Linux raw capture, Network Security Monitor live capture, and passive
+  monitor-mode Wi-Fi controls visibly Debian-only while retaining capture-file analysis.
+- Add a pinned Windows build, smoke-test, checksum, artifact-provenance, and
+  coordinated tagged-release workflow.
+
 ## 2.2.0 - 2026-09-07
 
 - Add provider-isolated OpenAI, Gemini, and OpenRouter keyring settings.
