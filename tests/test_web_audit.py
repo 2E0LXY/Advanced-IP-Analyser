@@ -1,8 +1,8 @@
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import tempfile
 import threading
-from pathlib import Path
 import unittest
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 from ip_analyser.web_audit import audit_site, export_web_audit
 
@@ -132,12 +132,14 @@ class WebAuditTests(unittest.TestCase):
                     max_pages=2,
                     max_depth=1,
                     allowed_hosts=("localhost",),
-                    request_headers={"Authorization": "Bearer secret", "Cookie": "session=secret"},
+                    request_headers={"Authorization": "Bearer secret", "Cookie": "session=secret",
+                                     "X-Internal-Trace": "private"},
                 )
                 received = _HeaderCaptureHandler.received_headers
                 self.assertIsNotNone(received)
                 self.assertIsNone(received.get("Authorization"))
                 self.assertIsNone(received.get("Cookie"))
+                self.assertIsNone(received.get("X-Internal-Trace"))
             finally:
                 origin.shutdown()
                 origin.server_close()
@@ -152,12 +154,14 @@ class WebAuditTests(unittest.TestCase):
                 audit_site(
                     f"http://127.0.0.1:{redirector.server_port}/",
                     allowed_hosts=("localhost",),
-                    request_headers={"Authorization": "Bearer secret", "Cookie": "session=secret"},
+                    request_headers={"Authorization": "Bearer secret", "Cookie": "session=secret",
+                                     "X-Internal-Trace": "private"},
                 )
                 received = _HeaderCaptureHandler.received_headers
                 self.assertIsNotNone(received)
                 self.assertIsNone(received.get("Authorization"))
                 self.assertIsNone(received.get("Cookie"))
+                self.assertIsNone(received.get("X-Internal-Trace"))
             finally:
                 redirector.shutdown()
                 redirector.server_close()

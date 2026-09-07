@@ -4,14 +4,15 @@ import concurrent.futures
 import ipaddress
 import socket
 import subprocess
-import time
 import threading
+import time
+from collections import deque
 from collections.abc import Callable, Iterable
 from dataclasses import replace
 
-from .models import Host
-from .fingerprints import probe_service
 from .asset_profiles import infer_asset_profile
+from .fingerprints import probe_service
+from .models import Host
 from .vendors import MacVendorLookup
 
 DEFAULT_PORTS = {
@@ -28,11 +29,16 @@ DEFAULT_PORTS = {
 
 class Scanner:
     def __init__(self, timeout: float = 0.35, workers: int = 64, ports: dict[int, str] | None = None,
-                 vendors: MacVendorLookup | None = None):
+                 vendors: MacVendorLookup | None = None, adaptive: bool = False):
         self.timeout = max(0.05, timeout)
         self.workers = min(512, max(1, workers))
         self.ports = ports or DEFAULT_PORTS
         self.vendors = vendors or MacVendorLookup()
+        self.adaptive = adaptive
+        self._throttle_lock = threading.Lock()
+        self._probe_samples: deque[bool] = deque(maxlen=32)
+        self._probe_delay = 0.0
+        self._next_probe_at = 0.0
 
     def scan(self, targets: Iterable[str], progress: Callable[[int, int, Host], None] | None = None,
              cancel: threading.Event | None = None, discover_services: bool = True,
@@ -127,15 +133,43 @@ class Scanner:
         return [discovered[host.identity] for host in hosts]
 
     def _port_open(self, address: str, port: int) -> bool:
+        if self.adaptive:
+            self._wait_for_probe_slot()
+        started = time.monotonic()
         try:
             with socket.create_connection((address, port), timeout=self.timeout):
-                return True
+                opened = True
         except (OSError, TimeoutError):
-            return False
+            opened = False
+        if self.adaptive:
+            elapsed = time.monotonic() - started
+            self._record_probe_pressure(not opened and elapsed >= max(0.04, self.timeout * 0.75))
+        return opened
+
+    def _wait_for_probe_slot(self) -> None:
+        with self._throttle_lock:
+            now = time.monotonic()
+            delay = max(0.0, self._next_probe_at - now)
+            self._next_probe_at = max(now, self._next_probe_at) + self._probe_delay
+        if delay:
+            time.sleep(delay)
+
+    def _record_probe_pressure(self, slow_failure: bool) -> None:
+        with self._throttle_lock:
+            self._probe_samples.append(slow_failure)
+            if len(self._probe_samples) < self._probe_samples.maxlen:
+                return
+            pressure = sum(self._probe_samples) / len(self._probe_samples)
+            if pressure >= 0.65:
+                self._probe_delay = min(0.05, max(0.001, self._probe_delay * 2))
+            elif pressure <= 0.20:
+                self._probe_delay = max(0.0, self._probe_delay / 2 - 0.0005)
+            self._probe_samples.clear()
 
     def _ping(self, address: str) -> bool:
         try:
-            result = subprocess.run(["ping", "-n", "-c", "1", "-W", "1", address], capture_output=True, timeout=2)
+            result = subprocess.run(["ping", "-n", "-c", "1", "-W", "1", address],
+                                    capture_output=True, timeout=2, check=False)
             return result.returncode == 0
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return False
@@ -143,7 +177,8 @@ class Scanner:
     @staticmethod
     def _neighbour_mac(address: str) -> str:
         try:
-            output = subprocess.run(["ip", "neigh", "show", address], text=True, capture_output=True, timeout=1).stdout
+            output = subprocess.run(["ip", "neigh", "show", address], text=True,
+                                    capture_output=True, timeout=1, check=False).stdout
             words = output.split()
             return words[words.index("lladdr") + 1].upper() if "lladdr" in words else ""
         except (FileNotFoundError, subprocess.TimeoutExpired, ValueError, IndexError):

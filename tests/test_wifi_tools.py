@@ -6,7 +6,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from ip_analyser.wifi_tools import (AccessPoint, WifiClient, _pkexec_command,
-                                    analyze_wifi_capture, save_wifi_report)
+                                    analyze_wifi_capture, rogue_wifi_indicators,
+                                    save_wifi_report)
 
 
 AP = bytes.fromhex("001122334455")
@@ -72,6 +73,12 @@ class WifiToolTests(unittest.TestCase):
             save_wifi_report(path, [ap], [])
             report = json.loads(path.read_text(encoding="utf-8"))
         self.assertEqual(report["access_points"][0]["clients"][0]["probes"], ["Cafe"])
+
+    def test_conflicting_same_ssid_security_is_an_indicator_not_a_verdict(self):
+        aps = [AccessPoint("00:11:22:33:44:55", name="Office", security="WPA3"),
+               AccessPoint("00:11:22:33:44:66", name="Office", security="Open")]
+        self.assertEqual(rogue_wifi_indicators(aps), 2)
+        self.assertIn("verify", aps[0].indicators[0].casefold())
 
     @patch("ip_analyser.wifi_tools.shutil.which", return_value="/usr/bin/pkexec")
     @patch("ip_analyser.wifi_tools.os.name", "posix")

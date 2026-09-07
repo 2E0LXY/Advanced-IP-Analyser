@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import queue
 import shutil
 import sqlite3
@@ -8,22 +9,34 @@ import subprocess
 import threading
 import time
 import tkinter as tk
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from .models import Host
-from .monitoring import (AlertRule, Analysis, MonitorAnalyzer, MonitorStore,
-                         enforce_capture_retention, export_analysis, load_rules,
-                         save_rules)
-from .packet_tools import (CaptureSession, list_capture_interfaces, read_capture,
-                           start_monitor_capture, validate_interface)
+from .monitoring import (
+    AlertRule,
+    Analysis,
+    MonitorAnalyzer,
+    MonitorStore,
+    enforce_capture_retention,
+    export_analysis,
+    load_rules,
+    save_rules,
+)
+from .packet_tools import (
+    CaptureSession,
+    list_capture_interfaces,
+    read_capture,
+    start_monitor_capture,
+    validate_interface,
+)
 
 
 class NetworkWatch(tk.Toplevel):
     def __init__(self, parent: tk.Misc, known_hosts: list[Host] | None = None):
         super().__init__(parent)
-        self.title("Network Watch · Advanced IP Analyser")
+        self.title("Network Security Monitor · Advanced IP Analyser")
         self.geometry("1280x760")
         self.minsize(880, 560)
         self.protocol("WM_DELETE_WINDOW", self.close)
@@ -55,7 +68,8 @@ class NetworkWatch(tk.Toplevel):
     def _build(self) -> None:
         controls = ttk.Frame(self, padding=12)
         controls.pack(fill="x")
-        ttk.Label(controls, text="Network Watch", font=("TkDefaultFont", 16, "bold")).pack(side="left")
+        ttk.Label(controls, text="Network Security Monitor",
+                  font=("TkDefaultFont", 16, "bold")).pack(side="left")
         ttk.Label(controls, text="Interface").pack(side="left", padx=(24, 4))
         self.interface = ttk.Combobox(controls, width=17, state="readonly")
         self.interface.pack(side="left")
@@ -70,7 +84,7 @@ class NetworkWatch(tk.Toplevel):
                                          values=("Headers only", "Protocol details", "Full packets"))
         self.detail_level.set("Headers only")
         self.detail_level.pack(side="left")
-        self.start_button = ttk.Button(controls, text="Start watching", command=self.start,
+        self.start_button = ttk.Button(controls, text="Activate monitor", command=self.start,
                                        style="Accent.TButton")
         self.start_button.pack(side="left", padx=(12, 4))
         self.stop_button = ttk.Button(controls, text="Stop", command=self.stop,
@@ -129,6 +143,9 @@ class NetworkWatch(tk.Toplevel):
         self.findings = self._table(self.findings_page,
             ("time", "severity", "category", "subject", "explanation"),
             (110, 80, 170, 240, 500))
+        self.findings.tag_configure("alert", background="#ffd8d8", foreground="#750000")
+        self.findings.tag_configure("warning", background="#fff1c7", foreground="#5e4300")
+        self.findings.tag_configure("notice", background="#e7f2ff", foreground="#123b66")
         self.protocols = self._table(self.protocols_page,
             ("type", "name", "packets", "share"), (100, 280, 120, 120))
         self.history = self._table(self.history_page,
@@ -137,7 +154,9 @@ class NetworkWatch(tk.Toplevel):
 
         footer = ttk.Frame(self, padding=12)
         footer.pack(fill="x")
-        self.status = ttk.Label(footer, text="Ready. Header-only monitoring is recommended.")
+        self.status = ttk.Label(
+            footer,
+            text="Ready. Monitors observed inbound and outbound traffic on every port; headers-only is recommended.")
         self.status.pack(side="left")
         self.progress = ttk.Progressbar(footer, mode="indeterminate", length=180,
                                         style="Green.Horizontal.TProgressbar")
@@ -174,9 +193,11 @@ class NetworkWatch(tk.Toplevel):
         scope = "packet headers" if snaplen == 128 else (
             "up to 512 bytes per packet" if snaplen == 512 else "complete packet payloads")
         if not messagebox.askyesno(
-                "Start Network Watch",
-                f"Watch {self.interface.get()} for up to {self.duration.get()}?\n\n"
+                "Activate Network Security Monitor",
+                f"Watch {self.interface.get()} for observed inbound and outbound traffic on all ports "
+                f"for up to {self.duration.get()}?\n\n"
                 f"This records {scope}. Debian may request administrator authorization. "
+                "The session is bounded to 100,000 packets and is not an intrusion-prevention system. "
                 "Captured data stays on this computer and is subject to the retention limit.", parent=self):
             return
         try:
@@ -184,7 +205,7 @@ class NetworkWatch(tk.Toplevel):
             self.capture = start_monitor_capture(interface, seconds, snaplen=snaplen,
                                                  cache_dir=self.capture_dir)
         except (OSError, RuntimeError, ValueError) as error:
-            messagebox.showerror("Network Watch could not start", str(error), parent=self)
+            messagebox.showerror("Network Security Monitor could not start", str(error), parent=self)
             return
         self.capture_path = self.capture.path
         self.saved_session = False
@@ -192,7 +213,7 @@ class NetworkWatch(tk.Toplevel):
         self.start_button.configure(state="disabled")
         self.stop_button.configure(state="normal")
         self.progress.start(10)
-        self.status.configure(text="Watching network activity…")
+        self.status.configure(text="Security monitor active · analysing all observed ports and directions…")
         self._schedule_refresh()
 
     def stop(self) -> None:
@@ -277,7 +298,7 @@ class NetworkWatch(tk.Toplevel):
                 return
             self.refresh_generation += 1
             self.final_generation = self.refresh_generation
-            self.status.configure(text="Finalising Network Watch analysis…")
+            self.status.configure(text="Finalising Network Security Monitor analysis…")
             self._start_analysis_worker(self.capture_path, self.final_generation,
                                         self.store.baselines())
 
@@ -318,12 +339,15 @@ class NetworkWatch(tk.Toplevel):
             ", ".join(f"{name} {count}" for name, count in device.protocols.most_common(8)))
             for device in analysis.devices])
         self._replace(self.dns, [(
-            datetime.fromtimestamp(event.timestamp).strftime("%H:%M:%S"), event.device,
+            datetime.fromtimestamp(event.timestamp, UTC).astimezone().strftime("%H:%M:%S"), event.device,
             event.server, event.name, "OK" if not event.rcode else f"Error {event.rcode}")
             for event in reversed(analysis.dns[-5_000:])])
-        self._replace(self.findings, [(
-            datetime.fromtimestamp(item.timestamp).strftime("%H:%M:%S"), item.severity,
-            item.category, item.subject, item.explanation) for item in analysis.findings])
+        self.findings.delete(*self.findings.get_children())
+        for item in analysis.findings:
+            self.findings.insert("", "end", values=(
+                datetime.fromtimestamp(item.timestamp, UTC).astimezone().strftime("%H:%M:%S"),
+                item.severity, item.category, item.subject, item.explanation),
+                tags=(item.severity.casefold(),))
         protocol_total = max(1, sum(analysis.protocols.values()))
         protocol_rows = [("Protocol", name, count, f"{count / protocol_total:.1%}")
                          for name, count in sorted(analysis.protocols.items(),
@@ -368,9 +392,9 @@ class NetworkWatch(tk.Toplevel):
                                fill="#1587bd")
         canvas.create_text(margin, 18, anchor="w", text=f"Peak {self._size(peak)} per minute")
         canvas.create_text(margin, height - 18, anchor="w",
-                           text=datetime.fromtimestamp(buckets[0].started).strftime("%H:%M"))
+                           text=datetime.fromtimestamp(buckets[0].started, UTC).astimezone().strftime("%H:%M"))
         canvas.create_text(width - margin, height - 18, anchor="e",
-                           text=datetime.fromtimestamp(buckets[-1].started).strftime("%H:%M"))
+                           text=datetime.fromtimestamp(buckets[-1].started, UTC).astimezone().strftime("%H:%M"))
 
     @staticmethod
     def _flow_health(flow) -> str:
@@ -423,7 +447,9 @@ class NetworkWatch(tk.Toplevel):
 
     def save_report(self) -> None:
         if not self.analysis:
-            messagebox.showinfo("No analysis", "Start Network Watch or open a recording first.", parent=self)
+            messagebox.showinfo(
+                "No analysis", "Activate the Network Security Monitor or open a recording first.",
+                parent=self)
             return
         name = filedialog.asksaveasfilename(parent=self, defaultextension=".html",
             filetypes=[("HTML report", "*.html"), ("JSON data", "*.json"),
@@ -442,21 +468,32 @@ class NetworkWatch(tk.Toplevel):
             return
         note = simpledialog.askstring("Bookmark recording", "Optional note:", parent=self) or ""
         bookmarks = self.data_dir / "bookmarks"
-        bookmarks.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        bookmarks.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if os.name == "posix":
+            bookmarks.chmod(0o700)
+        stamp = datetime.now(UTC).astimezone().strftime("%Y%m%d-%H%M%S")
         destination = bookmarks / f"bookmark-{stamp}{self.capture_path.suffix}"
+        note_path = destination.with_suffix(destination.suffix + ".json")
         try:
-            shutil.copyfile(self.capture_path, destination)
-            destination.with_suffix(destination.suffix + ".json").write_text(
-                json.dumps({"created": time.time(), "note": note[:4096]}, indent=2) + "\n",
-                encoding="utf-8")
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            descriptor = os.open(destination, flags, 0o600)
+            with self.capture_path.open("rb") as source, os.fdopen(descriptor, "wb") as output:
+                shutil.copyfileobj(source, output, length=64 * 1024)
+            note_descriptor = os.open(note_path, flags, 0o600)
+            with os.fdopen(note_descriptor, "w", encoding="utf-8") as stream:
+                json.dump({"created": time.time(), "note": note[:4096]}, stream, indent=2)
+                stream.write("\n")
             self.status.configure(text=f"Bookmarked recording as {destination.name}")
         except OSError as error:
+            destination.unlink(missing_ok=True)
+            note_path.unlink(missing_ok=True)
             messagebox.showerror("Bookmark failed", str(error), parent=self)
 
     def edit_rules(self) -> None:
         window = tk.Toplevel(self)
-        window.title("Network Watch alert rules")
+        window.title("Network Security Monitor alert rules")
         window.geometry("760x430")
         table = self._table(window, ("name", "kind", "threshold", "device", "enabled"),
                             (180, 150, 130, 170, 70))
@@ -507,13 +544,14 @@ class NetworkWatch(tk.Toplevel):
 
     def _refresh_history(self) -> None:
         self._replace(self.history, [(
-            session_id, datetime.fromtimestamp(started).strftime("%Y-%m-%d %H:%M"),
+            session_id, datetime.fromtimestamp(started, UTC).astimezone().strftime("%Y-%m-%d %H:%M"),
             f"{max(0, ended - started):.0f}s", f"{packets:,}", self._size(size), capture)
             for session_id, started, ended, packets, size, capture in self.store.recent_sessions()])
 
     def close(self) -> None:
         if self.capture and self.capture.running:
-            if not messagebox.askyesno("Stop Network Watch", "Stop the active watch and close?", parent=self):
+            if not messagebox.askyesno(
+                    "Stop Network Security Monitor", "Stop the active monitor and close?", parent=self):
                 return
             self.close_after_final = True
             self.capture.stop()

@@ -5,10 +5,19 @@ import shutil
 from pathlib import Path
 
 from .actions import wake
-from .monitoring import MonitorAnalyzer, MonitorStore, export_analysis
+from .monitoring import (
+    MonitorAnalyzer,
+    MonitorStore,
+    enforce_capture_retention,
+    export_analysis,
+)
 from .packet_filters import compile_filter
-from .packet_tools import (capture_live, list_capture_interfaces, read_capture,
-                           start_monitor_capture)
+from .packet_tools import (
+    capture_live,
+    list_capture_interfaces,
+    read_capture,
+    start_monitor_capture,
+)
 from .scanner import Scanner
 from .storage import export
 from .targets import parse_targets
@@ -106,6 +115,8 @@ def main(argv: list[str] | None = None) -> int:
                              "advanced-ip-analyser" / "network-watch.sqlite3")
         try:
             store.save(analysis, session.path)
+            store.prune(7)
+            enforce_capture_retention(session.path.parent, days=7)
         finally:
             store.close()
         if args.report:

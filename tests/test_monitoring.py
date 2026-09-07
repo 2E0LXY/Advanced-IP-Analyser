@@ -1,42 +1,66 @@
 import json
-from pathlib import Path
 import socket
 import struct
 import tempfile
 import time
 import unittest
+from dataclasses import replace
+from pathlib import Path
 
-from ip_analyser.monitoring import (AlertRule, MonitorAnalyzer, MonitorStore,
-                                    enforce_capture_retention, export_analysis,
-                                    load_rules, save_rules)
+from ip_analyser.monitoring import (
+    AlertRule,
+    MonitorAnalyzer,
+    MonitorStore,
+    enforce_capture_retention,
+    export_analysis,
+    load_rules,
+    save_rules,
+)
 from ip_analyser.packet_tools import PacketRecord
 
 
 def tcp_record(number: int, timestamp: float, flags: int = 0x02,
                source: str = "192.168.1.10", destination: str = "198.51.100.4",
+               source_port: int = 50_000, destination_port: int = 443,
                sequence: int = 1, payload: bytes = b"") -> PacketRecord:
     ethernet = bytes.fromhex("00112233445566778899aabb0800")
-    tcp = struct.pack("!HHLLBBHHH", 50_000, 443, sequence, 0, 0x50,
+    tcp = struct.pack("!HHLLBBHHH", source_port, destination_port, sequence, 0, 0x50,
                       flags, 8192, 0, 0) + payload
     ip = struct.pack("!BBHHHBBH4s4s", 0x45, 0, 20 + len(tcp), number, 0, 64, 6, 0,
                      socket.inet_aton(source), socket.inet_aton(destination))
     frame = ethernet + ip + tcp
     info = ",".join(name for bit, name in ((2, "SYN"), (16, "ACK"), (4, "RST")) if flags & bit)
-    return PacketRecord(number, timestamp, source, destination, "TCP", 50_000, 443,
+    return PacketRecord(number, timestamp, source, destination, "TCP", source_port, destination_port,
                         len(frame), info, frame)
 
 
-def dns_record(timestamp: float, rcode: int = 0) -> PacketRecord:
+def dns_record(timestamp: float, rcode: int = 0, label: bytes = b"example",
+               response: bool = True) -> PacketRecord:
     ethernet = bytes.fromhex("00112233445566778899aabb0800")
-    name = b"\x07example\x03com\x00"
-    dns = struct.pack("!HHHHHH", 1, 0x8000 | rcode, 1, 0, 0, 0) + name + struct.pack("!HH", 1, 1)
-    udp = struct.pack("!HHHH", 53, 53000, 8 + len(dns), 0) + dns
-    source, destination = "192.168.1.1", "192.168.1.10"
+    name = bytes([len(label)]) + label + b"\x03com\x00"
+    dns = struct.pack("!HHHHHH", 1, (0x8000 if response else 0) | rcode,
+                      1, 0, 0, 0) + name + struct.pack("!HH", 1, 1)
+    source_port, destination_port = (53, 53000) if response else (53000, 53)
+    udp = struct.pack("!HHHH", source_port, destination_port, 8 + len(dns), 0) + dns
+    source, destination = (("192.168.1.1", "192.168.1.10") if response else
+                           ("192.168.1.10", "192.168.1.1"))
     ip = struct.pack("!BBHHHBBH4s4s", 0x45, 0, 20 + len(udp), 1, 0, 64, 17, 0,
                      socket.inet_aton(source), socket.inet_aton(destination))
     frame = ethernet + ip + udp
-    return PacketRecord(1, timestamp, source, destination, "DNS", 53, 53000,
+    return PacketRecord(1, timestamp, source, destination, "DNS", source_port, destination_port,
                         len(frame), "", frame)
+
+
+def dhcp_reply(source: str, timestamp: float) -> PacketRecord:
+    ethernet = bytes.fromhex("ffffffffffff66778899aabb0800")
+    payload = b"\x02" + b"\x00" * 239
+    udp = struct.pack("!HHHH", 67, 68, 8 + len(payload), 0) + payload
+    destination = "255.255.255.255"
+    ip = struct.pack("!BBHHHBBH4s4s", 0x45, 0, 20 + len(udp), 1, 0, 64, 17, 0,
+                     socket.inet_aton(source), socket.inet_aton(destination))
+    frame = ethernet + ip + udp
+    return PacketRecord(1, timestamp, source, destination, "UDP", 67, 68,
+                        len(frame), "DHCP", frame)
 
 
 class MonitoringTests(unittest.TestCase):
@@ -59,6 +83,49 @@ class MonitoringTests(unittest.TestCase):
         self.assertEqual(analysis.dns[0].name, "example.com")
         self.assertEqual(analysis.dns[0].rcode, 3)
         self.assertTrue(any(item.category == "DNS failures" for item in analysis.findings))
+
+    def test_multiple_dhcp_servers_are_flagged_for_authorization_review(self):
+        analysis = MonitorAnalyzer().analyze([
+            dhcp_reply("192.168.1.1", 1_700_000_000),
+            dhcp_reply("192.168.1.2", 1_700_000_001),
+        ])
+        finding = next(item for item in analysis.findings if item.category == "Multiple DHCP servers")
+        self.assertIn("legitimate", finding.explanation)
+
+    def test_security_monitor_flags_scan_inbound_and_outbound_indicators(self):
+        started = 1_700_000_000.0
+        port_scan = [tcp_record(index, started + index, destination_port=1_000 + index)
+                     for index in range(20)]
+        inbound = [tcp_record(100 + index, started + index, source="8.8.8.8",
+                              destination="192.168.1.10", source_port=40_000 + index,
+                              destination_port=20 + index) for index in range(3)]
+        uncommon = [tcp_record(200 + index, started + index, destination="1.1.1.1",
+                               destination_port=4444) for index in range(3)]
+        large = replace(tcp_record(300, started, destination="1.1.1.1"),
+                        length=50 * 1024 * 1024)
+        analysis = MonitorAnalyzer().analyze(port_scan + inbound + uncommon + [large])
+        categories = {item.category for item in analysis.findings}
+        self.assertIn("Port-scan pattern", categories)
+        self.assertIn("Inbound connection attempts", categories)
+        self.assertIn("Uncommon outbound port", categories)
+        self.assertIn("Large outbound transfer", categories)
+
+    def test_security_monitor_flags_repeated_long_dns_queries(self):
+        label = b"a" * 55
+        analysis = MonitorAnalyzer().analyze([
+            dns_record(1_700_000_000 + index, label=label, response=False) for index in range(3)
+        ])
+        self.assertTrue(any(item.category == "Long DNS query pattern"
+                            for item in analysis.findings))
+
+    def test_security_monitor_flags_cleartext_and_high_dns_variety(self):
+        records = [tcp_record(1, 1_700_000_000, destination="1.1.1.1", destination_port=23)]
+        records.extend(dns_record(1_700_000_001 + index,
+                                  label=f"device-{index}".encode(), response=False)
+                       for index in range(50))
+        categories = {item.category for item in MonitorAnalyzer().analyze(records).findings}
+        self.assertIn("Cleartext remote protocol", categories)
+        self.assertIn("High DNS-name variety", categories)
 
     def test_configured_rules_are_validated_and_trigger(self):
         rule = AlertRule.from_dict({"name": "Large session", "kind": "traffic_bytes",

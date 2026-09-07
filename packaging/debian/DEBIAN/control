@@ -4,7 +4,7 @@ Section: net
 Priority: optional
 Architecture: all
 Maintainer: Daren Loxley <24845841+2E0LXY@users.noreply.github.com>
-Depends: python3 (>= 3.11), python3-tk, python3-defusedxml, iputils-ping, iproute2, xdg-utils, pkexec
+Depends: python3 (>= 3.11), python3-tk, python3-defusedxml, iputils-ping, iproute2, xdg-utils, pkexec, libsecret-tools
 Recommends: ieee-data, iw, nmap-common, openssh-client, freerdp3-x11, gvfs-backends, iputils-tracepath, telnet, x-terminal-emulator
 Installed-Size: @INSTALLED_SIZE@
 Homepage: https://github.com/2E0LXY/Advanced-IP-Analyser

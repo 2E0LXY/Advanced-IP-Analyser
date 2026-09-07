@@ -81,9 +81,9 @@ class WifiWatch(tk.Toplevel):
         panes.add(client_frame, weight=2)
 
         ap_columns = ("name", "bssid", "channel", "signal", "security",
-                      "beacons", "data", "clients", "handshake")
+                      "beacons", "data", "clients", "handshake", "indicators")
         self.ap_table = ttk.Treeview(ap_frame, columns=ap_columns, show="headings", selectmode="browse")
-        ap_widths = (150, 140, 55, 55, 90, 60, 60, 55, 75)
+        ap_widths = (150, 140, 55, 55, 90, 60, 60, 55, 75, 280)
         for column, width in zip(ap_columns, ap_widths):
             self.ap_table.heading(column, text=column.title())
             self.ap_table.column(column, width=width, anchor="w", stretch=column == "name")
@@ -217,14 +217,16 @@ class WifiWatch(tk.Toplevel):
             item = self.ap_table.insert("", "end", values=(
                 ap.name or "<hidden>", ap.bssid, ap.channel or "", ap.signal_dbm or "",
                 ap.security, ap.beacons, ap.data_packets, len(ap.clients),
-                "Observed" if ap.handshake_seen else ""))
+                "Observed" if ap.handshake_seen else "", "; ".join(ap.indicators)))
             self.ap_by_item[item] = ap
             if ap.bssid == selected_bssid:
                 selected_item = item
         if selected_item:
             self.ap_table.selection_set(selected_item)
+        indicator_count = sum(len(ap.indicators) for ap in self.access_points)
         self.status.configure(text=f"Observed {len(self.access_points)} access points and "
-                                   f"{sum(len(ap.clients) for ap in self.access_points) + len(self.unlinked_clients)} clients")
+                                   f"{sum(len(ap.clients) for ap in self.access_points) + len(self.unlinked_clients)} clients"
+                                   + (f" · {indicator_count} rogue-infrastructure indicator(s)" if indicator_count else ""))
         self._show_clients()
 
     def _show_clients(self, _event=None) -> None:

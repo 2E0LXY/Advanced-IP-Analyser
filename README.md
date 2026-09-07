@@ -36,9 +36,10 @@ actions, packet tools, and verified updates in one interface.
 | Device access | HTTP, HTTPS, FTP, SMB, SSH, RDP and Telnet launchers; Ping, Tracepath, Wake-on-LAN; confirmed delayed SSH shutdown/reboot and abort |
 | Packet engine | Native Linux `AF_PACKET` capture, selected-host/service scope, interface discovery, Ethernet PCAP/PCAPNG/gzip reading, endpoint/port/protocol summaries, byte preview |
 | Display filters | IP/CIDR, TCP/UDP ports, DNS, HTTP, TLS, ICMP, ARP, TCP flags, lengths, comparisons, text/regex matching, boolean expressions, 20 quick filters, saved named filters |
-| Network Watch | Up to 24-hour sessions, minute timeline, conversations, devices, DNS, protocols/services, TCP diagnostics, baselines, findings, alerts, bookmarks, reports, retention, history |
+| Network Security Monitor | Up to 24-hour sessions across all observed ports and both directions, minute timeline, conversations, devices, DNS, TCP diagnostics, behavioural baselines, colour-coded findings, alerts, bookmarks, reports, retention, history |
 | Passive Wi-Fi | Monitor-mode virtual interface, AP/client discovery, SSID/BSSID, channel, signal, security advertisement, beacons/data, probes, passive EAPOL observation, PCAP/JSON save |
 | Web Security Audit | Same-host bounded crawler, path exclusions, extra allowed hosts, custom headers, page/form/technology inventory, TLS fingerprint, security-header, cookie, cleartext, mixed-content, directory-listing, CORS, and password-form observations, HTML/JSON reports |
+| AI intelligence | Separate OpenAI, Gemini, and OpenRouter keys in Debian's Secret Service keyring; supplier-native live model lists; exact outbound preview; redaction; explicit consent; evidence-backed advisory analysis |
 | Updates | Automatic GitHub release check, flashing button, trusted release URL, SHA-256 verification, Debian package identity check, close/install/restart workflow |
 | Debian packaging | Reproducible `.deb`, Lintian/AppStream/desktop validation, install/GUI/remove smoke test, release checksum, optional signed GitHub Pages APT feed |
 
@@ -50,7 +51,7 @@ then run:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.1.0_all.deb
+sudo apt install ./advanced-ip-analyser_2.2.0_all.deb
 ```
 
 Launch it from the desktop application menu or run:
@@ -60,7 +61,7 @@ advanced-ip-analyser-gui
 ```
 
 The package installs Python, Tk, hardened XML parsing, ping, IP-route tools,
-desktop integration, and PolicyKit dependencies. `iw` is recommended for Passive
+desktop integration, PolicyKit, and `libsecret-tools` for secure AI-key storage. `iw` is recommended for Passive
 Wi-Fi Watch. Optional service launchers use Debian packages such as OpenSSH,
 FreeRDP, GVfs, Tracepath, and Telnet when installed.
 
@@ -69,7 +70,7 @@ FreeRDP, GVfs, Tracepath, and Telnet when installed.
 ```sh
 sudo apt update
 sudo apt install python3 python3-venv python3-tk python3-defusedxml \
-  iputils-ping iproute2 pkexec iw xdg-utils
+  iputils-ping iproute2 pkexec libsecret-tools iw xdg-utils
 git clone https://github.com/2E0LXY/Advanced-IP-Analyser.git
 cd Advanced-IP-Analyser
 python3 -m venv --system-site-packages .venv
@@ -119,6 +120,43 @@ restricted to a small number of authorized targets.
 - Shutdown/reboot/abort require confirmation and non-interactive SSH keys;
 passwords are never requested or stored.
 
+## AI evidence analysis
+
+The **AI Settings** footer button configures OpenAI, Gemini, or OpenRouter.
+Each provider has a separate API key stored by Debian's Secret Service through
+`secret-tool`; keys are never written to the settings JSON, command arguments,
+logs, exports, or Git. **Refresh models** queries the selected supplier's live
+model-list API and saves the chosen model identifier.
+
+After a scan, **AI analysis** can prepare device classification, snapshot and
+behavioural changes, vulnerability/attack-path priorities, unknown or remapped
+service indicators, rogue-infrastructure indicators, a low-noise scan plan,
+topology/dependency inference, natural-language asset search, defensive
+remediation drafts, and address-capacity analysis. “Unknown service” is used
+instead of claiming unsupported zero-day detection.
+
+Every request follows this workflow:
+
+1. The app builds a bounded JSON evidence payload.
+2. IP addresses, MAC addresses, and hostnames are excluded by default.
+3. Credential-, cookie-, token-, password-, and key-labelled fields are removed.
+4. Raw packet payloads are never included.
+5. The exact outbound JSON is displayed for review.
+6. The user must explicitly approve that preview before it can be sent.
+
+AI results are advisory. Network-derived strings are treated as untrusted data,
+not instructions. AI has no route to privileged helpers, scanning controls,
+remote actions, firewall execution, or automatic enforcement. Remediation rules
+are drafts that require platform-specific validation and a rollback plan.
+
+Completed scans are recorded in
+`~/.local/share/advanced-ip-analyser/scan-history.sqlite3` so changes can be
+compared over time. Capacity estimates use observed reachable-address counts;
+they are not presented as DHCP lease or pool data. The latest bounded Network
+Watch session is also included when available, giving the approved request
+traffic, DNS, flow-diagnostic, anomaly, and rogue-DHCP evidence without raw
+packet payloads.
+
 ## Native Web Security Audit
 
 ![Web Security Audit](docs/images/web-security-audit.png)
@@ -128,9 +166,9 @@ enter an authorized URL. The audit requires an explicit authorization checkbox.
 It uses read-only `GET` requests, remains on the initial/allowed hosts, follows at
 most five link levels, reads at most 100 pages and 20 MiB total, and supports path
 exclusions, custom request headers, and additional allowed hostnames.
-Credential-bearing headers (`Authorization`, `Cookie`, and `Proxy-Authorization`)
-are confined to the original scheme, hostname, and port and are stripped from
-cross-origin links and redirects.
+All operator-supplied custom headers are confined to the original scheme,
+hostname, and port and stripped from cross-origin links and redirects. HTTPS
+page requests always require normal certificate and hostname verification.
 
 The results include crawled pages, titles, links, forms, disclosed technologies,
 TLS certificate validation, protocol/cipher/certificate fingerprint, errors, and prioritized observations
@@ -180,18 +218,21 @@ The expression and regex parsers are bounded and do not call `eval`.
 
 See [the complete filter reference](docs/DISPLAY_FILTERS.md).
 
-## Network Watch
+## Network Security Monitor
 
-![Network Watch dashboard](docs/images/network-watch-dashboard.png)
+![Network Security Monitor dashboard](docs/images/network-watch-dashboard.png)
 
-Open **Packets → Network Watch** for continuous analysis. Choose an interface,
-duration, and capture detail:
+Open **Packets → Network Security Monitor** for continuous analysis. Select
+`any` to observe every available interface, or select one interface for a narrower
+view. The monitor applies no port or direction filter: it analyses every inbound
+and outbound packet visible to the selected Linux capture interface. Choose a
+duration and capture detail:
 
 - **Headers only (recommended):** retain 128 bytes per packet.
 - **Protocol details:** retain 512 bytes per packet.
 - **Full packets:** retain complete payloads within the global safety bounds.
 
-Network Watch provides:
+The Network Security Monitor provides:
 
 - per-minute packet and byte timeline;
 - bidirectional flows, duration, packets, bytes, and TCP health;
@@ -200,17 +241,21 @@ Network Watch provides:
 - protocol and service totals;
 - handshake timing, resets, zero windows, and conservative retransmission and
   out-of-order estimates;
-- new-device, fan-out, traffic-baseline, DNS-failure, regular-timing, reset,
-  retransmission and unanswered-SYN findings;
+- new-device, connection fan-out, port-scan, public inbound-attempt, large
+  outbound-transfer, uncommon outbound-port, clear-text remote-protocol,
+  long/high-variety DNS, traffic-baseline, DNS-failure, regular-timing, reset,
+  retransmission, unanswered-SYN, ARP ownership, and multiple-DHCP findings;
 - user rules for new devices, traffic, unanswered connections, destination,
   port, and DNS text;
 - optional desktop notifications, reports, bookmarks, seven-day/250 MiB ordinary
   capture retention, and SQLite history.
 
-Findings are explainable indicators for investigation, not declarations that a
-system is compromised. Encrypted payloads remain encrypted.
+Alert, warning, and notice rows are colour-coded. Findings are explainable
+indicators for investigation, not declarations that a system is compromised.
+This is a visibility and alerting tool, not an IDS/IPS: it does not block traffic.
+Sessions remain bounded to 100,000 packets, and encrypted payloads remain encrypted.
 
-See [Network Watch documentation](docs/NETWORK_WATCH.md).
+See [Network Security Monitor documentation](docs/NETWORK_WATCH.md).
 
 ## Passive Wi-Fi Watch
 
@@ -298,16 +343,19 @@ Run `advanced-ip-analyser COMMAND --help` for every option.
 | --- | --- |
 | `~/.config/advanced-ip-analyser/favorites.json` | Saved devices and notes |
 | `~/.config/advanced-ip-analyser/packet-filters.json` | Named display filters |
-| `~/.config/advanced-ip-analyser/alert-rules.json` | Network Watch rules |
+| `~/.config/advanced-ip-analyser/alert-rules.json` | Network Security Monitor rules |
+| `~/.config/advanced-ip-analyser/ai-settings.json` | Provider, model selections, and request bound; never API keys |
 | `~/.local/share/advanced-ip-analyser/network-watch.sqlite3` | Session history and baselines |
-| `~/.local/share/advanced-ip-analyser/captures/` | Ordinary Network Watch recordings |
+| `~/.local/share/advanced-ip-analyser/scan-history.sqlite3` | Bounded completed-scan snapshots and change evidence |
+| `~/.local/share/advanced-ip-analyser/captures/` | Ordinary Network Security Monitor recordings |
 | `~/.local/share/advanced-ip-analyser/bookmarks/` | Bookmarked recordings and notes |
 | `~/.local/share/advanced-ip-analyser/wifi-captures/` | Passive Wi-Fi recordings |
 
-The application has no analytics or telemetry service. Network inventories,
+AI API keys are separate Secret Service keyring entries for OpenAI, Gemini, and
+OpenRouter. The application has no analytics or telemetry service. Network inventories,
 captures, rules, favorites, and reports stay on the computer unless the user
-explicitly exports or copies them. The update checker contacts this project's
-GitHub Releases API.
+explicitly exports, copies, or approves an AI outbound preview. The update checker
+contacts this project's GitHub Releases API.
 
 ## Troubleshooting
 
@@ -349,7 +397,7 @@ guide](docs/DEBIAN_INCLUSION.md) for the ITP and sponsorship stages.
 - [Complete instruction book (PDF)](output/pdf/Advanced-IP-Analyser-Instruction-Book.pdf)
 - [Instruction book source](docs/USER_GUIDE.md)
 - [Display filters](docs/DISPLAY_FILTERS.md)
-- [Network Watch](docs/NETWORK_WATCH.md)
+- [Network Security Monitor](docs/NETWORK_WATCH.md)
 - [Passive Wi-Fi Watch](docs/PASSIVE_WIFI.md)
 - [Packet engine and safety boundaries](docs/PACKET_ANALYSIS.md)
 - [Feature parity](docs/FEATURE_PARITY.md)

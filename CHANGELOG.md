@@ -1,5 +1,37 @@
 # Changelog
 
+## 2.2.0 - 2026-09-07
+
+- Add provider-isolated OpenAI, Gemini, and OpenRouter keyring settings.
+- Retrieve live text-generation model choices with each supplier's native API.
+- Add explicit, redacted AI evidence previews and eleven advisory analysis modes.
+- Record bounded scan snapshots for change and address-capacity evidence.
+- Add an adaptive low-noise profile driven by sustained connection timeout pressure.
+- Flag multiple DHCP responders and conflicting same-SSID security advertisements for review.
+- Require verified TLS for web-audit requests, strip every custom cross-origin header, and bound link queues.
+- Bound PCAPNG blocks, interfaces, and sections; harden monitoring-file permissions and CLI retention.
+- Gate tagged publishing on trusted-default-branch ancestry and protected GitHub environments.
+- Expand Network Watch into a bidirectional, all-port Network Security Monitor with
+  colour-coded scan, inbound-attempt, outbound-transfer, uncommon-port,
+  clear-text-protocol, and DNS-anomaly indicators.
+- Add AI-provider, privacy, history, model parsing, and adaptive-throttle tests.
+
+## 2.1.2 - 2026-09-04
+
+- Make the updater-helper ownership test independent of unpacked source-tree
+  ownership so Debian source packages build reproducibly under non-root build
+  users and current Debian Python.
+
+## 2.1.1 - 2026-09-04
+
+- Harden the automatic updater against package replacement races by installing
+  only a root-owned staged copy that is revalidated after privilege escalation.
+- Bound and validate GitHub release metadata, versions, assets, downloads, and
+  Debian package identity before installation.
+- Pin release workflow actions, reduce job permissions, and remove stale
+  hard-coded package versions from Debian and public APT checks.
+- Expand updater regression coverage and resolve Python correctness-lint issues.
+
 ## 2.1.0 - 2026-09-02
 
 - Add conservative device type, operating system/version, model, and confidence

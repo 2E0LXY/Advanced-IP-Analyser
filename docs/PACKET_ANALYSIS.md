@@ -28,7 +28,7 @@ packet in the byte preview. A bounded parser provides IP/CIDR, port, DNS, HTTP,
 TLS, TCP flag, frame-length, comparison, text, regular-expression, and boolean
 display filters. See [DISPLAY_FILTERS.md](DISPLAY_FILTERS.md).
 
-Network Watch extends the same engine to captures up to 24 hours with local
+The Network Security Monitor extends the same engine to captures up to 24 hours with local
 session history, timelines, flows, DNS activity, device baselines, TCP diagnostics,
 findings, alerts, and reports. Passive Wi-Fi Watch separately handles radiotap PCAP
 from a temporary monitor-mode interface. Neither feature requires Wireshark.
