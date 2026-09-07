@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import concurrent.futures
 import ipaddress
+import os
+import re
 import socket
 import subprocess
 import threading
@@ -168,7 +170,9 @@ class Scanner:
 
     def _ping(self, address: str) -> bool:
         try:
-            result = subprocess.run(["ping", "-n", "-c", "1", "-W", "1", address],
+            command = (["ping", "-n", "1", "-w", "1000", address] if os.name == "nt" else
+                       ["ping", "-n", "-c", "1", "-W", "1", address])
+            result = subprocess.run(command,
                                     capture_output=True, timeout=2, check=False)
             return result.returncode == 0
         except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -177,6 +181,12 @@ class Scanner:
     @staticmethod
     def _neighbour_mac(address: str) -> str:
         try:
+            if os.name == "nt":
+                output = subprocess.run(["arp.exe", "-a", address], text=True,
+                                        capture_output=True, timeout=1, check=False).stdout
+                match = re.search(r"\b([0-9a-f]{2}(?:-[0-9a-f]{2}){5})\b", output,
+                                  flags=re.IGNORECASE)
+                return match.group(1).replace("-", ":").upper() if match else ""
             output = subprocess.run(["ip", "neigh", "show", address], text=True,
                                     capture_output=True, timeout=1, check=False).stdout
             words = output.split()

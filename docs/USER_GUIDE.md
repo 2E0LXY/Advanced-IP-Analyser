@@ -1,6 +1,6 @@
-# Advanced IP Analyser 2.2.0 Instruction Book
+# Advanced IP Analyser 2.3.0 Instruction Book
 
-Debian 13 edition
+Windows 10/11 and Debian 13 edition
 
 Copyright © 2026 Daren Loxley (2E0LXY)
 
@@ -28,20 +28,27 @@ Advanced IP Analyser combines four workflows:
 4. **Monitoring:** analyze traffic over time and passively observe compatible
    Wi-Fi monitor-mode traffic.
 
-It is a focused Debian administration utility, not a complete protocol-forensics
+It is a focused network administration utility, not a complete protocol-forensics
 suite. It does not decrypt TLS, reconstruct every application stream, exploit a
 service, disconnect Wi-Fi clients, inject frames, or recover passwords.
 
 ## 2. System requirements
 
-### Required
+### Debian 13 requirements
 
 - Debian GNU/Linux 13 (Trixie), with a graphical desktop for the GUI.
 - Python 3.11 or newer and Tk.
 - `iproute2`, `iputils-ping`, `xdg-utils`, `pkexec`, `libsecret-tools`, and `python3-defusedxml`.
 - Authorization for every network and device placed in scope.
 
-### Optional
+### Windows 10/11 requirements
+
+- 64-bit Windows 10 or Windows 11.
+- No separate Python installation is required by the installer.
+- Windows OpenSSH Client is optional for SSH and remote power actions.
+- Authorization for every network and device placed in scope.
+
+### Optional Debian components
 
 - `iw` and a compatible wireless adapter for Passive Wi-Fi Watch.
 - `openssh-client` for SSH and remote power.
@@ -53,14 +60,23 @@ service, disconnect Wi-Fi clients, inject frames, or recover passwords.
 
 ## 3. Install and remove
 
-### Install the release package
+### Install on Windows
 
-Download `advanced-ip-analyser_2.2.0_all.deb` from the project release page.
+Download `Advanced-IP-Analyser-Setup-2.3.0.exe` from the project release page
+and run it. The per-user installer normally needs no administrator rights and
+offers Start-menu and desktop shortcuts. Windows supports network scanning,
+inventory, web auditing, AI analysis, and saved capture-file inspection. Linux
+live capture, the Network Security Monitor, and passive monitor-mode Wi-Fi are
+visibly disabled because the project does not bundle a Windows capture driver.
+
+### Install on Debian 13
+
+Download `advanced-ip-analyser_2.3.0_all.deb` from the project release page.
 In a terminal:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.2.0_all.deb
+sudo apt install ./advanced-ip-analyser_2.3.0_all.deb
 ```
 
 Use `apt install ./file.deb`, not `dpkg -i`, because APT resolves dependencies.
@@ -74,6 +90,12 @@ advanced-ip-analyser-gui
 The CLI executable is `advanced-ip-analyser`.
 
 ### Remove
+
+On Windows, open **Settings > Apps > Installed apps**, select Advanced IP
+Analyser, and choose **Uninstall**. The uninstaller removes the application but
+leaves user-created inventories and reports in place.
+
+On Debian:
 
 ```sh
 sudo apt remove advanced-ip-analyser

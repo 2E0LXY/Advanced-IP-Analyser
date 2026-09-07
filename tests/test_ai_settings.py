@@ -87,6 +87,23 @@ class AISettingsTests(unittest.TestCase):
             with self.assertRaises(SecretStoreError):
                 save_api_key("OpenAI", "api-secret-value", tool=missing)
 
+    @patch("ip_analyser.ai_settings.sys.platform", "win32")
+    @patch("ip_analyser.ai_settings._windows_keyring")
+    def test_windows_credential_manager_keeps_provider_keys_isolated(self, keyring):
+        values = {}
+        keyring.return_value.set_password.side_effect = (
+            lambda service, account, value: values.__setitem__((service, account), value))
+        keyring.return_value.get_password.side_effect = (
+            lambda service, account: values.get((service, account)))
+        keyring.return_value.delete_password.side_effect = (
+            lambda service, account: values.pop((service, account), None))
+        save_api_key("Gemini", "windows-secret-value")
+        self.assertTrue(has_api_key("Gemini"))
+        self.assertEqual(load_api_key("Gemini"), "windows-secret-value")
+        self.assertFalse(has_api_key("OpenAI"))
+        clear_api_key("Gemini")
+        self.assertFalse(has_api_key("Gemini"))
+
 
 if __name__ == "__main__":
     unittest.main()

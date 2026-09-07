@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -15,7 +16,8 @@ RELEASE_API = "https://api.github.com/repos/2E0LXY/Advanced-IP-Analyser/releases
 MAX_PACKAGE_BYTES = 50 * 1024 * 1024
 MAX_RELEASE_METADATA_BYTES = 1024 * 1024
 VERSION_PATTERN = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
-PACKAGE_PATTERN = re.compile(r"^advanced-ip-analyser_([0-9]+\.[0-9]+\.[0-9]+)_all\.deb$")
+DEBIAN_PACKAGE_PATTERN = re.compile(r"^advanced-ip-analyser_([0-9]+\.[0-9]+\.[0-9]+)_all\.deb$")
+WINDOWS_PACKAGE_PATTERN = re.compile(r"^Advanced-IP-Analyser-Setup-([0-9]+\.[0-9]+\.[0-9]+)\.exe$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 DOWNLOAD_PREFIX = "https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/"
 
@@ -26,6 +28,15 @@ class Update:
     download_url: str
     filename: str
     sha256: str = ""
+    installer_kind: str = "debian"
+
+
+def _installer_pattern(kind: str) -> re.Pattern[str]:
+    if kind == "debian":
+        return DEBIAN_PACKAGE_PATTERN
+    if kind == "windows":
+        return WINDOWS_PACKAGE_PATTERN
+    raise ValueError("unsupported update installer kind")
 
 
 def version_key(value: str) -> tuple[tuple[int, int | str], ...]:
@@ -36,7 +47,10 @@ def version_key(value: str) -> tuple[tuple[int, int | str], ...]:
     return tuple((0, int(part)) for part in value.split("."))
 
 
-def check_for_update(current_version: str, timeout: float = 5.0) -> Update | None:
+def check_for_update(current_version: str, timeout: float = 5.0,
+                     installer_kind: str | None = None) -> Update | None:
+    installer_kind = installer_kind or ("windows" if sys.platform == "win32" else "debian")
+    package_pattern = _installer_pattern(installer_kind)
     request = urllib.request.Request(RELEASE_API, headers={
         "Accept": "application/vnd.github+json",
         "User-Agent": f"Advanced-IP-Analyser/{current_version}",
@@ -64,7 +78,7 @@ def check_for_update(current_version: str, timeout: float = 5.0) -> Update | Non
         if not isinstance(asset, dict):
             continue
         filename = str(asset.get("name", ""))
-        match = PACKAGE_PATTERN.fullmatch(filename)
+        match = package_pattern.fullmatch(filename)
         url = str(asset.get("browser_download_url", ""))
         expected_url = f"{DOWNLOAD_PREFIX}v{latest}/{filename}"
         if match and match.group(1) == latest and url == expected_url:
@@ -72,12 +86,12 @@ def check_for_update(current_version: str, timeout: float = 5.0) -> Update | Non
             sha256 = digest.removeprefix("sha256:") if digest.startswith("sha256:") else ""
             if not SHA256_PATTERN.fullmatch(sha256):
                 raise ValueError("the GitHub release does not publish a valid SHA-256 package digest")
-            return Update(latest, url, filename, sha256)
+            return Update(latest, url, filename, sha256, installer_kind)
     return None
 
 
 def download_update(update: Update, cache_dir: Path | None = None, timeout: float = 30.0) -> Path:
-    match = PACKAGE_PATTERN.fullmatch(update.filename)
+    match = _installer_pattern(update.installer_kind).fullmatch(update.filename)
     expected_url = f"{DOWNLOAD_PREFIX}v{update.version}/{update.filename}"
     if (not match or match.group(1) != update.version or
             update.download_url != expected_url or
@@ -113,12 +127,18 @@ def download_update(update: Update, cache_dir: Path | None = None, timeout: floa
             os.fsync(stream.fileno())
         if digest.hexdigest() != update.sha256:
             raise ValueError("downloaded update failed its SHA-256 integrity check")
-        result = subprocess.run(["/usr/bin/dpkg-deb", "--field", str(temporary), "Package", "Version"],
-                                text=True, capture_output=True, timeout=10)
-        fields = dict(line.split(":", 1) for line in result.stdout.splitlines() if ":" in line)
-        if (result.returncode or fields.get("Package", "").strip() != "advanced-ip-analyser" or
-                fields.get("Version", "").strip() != update.version):
-            raise ValueError("download is not the expected Advanced IP Analyser package")
+        if update.installer_kind == "debian":
+            result = subprocess.run(
+                ["/usr/bin/dpkg-deb", "--field", str(temporary), "Package", "Version"],
+                text=True, capture_output=True, timeout=10, check=False)
+            fields = dict(line.split(":", 1) for line in result.stdout.splitlines() if ":" in line)
+            if (result.returncode or fields.get("Package", "").strip() != "advanced-ip-analyser" or
+                    fields.get("Version", "").strip() != update.version):
+                raise ValueError("download is not the expected Advanced IP Analyser package")
+        else:
+            with temporary.open("rb") as stream:
+                if stream.read(2) != b"MZ":
+                    raise ValueError("download is not a Windows executable installer")
         os.replace(temporary, destination)
         return destination
     finally:
@@ -131,6 +151,26 @@ def download_update(update: Update, cache_dir: Path | None = None, timeout: floa
 
 def launch_installer(package: Path, update: Update) -> None:
     """Start the detached privileged installer; the caller can then close the GUI."""
+    package = package.resolve()
+    match = _installer_pattern(update.installer_kind).fullmatch(package.name)
+    if (not match or match.group(1) != update.version or
+            not SHA256_PATTERN.fullmatch(update.sha256)):
+        raise ValueError("update installer metadata is invalid")
+    if not package.is_file() or package.stat().st_size > MAX_PACKAGE_BYTES:
+        raise ValueError("update installer file is invalid")
+    with package.open("rb") as stream:
+        actual_digest = hashlib.file_digest(stream, "sha256").hexdigest()
+    if not hmac.compare_digest(actual_digest, update.sha256):
+        raise ValueError("update installer failed its final SHA-256 integrity check")
+    if update.installer_kind == "windows":
+        with package.open("rb") as stream:
+            if stream.read(2) != b"MZ":
+                raise ValueError("update installer is not a Windows executable")
+        subprocess.Popen(
+            [str(package), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
+             "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS", "/RELAUNCH=1"],
+            close_fds=True)
+        return
     subprocess.Popen([sys.executable, "-m", "ip_analyser.update_helper", str(package),
                       update.version, update.sha256, str(os.getpid())],
                      start_new_session=True, close_fds=True)

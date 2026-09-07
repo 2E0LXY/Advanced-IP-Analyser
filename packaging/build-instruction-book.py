@@ -28,7 +28,6 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "docs" / "USER_GUIDE.md"
 OUTPUT = ROOT / "output" / "pdf" / "Advanced-IP-Analyser-Instruction-Book.pdf"
@@ -93,7 +92,8 @@ def _header_footer(canvas, document) -> None:
     canvas.rect(0, A4[1] - 13 * mm, A4[0], 13 * mm, fill=1, stroke=0)
     canvas.setFillColor(colors.white)
     canvas.setFont(BOLD, 8)
-    canvas.drawString(15 * mm, A4[1] - 8.5 * mm, "ADVANCED IP ANALYSER - DEBIAN 13")
+    canvas.drawString(15 * mm, A4[1] - 8.5 * mm,
+                      "ADVANCED IP ANALYSER - WINDOWS 10/11 + DEBIAN 13")
     canvas.setFillColor(GREEN)
     canvas.drawRightString(A4[0] - 15 * mm, A4[1] - 8.5 * mm, "SAFE NETWORK EVIDENCE")
     canvas.setStrokeColor(colors.HexColor("#b9ccd6"))
@@ -134,7 +134,7 @@ def build() -> None:
         str(OUTPUT), pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm,
         topMargin=19 * mm, bottomMargin=17 * mm,
         title=lines[0].removeprefix("# "), author="Daren Loxley (2E0LXY)",
-        subject="Debian 13 user, administrator, and AI safety guide",
+        subject="Windows 10/11 and Debian 13 user, administrator, and AI safety guide",
         creator="Advanced IP Analyser documentation build")
     document.addPageTemplates(PageTemplate(
         id="guide", frames=[Frame(document.leftMargin, document.bottomMargin,

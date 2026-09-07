@@ -1,0 +1,108 @@
+name: Windows installer
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install tested build dependencies
+        run: python -m pip install ".[windows]" "pyinstaller==6.22.2" "pillow>=11,<13"
+
+      - name: Verify release tag matches the application version
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        run: |
+          $version = python -c "from ip_analyser import __version__; print(__version__)"
+          if ("v$version" -ne $env:GITHUB_REF_NAME) {
+            throw "Tag $env:GITHUB_REF_NAME does not match application version v$version"
+          }
+
+      - name: Run Windows tests
+        run: |
+          python -m compileall -q src tests
+          python -m unittest discover -s tests -v
+
+      - name: Build application and installer
+        shell: pwsh
+        run: ./packaging/windows/build.ps1
+
+      - name: Smoke test installer, application, and uninstaller
+        shell: pwsh
+        run: |
+          $installer = (Resolve-Path "dist/windows-installer/Advanced-IP-Analyser-Setup-*.exe").Path
+          $installDir = Join-Path $env:RUNNER_TEMP "Advanced-IP-Analyser-Test"
+          $setup = Start-Process -FilePath $installer -ArgumentList @(
+            "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$installDir"
+          ) -Wait -PassThru -WindowStyle Hidden
+          if ($setup.ExitCode -ne 0) { throw "Installer failed with exit code $($setup.ExitCode)" }
+          $installedExe = Join-Path $installDir "Advanced-IP-Analyser.exe"
+          if (-not (Test-Path -LiteralPath $installedExe)) { throw "Installed application is missing" }
+          $process = Start-Process -FilePath $installedExe -PassThru
+          Start-Sleep -Seconds 8
+          if ($process.HasExited) { throw "Installed application exited during smoke test" }
+          Stop-Process -Id $process.Id
+          $uninstaller = Join-Path $installDir "unins000.exe"
+          $remove = Start-Process -FilePath $uninstaller -ArgumentList @(
+            "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"
+          ) -Wait -PassThru -WindowStyle Hidden
+          if ($remove.ExitCode -ne 0) { throw "Uninstaller failed with exit code $($remove.ExitCode)" }
+          if (Test-Path -LiteralPath $installedExe) { throw "Uninstaller left the application executable behind" }
+
+      - name: Attest Windows installer provenance
+        if: github.event_name != 'pull_request'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: dist/windows-installer/Advanced-IP-Analyser-Setup-*.exe
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: advanced-ip-analyser-windows
+          path: |
+            dist/windows-installer/Advanced-IP-Analyser-Setup-*.exe
+            dist/windows-installer/SHA256SUMS-WINDOWS.txt
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: windows
+    runs-on: windows-2022
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: advanced-ip-analyser-windows
+          path: release
+
+      - name: Attach Windows installer to the verified release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          for ($attempt = 0; $attempt -lt 30; $attempt++) {
+            gh release view $env:GITHUB_REF_NAME --repo $env:GITHUB_REPOSITORY 2>$null
+            if ($LASTEXITCODE -eq 0) { break }
+            Start-Sleep -Seconds 10
+          }
+          if ($LASTEXITCODE -ne 0) { throw "The coordinated Debian release was not created" }
+          gh release upload $env:GITHUB_REF_NAME release/* --repo $env:GITHUB_REPOSITORY --clobber

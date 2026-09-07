@@ -1,13 +1,19 @@
 import hashlib
 import io
 import json
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
-from ip_analyser.updater import Update, check_for_update, download_update, version_key
 from ip_analyser import update_helper
+from ip_analyser.updater import (
+    Update,
+    check_for_update,
+    download_update,
+    launch_installer,
+    version_key,
+)
 
 
 class _Response(io.BytesIO):
@@ -39,7 +45,7 @@ class UpdaterTests(unittest.TestCase):
             "digest": f"sha256:{digest}",
         }]}
         urlopen.return_value = _Response(json.dumps(payload).encode())
-        update = check_for_update("0.5.0")
+        update = check_for_update("0.5.0", installer_kind="debian")
         self.assertEqual(update, Update("0.5.1", payload["assets"][0]["browser_download_url"],
                                         "advanced-ip-analyser_0.5.1_all.deb", digest))
 
@@ -66,13 +72,65 @@ class UpdaterTests(unittest.TestCase):
         }]}
         urlopen.return_value = _Response(json.dumps(payload).encode())
         with self.assertRaisesRegex(ValueError, "SHA-256"):
-            check_for_update("0.5.0")
+            check_for_update("0.5.0", installer_kind="debian")
 
     @patch("ip_analyser.updater.urllib.request.urlopen")
     def test_invalid_release_document_is_rejected(self, urlopen):
         urlopen.return_value = _Response(b"[]")
         with self.assertRaisesRegex(ValueError, "release record"):
-            check_for_update("0.5.0")
+            check_for_update("0.5.0", installer_kind="debian")
+
+    @patch("ip_analyser.updater.urllib.request.urlopen")
+    def test_latest_windows_installer_is_selected(self, urlopen):
+        digest = "b" * 64
+        name = "Advanced-IP-Analyser-Setup-0.5.1.exe"
+        url = f"https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v0.5.1/{name}"
+        urlopen.return_value = _Response(json.dumps({"tag_name": "v0.5.1", "assets": [{
+            "name": name, "browser_download_url": url, "digest": f"sha256:{digest}",
+        }]}).encode())
+        self.assertEqual(check_for_update("0.5.0", installer_kind="windows"),
+                         Update("0.5.1", url, name, digest, "windows"))
+
+    @patch("ip_analyser.updater.urllib.request.urlopen")
+    def test_windows_installer_requires_pe_header(self, urlopen):
+        content = b"not a PE installer"
+        urlopen.return_value = _Response(content)
+        name = "Advanced-IP-Analyser-Setup-0.5.1.exe"
+        update = Update(
+            "0.5.1",
+            f"https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v0.5.1/{name}",
+            name, hashlib.sha256(content).hexdigest(), "windows")
+        with tempfile.TemporaryDirectory() as directory, \
+                self.assertRaisesRegex(ValueError, "Windows executable"):
+            download_update(update, Path(directory))
+
+    @patch("ip_analyser.updater.subprocess.Popen")
+    def test_windows_installer_uses_silent_relaunch_arguments(self, popen):
+        with tempfile.TemporaryDirectory() as directory:
+            package = Path(directory) / "Advanced-IP-Analyser-Setup-0.5.1.exe"
+            package.write_bytes(b"MZ")
+            update = Update(
+                "0.5.1", "unused", package.name,
+                hashlib.sha256(package.read_bytes()).hexdigest(), "windows")
+            launch_installer(package, update)
+        command = popen.call_args.args[0]
+        self.assertEqual(command[0], str(package.resolve()))
+        self.assertIn("/VERYSILENT", command)
+        self.assertIn("/RESTARTAPPLICATIONS", command)
+        self.assertIn("/RELAUNCH=1", command)
+
+    @patch("ip_analyser.updater.subprocess.Popen")
+    def test_windows_installer_is_rehashed_immediately_before_launch(self, popen):
+        with tempfile.TemporaryDirectory() as directory:
+            package = Path(directory) / "Advanced-IP-Analyser-Setup-0.5.1.exe"
+            package.write_bytes(b"MZ original")
+            update = Update(
+                "0.5.1", "unused", package.name,
+                hashlib.sha256(package.read_bytes()).hexdigest(), "windows")
+            package.write_bytes(b"MZ replaced")
+            with self.assertRaisesRegex(ValueError, "final SHA-256"):
+                launch_installer(package, update)
+        popen.assert_not_called()
 
     @patch("ip_analyser.updater.subprocess.run")
     @patch("ip_analyser.updater.urllib.request.urlopen")

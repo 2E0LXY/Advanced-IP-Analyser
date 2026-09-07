@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ipaddress
+import os
 import re
 import shutil
 import socket
@@ -8,8 +9,8 @@ import subprocess
 import webbrowser
 from dataclasses import dataclass
 
-
 _SSH_USER = re.compile(r"[A-Za-z0-9._-]+")
+CREATE_NEW_CONSOLE = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
 
 
 def validate_ssh_username(username: str) -> str:
@@ -30,23 +31,53 @@ def wake(mac: str, broadcast: str = "255.255.255.255", port: int = 9) -> None:
 
 
 def open_service(service: str, host: str, port: int | None = None, username: str = "") -> None:
+    ipaddress.ip_address(host)
+    if port is not None and not 1 <= port <= 65_535:
+        raise ValueError("port must be between 1 and 65535")
     if service in {"http", "https", "ftp"}:
         url = service_url(service, host, port)
-        if shutil.which("xdg-open"):
+        if os.name == "nt":
+            if not webbrowser.open(url):
+                raise RuntimeError("Windows could not open the service URL")
+        elif shutil.which("xdg-open"):
             subprocess.Popen(["xdg-open", url])
         elif not webbrowser.open(url):
             raise RuntimeError("no desktop URL opener is available; install xdg-utils")
     elif service == "smb":
-        subprocess.Popen(["xdg-open", f"smb://{host}/"])
+        if os.name == "nt":
+            subprocess.Popen(["explorer.exe", f"\\\\{host}\\"])
+        else:
+            subprocess.Popen(["xdg-open", f"smb://{host}/"])
     elif service == "ssh":
         validate_ssh_username(username)
+        if os.name == "nt":
+            executable = shutil.which("ssh")
+            if not executable:
+                raise RuntimeError("install the Windows OpenSSH Client to open SSH services")
+            command = [executable]
+            if port and port != 22:
+                command.extend(["-p", str(port)])
+            command.append(f"{username}@{host}" if username else host)
+            subprocess.Popen(command, creationflags=CREATE_NEW_CONSOLE)
+            return
         command = ["x-terminal-emulator", "-e", "ssh"]
         if port and port != 22:
             command.extend(["-p", str(port)])
         subprocess.Popen([*command, "--", f"{username}@{host}" if username else host])
     elif service == "rdp":
-        subprocess.Popen(["xfreerdp3", f"/v:{host}:{port}" if port and port != 3389 else f"/v:{host}"])
+        if os.name == "nt":
+            subprocess.Popen(["mstsc.exe", f"/v:{host}:{port}" if port and port != 3389 else f"/v:{host}"])
+        else:
+            subprocess.Popen(["xfreerdp3", f"/v:{host}:{port}" if port and port != 3389 else f"/v:{host}"])
     elif service == "telnet":
+        if os.name == "nt":
+            client = shutil.which("telnet")
+            if not client:
+                raise RuntimeError("enable the Windows Telnet Client to open Telnet services")
+            subprocess.Popen(
+                ["cmd.exe", "/k", client, host, str(port or 23)],
+                creationflags=CREATE_NEW_CONSOLE)
+            return
         terminal = shutil.which("x-terminal-emulator")
         client = shutil.which("telnet")
         if not terminal or not client:
@@ -59,6 +90,16 @@ def open_service(service: str, host: str, port: int | None = None, username: str
 def open_network_tool(tool: str, host: str) -> None:
     """Launch a bounded diagnostic in a terminal without invoking a shell."""
     ipaddress.ip_address(host)
+    if os.name == "nt":
+        commands = {
+            "ping": ["ping.exe", "-n", "4", host],
+            "trace": ["tracert.exe", "-d", host],
+        }
+        command = commands.get(tool)
+        if not command:
+            raise ValueError("unsupported network tool")
+        subprocess.Popen(["cmd.exe", "/k", *command], creationflags=CREATE_NEW_CONSOLE)
+        return
     terminal = shutil.which("x-terminal-emulator")
     commands = {
         "ping": [shutil.which("ping"), "-c", "4", host],
@@ -98,7 +139,7 @@ def remote_power(host: str, action: str, user: str = "", timeout: int = 15) -> R
         result = subprocess.run(
             [executable, "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", "--",
              destination, *commands[action]],
-            capture_output=True, text=True, timeout=timeout)
+            capture_output=True, text=True, timeout=timeout, check=False)
     except subprocess.TimeoutExpired:
         return RemotePowerResult(host, action, False, "SSH command timed out")
     except OSError as error:

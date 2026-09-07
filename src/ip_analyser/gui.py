@@ -4,6 +4,7 @@ import getpass
 import ipaddress
 import queue
 import shutil
+import sys
 import threading
 import tkinter as tk
 from dataclasses import replace
@@ -390,14 +391,25 @@ class Application(tk.Tk):
         packet_button = ttk.Menubutton(actions, text="Packets ▾")
         packet_button.pack(side="left", padx=(8, 0))
         packet_menu = tk.Menu(packet_button, tearoff=False)
-        packet_menu.add_command(label="Network Security Monitor…", command=self.open_network_watch)
-        packet_menu.add_command(label="Passive Wi-Fi Watch…", command=self.open_wifi_watch)
+        linux_capture = sys.platform.startswith("linux")
+        packet_menu.add_command(
+            label=("Network Security Monitor…" if linux_capture else
+                   "Network Security Monitor — Debian 13 only"),
+            command=self.open_network_watch, state=("normal" if linux_capture else "disabled"))
+        packet_menu.add_command(
+            label=("Passive Wi-Fi Watch…" if linux_capture else
+                   "Passive Wi-Fi Watch — Debian 13 only"),
+            command=self.open_wifi_watch, state=("normal" if linux_capture else "disabled"))
         packet_menu.add_separator()
-        packet_menu.add_command(label="Capture selected host/service",
-                                command=self.capture_selected_packets)
+        packet_menu.add_command(
+            label=("Capture selected host/service" if linux_capture else
+                   "Live packet capture — Debian 13 only"),
+            command=self.capture_selected_packets,
+            state=("normal" if linux_capture else "disabled"))
         packet_menu.add_command(label="Open capture file for selection…",
                                 command=self.open_packet_capture)
-        packet_menu.add_command(label="Show capture interfaces", command=self.show_capture_interfaces)
+        packet_menu.add_command(label="Show capture interfaces", command=self.show_capture_interfaces,
+                                state=("normal" if linux_capture else "disabled"))
         packet_button.configure(menu=packet_menu)
         ttk.Label(actions, text="Export uses selected rows when any are selected.").pack(side="right")
 
@@ -917,7 +929,7 @@ class Application(tk.Tk):
         add_tab("AI settings",
                 "AI Settings supports OpenAI, Gemini, and OpenRouter with a separate key for each provider. "
                 "Refresh models securely retrieves the live text-generation choices available to that key from the supplier's own API. "
-                "Non-secret preferences are saved in ~/.config/advanced-ip-analyser/ai-settings.json; Debian's Secret Service keyring stores the keys through secret-tool.\n\n"
+                "Non-secret preferences are saved locally; Debian Secret Service or Windows Credential Manager stores the provider keys.\n\n"
                 "AI analysis builds a bounded evidence payload for classification, changes, exposure priorities, unknown services, rogue-infrastructure indicators, topology, natural-language search, defensive drafts, or capacity review. "
                 "The exact outbound JSON is shown first. Identifiers are excluded by default, sensitive fields are removed, raw packet payloads are never included, and the request requires explicit approval. "
                 "Results are advisory and cannot start scans, run privileged helpers, execute remote actions, or apply generated rules.")
@@ -983,11 +995,15 @@ class Application(tk.Tk):
         update = self.available_update
         if not update:
             return
+        installer_note = (
+            "The application will close and the Windows installer will replace it, "
+            if update.installer_kind == "windows" else
+            "The application will close, Debian will request administrator authorization, "
+        )
         if not messagebox.askyesno(
                 "Install update",
                 f"Download and install Advanced IP Analyser v{update.version}?\n\n"
-                "The application will close, Debian will request administrator authorization, "
-                "and the updated version will reopen automatically."):
+                f"{installer_note}and the updated version will reopen automatically."):
             return
         self.update_button.configure(state="disabled", text=f"Downloading v{update.version}…")
         self.status.configure(text=f"Downloading verified update v{update.version}…")

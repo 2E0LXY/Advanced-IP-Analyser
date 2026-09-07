@@ -2,7 +2,14 @@ import subprocess
 import unittest
 from unittest.mock import patch
 
-from ip_analyser.actions import open_network_tool, open_service, preferred_web_service, remote_power, service_url
+from ip_analyser.actions import (
+    CREATE_NEW_CONSOLE,
+    open_network_tool,
+    open_service,
+    preferred_web_service,
+    remote_power,
+    service_url,
+)
 
 
 class WebActionTests(unittest.TestCase):
@@ -20,6 +27,7 @@ class WebActionTests(unittest.TestCase):
         self.assertEqual(service_url("https", "2001:db8::1", 8443), "https://[2001:db8::1]:8443")
 
     @patch("ip_analyser.actions.subprocess.Popen")
+    @patch("ip_analyser.actions.os.name", "posix")
     def test_ssh_opener_uses_selected_username_and_port(self, popen):
         open_service("ssh", "192.0.2.20", 2222, username="network-admin")
         popen.assert_called_once_with(
@@ -28,6 +36,12 @@ class WebActionTests(unittest.TestCase):
     def test_ssh_username_rejects_command_options(self):
         with self.assertRaises(ValueError):
             open_service("ssh", "192.0.2.20", username="-oProxyCommand=bad")
+
+    def test_service_opener_rejects_untrusted_host_and_port(self):
+        with self.assertRaises(ValueError):
+            open_service("ssh", "host & calc.exe")
+        with self.assertRaises(ValueError):
+            open_service("rdp", "192.0.2.20", 70_000)
 
     @patch("ip_analyser.actions.shutil.which", return_value="/usr/bin/ssh")
     @patch("ip_analyser.actions.subprocess.run")
@@ -56,8 +70,26 @@ class WebActionTests(unittest.TestCase):
 
     @patch("ip_analyser.actions.subprocess.Popen")
     @patch("ip_analyser.actions.shutil.which")
+    @patch("ip_analyser.actions.os.name", "posix")
     def test_ping_tool_uses_fixed_argument_vector(self, which, popen):
         which.side_effect = lambda name: f"/usr/bin/{name}"
         open_network_tool("ping", "192.0.2.20")
         popen.assert_called_once_with(
             ["/usr/bin/x-terminal-emulator", "-e", "/usr/bin/ping", "-c", "4", "192.0.2.20"])
+
+    @patch("ip_analyser.actions.subprocess.Popen")
+    @patch("ip_analyser.actions.os.name", "nt")
+    def test_windows_trace_uses_fixed_argument_vector(self, popen):
+        open_network_tool("trace", "192.0.2.20")
+        popen.assert_called_once_with(
+            ["cmd.exe", "/k", "tracert.exe", "-d", "192.0.2.20"],
+            creationflags=CREATE_NEW_CONSOLE)
+
+    @patch("ip_analyser.actions.subprocess.Popen")
+    @patch("ip_analyser.actions.shutil.which", return_value=r"C:\Windows\System32\telnet.exe")
+    @patch("ip_analyser.actions.os.name", "nt")
+    def test_windows_telnet_uses_validated_fixed_arguments(self, _which, popen):
+        open_service("telnet", "192.0.2.20", 2323)
+        popen.assert_called_once_with(
+            ["cmd.exe", "/k", r"C:\Windows\System32\telnet.exe", "192.0.2.20", "2323"],
+            creationflags=CREATE_NEW_CONSOLE)
