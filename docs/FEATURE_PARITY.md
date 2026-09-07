@@ -18,7 +18,7 @@ an independent GPL implementation and is not affiliated with Famatech.
 | Performance controls | Fast, Balanced, and Accurate profiles plus explicit timeout, worker, and port controls |
 | Automatic updates | Detects newer GitHub tags, flashes the Update button, requires the GitHub SHA-256 digest, validates package identity, requests PolicyKit authorization, and restarts |
 | Packet capture and analysis | Built-in Linux interface discovery, bounded selected-host/service capture, PCAP/PCAPNG reading, Wireshark-style display filters, protocol summaries, and byte previews; no Wireshark dependency |
-| Monitoring over time | Network Watch timelines, conversations, devices, DNS, TCP health estimates, baselines, findings, alert rules, reports, bookmarks, retention, and local history |
+| Monitoring over time | Network Security Monitor timelines, all observed ports and directions, conversations, devices, DNS, TCP health estimates, baselines, colour-coded findings, alert rules, reports, bookmarks, retention, and local history |
 | Passive wireless discovery | Compatible monitor-mode adapters can observe access points, security advertisements, clients, probe requests, signal, and EAPOL presence; disruptive and password-attack functions are deliberately excluded |
 
 ## Lansweeper free IP scanner comparison

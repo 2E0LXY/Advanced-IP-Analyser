@@ -89,8 +89,10 @@ for the Debian desktop interface, saved devices, service launchers,
 Wake-on-LAN, SSH power actions, and automatic updates.
 The built-in Linux packet engine creates bounded live captures for selected
 hosts and services and inspects Ethernet PCAP, PCAPNG, and compressed capture files.
-Network Watch records bounded traffic over time, stores session history, and reports
-flows, devices, DNS activity, TCP health, baselines, findings, and user alert rules.
+The Network Security Monitor records bounded traffic visible to the selected
+interface across all ports and both directions. It stores session history and
+reports flows, devices, DNS activity, TCP health, baselines, colour-coded findings,
+and user alert rules. It reports cautious indicators and does not block traffic.
 The passive Wi-Fi window can observe access points and clients with a compatible
 monitor-mode adapter; it never transmits deauthentication or injected frames.
 The Web Security Audit performs an explicitly authorized, same-host, bounded,
@@ -121,7 +123,7 @@ stores non-secret provider and model preferences. API keys remain in Secret Serv
 stores bounded completed-scan snapshots and change evidence.
 .br
 .I ~/.local/share/advanced-ip-analyser/network-watch.sqlite3
-stores Network Watch history.
+stores Network Security Monitor history.
 .SH SEE ALSO
 .BR ping (8),
 .BR tracepath (8),

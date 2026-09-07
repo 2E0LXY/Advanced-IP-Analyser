@@ -10,7 +10,7 @@ Licensed GPL-3.0-or-later
 
 This book explains how to install, operate, update, troubleshoot, and safely
 administer Advanced IP Analyser. It covers the graphical application, CLI,
-packet display filters, Network Watch, and Passive Wi-Fi Watch.
+packet display filters, the Network Security Monitor, and Passive Wi-Fi Watch.
 
 Advanced IP Analyser is intended only for networks, devices, and radio traffic
 you own or are explicitly authorized to inspect. The software does not grant
@@ -49,7 +49,7 @@ service, disconnect Wi-Fi clients, inject frames, or recover passwords.
 - `gvfs-backends` for SMB browsing.
 - `iputils-tracepath` and `telnet` for those diagnostic launchers.
 - Debian IEEE or Nmap vendor data for offline MAC manufacturer names.
-- `notify-send` for Network Watch desktop alerts.
+- `notify-send` for Network Security Monitor desktop alerts.
 
 ## 3. Install and remove
 
@@ -125,7 +125,7 @@ Results are hypotheses and explanations, not autonomous actions or proof of
 compromise. Generated rules are never executed by the application.
 
 When available, the preview also includes a bounded summary of the latest
-Network Watch session: device/peer activity, conversations, DNS observations,
+Network Security Monitor session: device/peer activity, conversations, DNS observations,
 TCP diagnostics, and findings such as multiple DHCP responders. It never adds
 raw packet payloads. The exact combined payload remains visible before consent.
 
@@ -338,11 +338,14 @@ backreferences, groups, counted repetition, and heavy repetition are rejected.
 The Quick filters menu provides 20 presets. Use **Save filter** to persist a
 validated named expression.
 
-## 12. Network Watch
+## 12. Network Security Monitor
 
-![Network Watch dashboard](images/network-watch-dashboard.png)
+![Network Security Monitor dashboard](images/network-watch-dashboard.png)
 
-Open **Packets → Network Watch**, choose an interface, duration, and detail:
+Open **Packets → Network Security Monitor**. Select `any` to observe every
+available interface or choose a specific interface. The monitor applies no port
+or direction filter, so it analyses every inbound and outbound packet visible to
+the selected Linux capture interface. Choose a duration and detail:
 
 - Headers only: 128 bytes per packet; recommended.
 - Protocol details: 512 bytes per packet.
@@ -365,7 +368,7 @@ active and views refresh from the growing PCAP.
 
 ### TCP health
 
-Network Watch estimates resets, zero advertised windows, retransmissions,
+The Network Security Monitor estimates resets, zero advertised windows, retransmissions,
 out-of-order sequences, unanswered SYNs, and SYN-to-SYN/ACK handshake time.
 Offloading, truncation, asymmetrical routing, or incomplete capture can affect
 these estimates; use them as investigative leads.
@@ -373,8 +376,12 @@ these estimates; use them as investigative leads.
 ### Findings and rules
 
 Built-in findings include new saved-device baseline addresses, connection fan-out,
-large traffic increases, repeated DNS failure, resets, retransmissions, unanswered
-connections, ARP ownership changes, and unusually regular timing.
+port-scan patterns, connection attempts from public addresses, large outbound
+transfers, uncommon outbound ports, clear-text FTP/Telnet/POP3/IMAP, long or
+high-variety DNS activity, large traffic increases, repeated DNS failures, resets,
+retransmissions, unanswered connections, ARP ownership changes, multiple DHCP
+responders, and unusually regular timing. Alerts, warnings, and notices are
+colour-coded for rapid review.
 
 Use **Alert rules** to add:
 
@@ -391,10 +398,15 @@ Rules are bounded and stored atomically. Enable **Desktop alerts** to use
 ### Reports, bookmarks, retention
 
 Save HTML, JSON, or conversation CSV reports. **Bookmark recording** copies the
-PCAP and a bounded note to a protected bookmark directory. Ordinary Network Watch
+PCAP and a bounded note to a protected bookmark directory. Ordinary Network Security Monitor
 captures and database history use seven-day retention; ordinary captures are also
 limited to 250 MiB, deleting oldest first. The recording being finalized and
 bookmarks are protected.
+
+The monitor is not an intrusion-prevention system and never blocks traffic.
+Findings are cautious indicators, not proof of compromise. Visibility depends on
+interface selection and network topology, sessions stop at 100,000 packets, and
+encrypted application content remains encrypted.
 
 ## 13. Passive Wi-Fi Watch
 
@@ -533,12 +545,12 @@ advanced-ip-analyser web-audit https://server.example \
 | --- | --- |
 | `~/.config/advanced-ip-analyser/favorites.json` | Favorites and notes |
 | `~/.config/advanced-ip-analyser/packet-filters.json` | Named display filters |
-| `~/.config/advanced-ip-analyser/alert-rules.json` | Network Watch rules |
+| `~/.config/advanced-ip-analyser/alert-rules.json` | Network Security Monitor rules |
 | `~/.config/advanced-ip-analyser/ai-settings.json` | Provider/model preferences and request limit; no API keys |
 | `~/.cache/advanced-ip-analyser/` | Short-lived selected-host captures and update downloads |
 | `~/.local/share/advanced-ip-analyser/network-watch.sqlite3` | Session history and baselines |
 | `~/.local/share/advanced-ip-analyser/scan-history.sqlite3` | Completed scan snapshots and change evidence |
-| `~/.local/share/advanced-ip-analyser/captures/` | Ordinary Network Watch PCAP |
+| `~/.local/share/advanced-ip-analyser/captures/` | Ordinary Network Security Monitor PCAP |
 | `~/.local/share/advanced-ip-analyser/bookmarks/` | Bookmarked PCAP and note JSON |
 | `~/.local/share/advanced-ip-analyser/wifi-captures/` | Passive Wi-Fi PCAP |
 
@@ -631,7 +643,7 @@ protocol/cipher inventory; validation failures are shown as High findings.
   scope, bound pages/depth/bytes, and never submit forms or send exploit payloads.
 - Update packages require both cryptographic digest and Debian identity checks.
 
-Network Watch findings and Passive Wi-Fi security labels are observations. They
+Network Security Monitor findings and Passive Wi-Fi security labels are observations. They
 can be affected by partial visibility and should be confirmed with configuration,
 logs, and authorized specialist tools before action.
 

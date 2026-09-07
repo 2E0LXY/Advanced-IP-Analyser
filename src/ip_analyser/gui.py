@@ -1,37 +1,73 @@
 from __future__ import annotations
 
+import getpass
+import ipaddress
 import queue
+import shutil
 import threading
 import tkinter as tk
-import ipaddress
-import getpass
-import shutil
 from dataclasses import replace
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from . import __version__
-from .actions import open_network_tool, open_service, preferred_web_service, remote_power, service_url, wake
+from .actions import (
+    open_network_tool,
+    open_service,
+    preferred_web_service,
+    remote_power,
+    service_url,
+    wake,
+)
 from .ai_analysis import ANALYSIS_MODES, SYSTEM_INSTRUCTION, build_analysis_preview
 from .ai_providers import AIProviderError, generate_text, list_models
-from .ai_settings import (AISettings, PROVIDERS, SecretStoreError, clear_api_key,
-                          load_ai_settings, load_api_key,
-                          save_ai_settings, save_api_key)
+from .ai_settings import (
+    PROVIDERS,
+    AISettings,
+    SecretStoreError,
+    clear_api_key,
+    load_ai_settings,
+    load_api_key,
+    save_ai_settings,
+    save_api_key,
+)
 from .config import parse_ports
 from .models import Host
-from .network import active_ipv4_networks, broadcasts_for_host, current_ipv4_subnet, ipv4_24_target
-from .packet_tools import (PacketRecord, capture_live, list_capture_interfaces,
-                           packet_hex_preview, read_capture, validate_interface)
-from .packet_filters import (FilterSyntaxError, QUICK_FILTERS, compile_filter,
-                             load_saved_filters, save_saved_filters)
-from .scanner import DEFAULT_PORTS, Scanner
+from .network import (
+    active_ipv4_networks,
+    broadcasts_for_host,
+    current_ipv4_subnet,
+    ipv4_24_target,
+)
+from .packet_filters import (
+    QUICK_FILTERS,
+    FilterSyntaxError,
+    compile_filter,
+    load_saved_filters,
+    save_saved_filters,
+)
+from .packet_tools import (
+    PacketRecord,
+    capture_live,
+    list_capture_interfaces,
+    packet_hex_preview,
+    read_capture,
+    validate_interface,
+)
 from .scan_history import latest_evidence, latest_network_watch_evidence, record_scan
-from .storage import export, import_inventory, load_favorites, merge_devices, save_favorites
+from .scanner import DEFAULT_PORTS, Scanner
+from .storage import (
+    export,
+    import_inventory,
+    load_favorites,
+    merge_devices,
+    save_favorites,
+)
 from .targets import parse_targets
 from .updater import Update, check_for_update, download_update, launch_installer
 from .watch_gui import NetworkWatch
-from .wifi_gui import WifiWatch
 from .web_gui import WebSecurityAudit
+from .wifi_gui import WifiWatch
 
 OPENABLE_SERVICES = {"http", "https", "ftp", "smb", "ssh", "rdp", "telnet"}
 COMMON_PORTS = ",".join(str(port) for port in DEFAULT_PORTS)
@@ -40,7 +76,7 @@ GUI_PACKET_LIMIT = 20_000
 
 
 class PacketViewer(tk.Toplevel):
-    def __init__(self, parent: "Application", capture: Path, records: list[PacketRecord]):
+    def __init__(self, parent: Application, capture: Path, records: list[PacketRecord]):
         super().__init__(parent)
         self.capture = capture
         self.records = records
@@ -354,7 +390,7 @@ class Application(tk.Tk):
         packet_button = ttk.Menubutton(actions, text="Packets ▾")
         packet_button.pack(side="left", padx=(8, 0))
         packet_menu = tk.Menu(packet_button, tearoff=False)
-        packet_menu.add_command(label="Network Watch…", command=self.open_network_watch)
+        packet_menu.add_command(label="Network Security Monitor…", command=self.open_network_watch)
         packet_menu.add_command(label="Passive Wi-Fi Watch…", command=self.open_wifi_watch)
         packet_menu.add_separator()
         packet_menu.add_command(label="Capture selected host/service",
@@ -695,7 +731,7 @@ class Application(tk.Tk):
         ttk.Label(
             content,
             text=("• Explain selected ports, services, and configuration findings\n"
-                  "• Summarize a scan or Network Watch session after a preview and confirmation\n"
+                  "• Summarize a scan or Network Security Monitor session after a preview and confirmation\n"
                   "• Suggest display filters from plain language, then validate them locally\n"
                   "• Draft a redacted troubleshooting, topology, or inventory report\n"
                   "• Prioritize evidence-backed anomalies and defensive remediation drafts\n\n"
@@ -867,12 +903,12 @@ class Application(tk.Tk):
                 "The display-filter bar supports IP addresses and CIDRs, TCP/UDP ports, DNS, HTTP, TLS, ICMP, ARP, TCP flags, frame length, comparisons, text matching, AND (&&), OR (||), NOT (!), and parentheses. "
                 "Quick filters provide 20 common starting points and named filters can be saved. These filters change only the displayed rows, never the recording.\n\n"
                 "Capture only traffic you are authorized to inspect. Encrypted payloads remain encrypted and this tool does not bypass authentication or encryption.")
-        add_tab("Network Watch",
-                "Packets → Network Watch opens continuous, time-based analysis. Start with Headers only unless complete payload retention is specifically required. "
+        add_tab("Network Security Monitor",
+                "Packets → Network Security Monitor opens continuous, time-based analysis across all observed ports and both traffic directions. Start with Headers only unless complete payload retention is specifically required. "
                 "The dashboard shows traffic over time, devices, bidirectional conversations, DNS activity, protocol/service usage, TCP health, explainable findings, and saved session history.\n\n"
-                "Findings highlight new devices, connection fan-out, traffic increases, DNS failures, resets, retransmissions, unanswered connections, and unusually regular timing. "
+                "Colour-coded findings highlight port scans, public inbound attempts, unusual outbound traffic, clear-text remote protocols, DNS anomalies, new devices, connection fan-out, traffic increases, resets, retransmissions, unanswered connections, and unusually regular timing. "
                 "Alert rules can watch traffic thresholds, destinations, ports, domain text, failed connections, or new devices. Reports export to HTML, JSON, or CSV.\n\n"
-                "Recordings and analysis remain local. Old unbookmarked watch captures are limited by age and storage; bookmarked recordings are retained. Encrypted content is never decrypted.")
+                "Recordings and analysis remain local. Old unbookmarked watch captures are limited by age and storage; bookmarked recordings are retained. Findings are indicators rather than proof of compromise, traffic is not blocked, and encrypted content is never decrypted.")
         add_tab("Passive Wi-Fi Watch",
                 "Packets → Passive Wi-Fi Watch discovers nearby access points and observed clients using a compatible Linux wireless adapter. "
                 "It shows network name, BSSID, channel, approximate signal, security type, beacon/data counts, client addresses, probe names, and whether WPA authentication traffic was observed.\n\n"

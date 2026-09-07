@@ -211,7 +211,7 @@ def start_monitor_capture(interface: str = "any", duration: int = 3_600,
                 helper_stat.st_mode & (stat.S_IWGRP | stat.S_IWOTH)):
             output.unlink(missing_ok=True)
             raise RuntimeError(
-                "Network Watch authorization requires the installed Debian package")
+                "Network Security Monitor authorization requires the installed Debian package")
         pkexec = shutil.which("pkexec")
         if not pkexec:
             output.unlink(missing_ok=True)

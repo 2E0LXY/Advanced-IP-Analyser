@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.2.0 - 2026-09-05
+## 2.2.0 - 2026-09-07
 
 - Add provider-isolated OpenAI, Gemini, and OpenRouter keyring settings.
 - Retrieve live text-generation model choices with each supplier's native API.
@@ -11,6 +11,9 @@
 - Require verified TLS for web-audit requests, strip every custom cross-origin header, and bound link queues.
 - Bound PCAPNG blocks, interfaces, and sections; harden monitoring-file permissions and CLI retention.
 - Gate tagged publishing on trusted-default-branch ancestry and protected GitHub environments.
+- Expand Network Watch into a bidirectional, all-port Network Security Monitor with
+  colour-coded scan, inbound-attempt, outbound-transfer, uncommon-port,
+  clear-text-protocol, and DNS-anomaly indicators.
 - Add AI-provider, privacy, history, model parsing, and adaptive-throttle tests.
 
 ## 2.1.2 - 2026-09-04

@@ -21,6 +21,15 @@ from .packet_tools import PacketRecord
 MAX_MONITOR_RECORDS = 100_000
 MAX_RULES = 256
 MAX_REPORT_ITEMS = 10_000
+PORT_SCAN_UNIQUE_TARGETS = 20
+INBOUND_ATTEMPT_TARGETS = 3
+LARGE_OUTBOUND_BYTES = 50 * 1024 * 1024
+SUSPICIOUS_DNS_LENGTH = 100
+SUSPICIOUS_DNS_LABEL_LENGTH = 50
+SUSPICIOUS_DNS_COUNT = 3
+HIGH_DNS_VARIETY = 50
+UNCOMMON_OUTBOUND_PORTS = {4444, 5555, 6667, 31337}
+CLEARTEXT_REMOTE_PORTS = {21: "FTP", 23: "Telnet", 110: "POP3", 143: "IMAP"}
 
 
 def _secure_private_path(path: Path, *, directory: bool = False) -> None:
@@ -368,6 +377,11 @@ class MonitorAnalyzer:
         protocols: Counter = Counter()
         services: Counter = Counter()
         arp_owners: dict[str, set[str]] = defaultdict(set)
+        syn_attempts: dict[str, set[tuple[str, int]]] = defaultdict(set)
+        inbound_attempts: dict[str, set[tuple[str, int]]] = defaultdict(set)
+        external_bytes_sent: Counter = Counter()
+        uncommon_outbound: Counter = Counter()
+        cleartext_outbound: set[tuple[str, str, int]] = set()
         for record in records:
             protocols[record.protocol] += 1
             owner = _arp_owner(record)
@@ -404,6 +418,23 @@ class MonitorAnalyzer:
                 direction = "b"
             metadata = _packet_metadata(record)
             flags = metadata["flags"]
+            try:
+                source_ip = ipaddress.ip_address(record.source)
+                destination_ip = ipaddress.ip_address(record.destination)
+            except ValueError:
+                source_ip = destination_ip = None
+            if source_ip is not None and destination_ip is not None:
+                destination_port = record.destination_port or 0
+                if record.protocol == "TCP" and flags & 0x02 and not flags & 0x10:
+                    syn_attempts[record.source].add((record.destination, destination_port))
+                    if source_ip.is_global and destination_ip.is_private:
+                        inbound_attempts[record.destination].add((record.source, destination_port))
+                if source_ip.is_private and destination_ip.is_global:
+                    external_bytes_sent[record.source] += max(0, record.length)
+                    if destination_port in UNCOMMON_OUTBOUND_PORTS:
+                        uncommon_outbound[(record.source, record.destination, destination_port)] += 1
+                    if destination_port in CLEARTEXT_REMOTE_PORTS:
+                        cleartext_outbound.add((record.source, record.destination, destination_port))
             if flags & 0x04:
                 flow.resets += 1
             if flags & 0x02:
@@ -468,8 +499,10 @@ class MonitorAnalyzer:
                     pass
             if dns_event and dns_event.device in devices:
                 devices[dns_event.device].dns_names.add(dns_event.name)
-        findings = self._findings(list(flows.values()), list(devices.values()),
-                                  dns_events, arp_owners, dhcp_servers)
+        findings = self._findings(
+            list(flows.values()), list(devices.values()), dns_events, arp_owners, dhcp_servers,
+            syn_attempts, inbound_attempts, external_bytes_sent, uncommon_outbound,
+            cleartext_outbound)
         return Analysis(min(record.timestamp for record in records),
                         max(record.timestamp for record in records),
                         len(records), sum(max(0, record.length) for record in records),
@@ -480,7 +513,12 @@ class MonitorAnalyzer:
 
     def _findings(self, flows: list[Flow], devices: list[DeviceActivity],
                   dns: list[DnsEvent], arp_owners: dict[str, set[str]],
-                  dhcp_servers: set[str]) -> list[Finding]:
+                  dhcp_servers: set[str],
+                  syn_attempts: dict[str, set[tuple[str, int]]],
+                  inbound_attempts: dict[str, set[tuple[str, int]]],
+                  external_bytes_sent: Counter,
+                  uncommon_outbound: Counter,
+                  cleartext_outbound: set[tuple[str, str, int]]) -> list[Finding]:
         findings: list[Finding] = []
         now = max((device.last_seen for device in devices), default=time.time())
         dns_failures = Counter(event.device for event in dns if event.response and event.rcode)
@@ -495,6 +533,60 @@ class MonitorAnalyzer:
                 findings.append(Finding(now, "alert", "ARP ownership changed", address,
                                         f"Observed {len(owners)} MAC addresses claiming this IPv4 address: "
                                         + ", ".join(sorted(owners))))
+        for source, targets in syn_attempts.items():
+            ports = {port for _address, port in targets if port}
+            hosts = {address for address, _port in targets}
+            if len(ports) >= PORT_SCAN_UNIQUE_TARGETS or len(hosts) >= PORT_SCAN_UNIQUE_TARGETS:
+                findings.append(Finding(
+                    now, "alert", "Port-scan pattern", source,
+                    f"Observed TCP connection starts to {len(hosts)} host(s) across {len(ports)} "
+                    "destination port(s). Inventory tools can cause this pattern; verify the source."))
+        for destination, attempts in inbound_attempts.items():
+            if len(attempts) >= INBOUND_ATTEMPT_TARGETS:
+                sources = {source for source, _port in attempts}
+                ports = {port for _source, port in attempts if port}
+                findings.append(Finding(
+                    now, "warning", "Inbound connection attempts", destination,
+                    f"Observed new TCP connection attempts from {len(sources)} public source(s) "
+                    f"to {len(ports)} local port(s). This is an indicator, not proof of a breach."))
+        for source, byte_count in external_bytes_sent.items():
+            if byte_count >= LARGE_OUTBOUND_BYTES:
+                findings.append(Finding(
+                    now, "warning", "Large outbound transfer", source,
+                    f"Observed approximately {byte_count:,} bytes sent toward public addresses in "
+                    "this bounded capture. Confirm the transfer is expected."))
+        for (source, destination, port), packets in uncommon_outbound.items():
+            if packets >= 3:
+                findings.append(Finding(
+                    now, "warning", "Uncommon outbound port", source,
+                    f"Observed {packets} packets to {destination}:{port}. Legitimate software may "
+                    "use this port; verify the owning process and destination."))
+        for source, destination, port in sorted(cleartext_outbound):
+            findings.append(Finding(
+                now, "notice", "Cleartext remote protocol", source,
+                f"Observed outbound {CLEARTEXT_REMOTE_PORTS[port]} traffic to {destination}:{port}. "
+                "Credentials or content may be exposed; prefer an encrypted alternative."))
+        suspicious_dns = Counter(
+            event.device for event in dns
+            if not event.response and (len(event.name) >= SUSPICIOUS_DNS_LENGTH or
+                                       max((len(label) for label in event.name.split(".")), default=0)
+                                       >= SUSPICIOUS_DNS_LABEL_LENGTH))
+        dns_variety: dict[str, set[str]] = defaultdict(set)
+        for event in dns:
+            if not event.response:
+                dns_variety[event.device].add(event.name)
+        for device, count in suspicious_dns.items():
+            if count >= SUSPICIOUS_DNS_COUNT:
+                findings.append(Finding(
+                    now, "warning", "Long DNS query pattern", device,
+                    f"Observed {count} unusually long DNS queries. CDNs and security tools can be "
+                    "legitimate causes; review query names for tunnelling or encoded data."))
+        for device, names in dns_variety.items():
+            if len(names) >= HIGH_DNS_VARIETY:
+                findings.append(Finding(
+                    now, "notice", "High DNS-name variety", device,
+                    f"Queried {len(names)} distinct names during this session. Compare with the "
+                    "device baseline and expected workload."))
         for device in devices:
             total = device.bytes_sent + device.bytes_received
             if self.known_devices and device.address not in self.known_devices:
@@ -566,7 +658,7 @@ class MonitorStore:
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         _secure_private_path(self.path.parent, directory=True)
         if self.path.is_symlink():
-            raise ValueError("Network Watch database must not be a symbolic link")
+            raise ValueError("Network Security Monitor database must not be a symbolic link")
         self.connection = sqlite3.connect(self.path)
         _secure_private_path(self.path)
         self.connection.execute("PRAGMA journal_mode=WAL")
@@ -764,8 +856,8 @@ def export_analysis(path: Path, analysis: Analysis) -> None:
                        (flow.endpoint_a, flow.port_a or "", flow.endpoint_b, flow.port_b or "",
                         flow.protocol, flow.packets, flow.bytes, f"{flow.duration:.1f}s")) + "</tr>"
                        for flow in analysis.flows[:MAX_REPORT_ITEMS])
-        path.write_text("<!doctype html><meta charset=utf-8><title>Network Watch report</title>"
-                        "<h1>Network Watch report</h1>"
+        path.write_text("<!doctype html><meta charset=utf-8><title>Network Security Monitor report</title>"
+                        "<h1>Network Security Monitor report</h1>"
                         f"<p>{analysis.packet_count:,} packets · {analysis.byte_count:,} bytes · "
                         f"{analysis.duration:.1f} seconds</p><h2>Findings</h2><ul>{findings}</ul>"
                         "<h2>Conversations</h2><table><thead><tr><th>Endpoint A</th><th>Port A</th>"
