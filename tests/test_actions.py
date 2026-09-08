@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from ip_analyser.actions import (
     CREATE_NEW_CONSOLE,
+    CREATE_NO_WINDOW,
     open_network_tool,
     open_service,
     preferred_web_service,
@@ -53,6 +54,14 @@ class WebActionTests(unittest.TestCase):
         self.assertEqual(command[-6:], ["admin@192.0.2.5", "sudo", "-n", "shutdown", "-r", "+1"])
         self.assertIn("BatchMode=yes", command)
         self.assertEqual(command[-7], "--")
+
+    @patch("ip_analyser.actions.os.name", "nt")
+    @patch("ip_analyser.actions.shutil.which", return_value=r"C:\Windows\System32\OpenSSH\ssh.exe")
+    @patch("ip_analyser.actions.subprocess.run")
+    def test_windows_remote_power_captures_ssh_without_console(self, run, _which):
+        run.return_value = subprocess.CompletedProcess([], 0, "", "")
+        self.assertTrue(remote_power("192.0.2.5", "reboot", "admin").succeeded)
+        self.assertEqual(run.call_args.kwargs["creationflags"], CREATE_NO_WINDOW)
 
     @patch("ip_analyser.actions.shutil.which", return_value="/usr/bin/ssh")
     def test_remote_power_rejects_ssh_option_in_username(self, _which):

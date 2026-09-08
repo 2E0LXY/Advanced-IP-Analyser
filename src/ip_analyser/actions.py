@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 _SSH_USER = re.compile(r"[A-Za-z0-9._-]+")
 CREATE_NEW_CONSOLE = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
+CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
 def validate_ssh_username(username: str) -> str:
@@ -139,7 +140,8 @@ def remote_power(host: str, action: str, user: str = "", timeout: int = 15) -> R
         result = subprocess.run(
             [executable, "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", "--",
              destination, *commands[action]],
-            capture_output=True, text=True, timeout=timeout, check=False)
+            capture_output=True, text=True, timeout=timeout, check=False,
+            creationflags=(CREATE_NO_WINDOW if os.name == "nt" else 0))
     except subprocess.TimeoutExpired:
         return RemotePowerResult(host, action, False, "SSH command timed out")
     except OSError as error:

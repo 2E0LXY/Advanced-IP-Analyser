@@ -3,6 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from ip_analyser.network import (
+    CREATE_NO_WINDOW,
     active_ipv4_networks,
     broadcasts_for_host,
     current_ipv4_subnet,
@@ -43,6 +44,7 @@ class NetworkTests(unittest.TestCase):
             '{"InterfaceAlias":"Ethernet","IPAddress":"192.168.50.12","PrefixLength":24}')
         self.assertEqual(active_ipv4_networks(), [
             ("Ethernet", "192.168.50.0/24", "192.168.50.255")])
+        self.assertEqual(run.call_args.kwargs["creationflags"], CREATE_NO_WINDOW)
 
     def test_ipv4_24_shortcut(self):
         self.assertEqual(ipv4_24_target("192.168.42.17"), "192.168.42.0/24")

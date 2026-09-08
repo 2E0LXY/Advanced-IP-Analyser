@@ -27,6 +27,7 @@ DEFAULT_PORTS = {
     8080: "http", 8081: "http", 8443: "https", 8888: "http", 9000: "http",
     9090: "http", 9100: "printer", 9200: "elasticsearch", 27017: "mongodb",
 }
+CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
 class Scanner:
@@ -65,22 +66,35 @@ class Scanner:
         return self.discover_all(results, discovery_progress, cancel) if discover_services else results
 
     def inspect(self, address: str) -> Host:
-        started = time.monotonic()
+        connection_latencies: list[float] = []
         if len(self.ports) <= 1024:
-            open_ports = [(port, name) for port, name in self.ports.items() if self._port_open(address, port)]
+            open_ports = []
+            for port, name in self.ports.items():
+                opened, elapsed = self._timed_port_open(address, port)
+                if opened:
+                    open_ports.append((port, name))
+                    connection_latencies.append(elapsed)
         else:
             open_ports = []
             port_items = list(self.ports.items())
             with concurrent.futures.ThreadPoolExecutor(max_workers=min(128, max(8, self.workers))) as pool:
                 for start in range(0, len(port_items), 2048):
-                    checks = {pool.submit(self._port_open, address, port): (port, name)
+                    checks = {pool.submit(self._timed_port_open, address, port): (port, name)
                               for port, name in port_items[start:start + 2048]}
-                    open_ports.extend(checks[future] for future in concurrent.futures.as_completed(checks)
-                                      if future.result())
+                    for future in concurrent.futures.as_completed(checks):
+                        opened, elapsed = future.result()
+                        if opened:
+                            open_ports.append(checks[future])
+                            connection_latencies.append(elapsed)
             open_ports.sort()
         services = [name for _port, name in open_ports]
-        reachable = bool(services) or self._ping(address)
-        latency = round((time.monotonic() - started) * 1000, 1) if reachable else None
+        reachable = bool(services)
+        latency = min(connection_latencies, default=None)
+        if not reachable:
+            ping_started = time.monotonic()
+            reachable = self._ping(address)
+            if reachable:
+                latency = max(0.1, round((time.monotonic() - ping_started) * 1000, 1))
         hostname = ""
         if reachable:
             try:
@@ -88,9 +102,14 @@ class Scanner:
             except (socket.herror, socket.gaierror, TimeoutError):
                 pass
         mac = self._neighbour_mac(address)
-        return Host(address=address, reachable=reachable, hostname=hostname, latency_ms=latency,
+        host = Host(address=address, reachable=reachable, hostname=hostname, latency_ms=latency,
                     mac=mac, manufacturer=self.vendors.lookup(mac) if mac else "", services=services,
                     ports=[port for port, _name in open_ports])
+        profile = infer_asset_profile(host)
+        return replace(host, device_type=profile.device_type,
+                       operating_system=profile.operating_system,
+                       os_version=profile.os_version, model=profile.model,
+                       profile_confidence=profile.confidence)
 
     def discover(self, host: Host) -> Host:
         """Enrich one completed host result without delaying its initial display."""
@@ -148,6 +167,12 @@ class Scanner:
             self._record_probe_pressure(not opened and elapsed >= max(0.04, self.timeout * 0.75))
         return opened
 
+    def _timed_port_open(self, address: str, port: int) -> tuple[bool, float]:
+        started = time.monotonic()
+        opened = self._port_open(address, port)
+        elapsed = max(0.1, round((time.monotonic() - started) * 1000, 1))
+        return opened, elapsed
+
     def _wait_for_probe_slot(self) -> None:
         with self._throttle_lock:
             now = time.monotonic()
@@ -173,7 +198,8 @@ class Scanner:
             command = (["ping", "-n", "1", "-w", "1000", address] if os.name == "nt" else
                        ["ping", "-n", "-c", "1", "-W", "1", address])
             result = subprocess.run(command,
-                                    capture_output=True, timeout=2, check=False)
+                                    capture_output=True, timeout=2, check=False,
+                                    creationflags=(CREATE_NO_WINDOW if os.name == "nt" else 0))
             return result.returncode == 0
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return False
@@ -183,7 +209,8 @@ class Scanner:
         try:
             if os.name == "nt":
                 output = subprocess.run(["arp.exe", "-a", address], text=True,
-                                        capture_output=True, timeout=1, check=False).stdout
+                                        capture_output=True, timeout=1, check=False,
+                                        creationflags=CREATE_NO_WINDOW).stdout
                 match = re.search(r"\b([0-9a-f]{2}(?:-[0-9a-f]{2}){5})\b", output,
                                   flags=re.IGNORECASE)
                 return match.group(1).replace("-", ":").upper() if match else ""
