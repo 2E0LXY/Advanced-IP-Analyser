@@ -1,3 +1,11 @@
+advanced-ip-analyser (2.3.1) stable; urgency=medium
+
+  * Prevent Windows background probes from opening console windows.
+  * Correct the latency measurement to show a network probe, not scan duration.
+  * Populate basic device classifications during the initial scan.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Tue, 08 Sep 2026 08:00:00 +0100
+
 advanced-ip-analyser (2.3.0) stable; urgency=medium
 
   * Add a separately packaged Windows 10/11 edition and release workflow.
