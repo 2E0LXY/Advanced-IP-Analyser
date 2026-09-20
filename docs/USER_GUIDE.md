@@ -1,4 +1,4 @@
-# Advanced IP Analyser 2.5.0 Instruction Book
+# Advanced IP Analyser 2.5.1 Instruction Book
 
 Windows 10/11 and Debian 13 edition
 
@@ -62,7 +62,7 @@ service, disconnect Wi-Fi clients, inject frames, or recover passwords.
 
 ### Install on Windows
 
-Download `Advanced-IP-Analyser-Setup-2.5.0.exe` from the project release page
+Download `Advanced-IP-Analyser-Setup-2.5.1.exe` from the project release page
 and run it. The per-user installer normally needs no administrator rights and
 offers Start-menu and desktop shortcuts. Windows supports network scanning,
 inventory, web auditing, AI analysis, and saved capture-file inspection. Linux
@@ -71,12 +71,12 @@ visibly disabled because the project does not bundle a Windows capture driver.
 
 ### Install on Debian 13
 
-Download `advanced-ip-analyser_2.5.0_all.deb` from the project release page.
+Download `advanced-ip-analyser_2.5.1_all.deb` from the project release page.
 In a terminal:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.5.0_all.deb
+sudo apt install ./advanced-ip-analyser_2.5.1_all.deb
 ```
 
 Use `apt install ./file.deb`, not `dpkg -i`, because APT resolves dependencies.
@@ -132,6 +132,7 @@ The Network Scan page is arranged from setup to action:
 - **Scan results/Favorites:** inventory tables.
 - **Sidebar:** Dashboard, Network Scan, Diagnostics, Favorites, packet and security tools, Settings, and Help.
 - **Footer:** status, centered green progress, version, and Update.
+- **Top toolbar:** a yellow Install button replaces Scan Network when an update is available.
 
 ### AI settings and analysis
 
@@ -505,7 +506,8 @@ execution, destructive validation, and out-of-band exploit callbacks.
 ## 15. Automatic updates
 
 The app checks the latest project GitHub release after startup. A newer valid tag
-causes the footer button to flash. Click it and confirm to:
+turns the top toolbar's Scan Network button into a yellow Install button. Click
+it and confirm to:
 
 1. download only the exact expected release asset URL;
 2. enforce a 50 MiB package limit;

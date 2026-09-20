@@ -1,3 +1,10 @@
+advanced-ip-analyser (2.5.1-1) UNRELEASED; urgency=medium
+
+  * Put the verified download and install action in the main toolbar when an update is available.
+  * Keep the update action visible at the minimum supported window size.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Sun, 20 Sep 2026 19:00:00 +0100
+
 advanced-ip-analyser (2.5.0-1) UNRELEASED; urgency=medium
 
   * Redesign the desktop dashboard with live scan, traffic and activity panels.

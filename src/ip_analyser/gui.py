@@ -349,10 +349,12 @@ class Application(tk.Tk):
                  font=("Segoe UI", 13, "bold")).pack(side="left")
         tk.Label(top, text=f"v{__version__}", bg="#102132", fg="#93aac1",
                  font=("Segoe UI", 9)).pack(side="left", padx=(10, 0))
-        tk.Button(top, text="Scan Network", command=self.start_scan, relief="flat", bd=0,
-                  bg="#1688e7", fg="#ffffff", activebackground="#369cf0",
-                  activeforeground="#ffffff", font=("Segoe UI", 9, "bold"),
-                  padx=13, pady=7).pack(side="right")
+        self.header_update_button = tk.Button(
+            top, text="Scan Network", command=self.start_scan, relief="flat", bd=0,
+            bg="#1688e7", fg="#ffffff", activebackground="#369cf0",
+            activeforeground="#ffffff", font=("Segoe UI", 9, "bold"),
+            padx=13, pady=7)
+        self.header_update_button.pack(side="right")
         tk.Label(top, text="●  Ready", bg="#102132", fg="#55d992",
                  font=("Segoe UI", 9)).pack(side="right", padx=18)
         self.notebook = ttk.Notebook(content, style="Dark.TNotebook")
@@ -1174,7 +1176,11 @@ class Application(tk.Tk):
             self.available_update = value
             self.update_button.configure(text=f"Update to v{value.version}")
             self.update_button.pack(side="right", padx=(0, 8))
-            self.status.configure(text=f"Version {value.version} is available")
+            self.header_update_button.configure(
+                text=f"Install v{value.version}", command=self.install_available_update,
+                bg="#ffd34f", fg="#302400", activebackground="#ffad3f",
+                activeforeground="#302400", state="normal")
+            self.status.configure(text=f"Version {value.version} is available · use the yellow Install button above")
             self._flash_update_button()
         elif event == "current":
             if manual:
@@ -1188,19 +1194,22 @@ class Application(tk.Tk):
                 self.after(350, self.destroy)
             except OSError as error:
                 self.update_button.configure(state="normal")
+                self.header_update_button.configure(state="normal")
                 messagebox.showerror("Cannot start updater", str(error))
         else:
             self.update_button.configure(state="normal")
+            self.header_update_button.configure(state="normal")
             if manual or event == "download_error":
                 messagebox.showerror("Update failed", str(value))
             if manual:
                 self.status.configure(text="Could not check for updates")
 
     def _flash_update_button(self) -> None:
-        if not self.available_update or not self.update_button.winfo_ismapped():
+        if not self.available_update or not self.header_update_button.winfo_ismapped():
             return
         self.update_flash_on = not self.update_flash_on
         self.update_button.configure(style="UpdateFlash.TButton" if self.update_flash_on else "Update.TButton")
+        self.header_update_button.configure(bg="#ffad3f" if self.update_flash_on else "#ffd34f")
         self.after(650, self._flash_update_button)
 
     def install_available_update(self) -> None:
@@ -1218,6 +1227,7 @@ class Application(tk.Tk):
                 f"{installer_note}and the updated version will reopen automatically."):
             return
         self.update_button.configure(state="disabled", text=f"Downloading v{update.version}…")
+        self.header_update_button.configure(state="disabled", text=f"Downloading v{update.version}…")
         self.status.configure(text=f"Downloading verified update v{update.version}…")
         threading.Thread(target=self._download_update_worker, args=(update,), daemon=True).start()
         self.after(50, self._drain_update_events)
