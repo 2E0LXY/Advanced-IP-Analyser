@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.5.0 - 2026-09-20
+
+- Rebuild the desktop dashboard around the supplied dark network overview: navigation, scan metrics, traffic chart, recent activity, favorite hosts, and system information.
+- Use the current scan and saved favorites for dashboard counts; show real interface traffic rates instead of sample figures.
+- Keep the dashboard usable in smaller windows with scrolling, and add psutil as a package dependency for traffic and adapter details.
+
 ## 2.4.1 - 2026-09-20
 
 - Reject Windows ICMP unreachable messages sent by the local PC or a router so absent addresses are not marked Up.

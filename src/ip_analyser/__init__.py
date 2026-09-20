@@ -1,3 +1,3 @@
 """Advanced IP Analyser: an independently implemented network inventory tool."""
 
-__version__ = "2.4.1"
+__version__ = "2.5.0"

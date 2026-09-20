@@ -28,7 +28,7 @@ jobs:
           apt-get install --yes --no-install-recommends \
             appstream autopkgtest build-essential ca-certificates debhelper \
             desktop-file-utils devscripts dh-python fakeroot git lintian \
-            pybuild-plugin-pyproject python3-all python3-defusedxml \
+            pybuild-plugin-pyproject python3-all python3-defusedxml python3-psutil \
             python3-setuptools python3-tk xauth xvfb
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

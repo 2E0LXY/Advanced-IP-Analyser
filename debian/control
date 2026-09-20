@@ -7,6 +7,7 @@ Build-Depends:
  pybuild-plugin-pyproject,
  python3-all,
  python3-defusedxml,
+ python3-psutil,
  python3-setuptools,
  python3-tk,
 Standards-Version: 4.7.4.1
@@ -24,6 +25,7 @@ Depends:
  libsecret-tools,
  pkexec,
  python3-defusedxml,
+ python3-psutil,
  python3-tk,
  xdg-utils,
 Recommends:

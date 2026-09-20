@@ -33,6 +33,7 @@ from .ai_settings import (
     save_api_key,
 )
 from .config import parse_ports
+from .dashboard import DashboardView
 from .diagnostics import run_diagnostic
 from .models import Host
 from .network import (
@@ -258,8 +259,10 @@ class Application(tk.Tk):
     def __init__(self):
         super().__init__(className="AdvancedIPAnalyser")
         self.title("Advanced IP Analyser")
-        self.geometry("1440x850")
-        self.minsize(1050, 680)
+        width = min(1440, max(1050, self.winfo_screenwidth() - 60))
+        height = min(850, max(640, self.winfo_screenheight() - 100))
+        self.geometry(f"{width}x{height}+40+40")
+        self.minsize(1050, 640)
         self.configure(background="#0b1420")
         self.results = []
         self.hosts_by_item = {}
@@ -276,6 +279,7 @@ class Application(tk.Tk):
         self.discovery_flash_on = False
         self.scheduled_scan_id: str | None = None
         self.active_scan_target = ""
+        self.scan_scanned_count = 0
         self.ssh_username = getpass.getuser()
         self.cancel_scan = threading.Event()
         self.network_presets = []
@@ -316,28 +320,41 @@ class Application(tk.Tk):
         style.configure("Treeview.Heading", background="#1c3147", foreground="#a9c6e4",
                         font=("Segoe UI", 9, "bold"), relief="flat")
         style.map("Treeview", background=[("selected", "#246398")], foreground=[("selected", "#ffffff")])
-        style.configure("Dark.TNotebook", background="#0b1420", borderwidth=0, tabmargins=0)
+        style.configure("Dark.TNotebook", background="#0d1b29", borderwidth=0, tabmargins=0,
+                        bordercolor="#0d1b29", lightcolor="#0d1b29", darkcolor="#0d1b29")
         style.layout("Dark.TNotebook.Tab", [])
 
     def _build(self) -> None:
         shell = ttk.Frame(self)
         shell.pack(fill="both", expand=True)
-        sidebar = tk.Frame(shell, bg="#132334", width=204)
+        sidebar = tk.Frame(shell, bg="#132334", width=190)
         sidebar.pack(side="left", fill="y")
         sidebar.pack_propagate(False)
-        tk.Label(sidebar, text="◉  ADVANCED IP", bg="#132334", fg="#f2f7ff",
-                 font=("Segoe UI", 13, "bold"), anchor="w").pack(fill="x", padx=18, pady=(22, 2))
-        tk.Label(sidebar, text="ANALYSER", bg="#132334", fg="#77a9d5",
-                 font=("Segoe UI", 9, "bold"), anchor="w").pack(fill="x", padx=48, pady=(0, 26))
+        brand = tk.Frame(sidebar, bg="#132334")
+        brand.pack(fill="x", padx=12, pady=(18, 25))
+        if self.app_icon is not None:
+            self.brand_icon = self.app_icon.subsample(7, 7)
+            tk.Label(brand, image=self.brand_icon, bg="#132334").pack(side="left", padx=(0, 8))
+        name = tk.Frame(brand, bg="#132334")
+        name.pack(side="left")
+        tk.Label(name, text="Advanced IP", bg="#132334", fg="#f2f7ff",
+                 font=("Segoe UI", 12, "bold"), anchor="w").pack(anchor="w")
+        tk.Label(name, text="Analyser", bg="#132334", fg="#77a9d5",
+                 font=("Segoe UI", 9), anchor="w").pack(anchor="w")
         content = ttk.Frame(shell)
         content.pack(side="left", fill="both", expand=True)
-        top = ttk.Frame(content, padding=(18, 15, 18, 12))
+        top = tk.Frame(content, bg="#102132", padx=19, pady=10)
         top.pack(fill="x")
-        ttk.Label(top, text="Network tools", font=("Segoe UI", 17, "bold")).pack(side="left")
-        ttk.Button(top, text="Scan network", style="Accent.TButton",
-                   command=lambda: self._navigate(self.scan_page)).pack(side="right")
-        ttk.Label(top, text="●  Ready", foreground="#50d799",
-                  font=("Segoe UI", 9)).pack(side="right", padx=22)
+        tk.Label(top, text="Advanced IP Analyser", bg="#102132", fg="#eff6ff",
+                 font=("Segoe UI", 13, "bold")).pack(side="left")
+        tk.Label(top, text=f"v{__version__}", bg="#102132", fg="#93aac1",
+                 font=("Segoe UI", 9)).pack(side="left", padx=(10, 0))
+        tk.Button(top, text="Scan Network", command=self.start_scan, relief="flat", bd=0,
+                  bg="#1688e7", fg="#ffffff", activebackground="#369cf0",
+                  activeforeground="#ffffff", font=("Segoe UI", 9, "bold"),
+                  padx=13, pady=7).pack(side="right")
+        tk.Label(top, text="●  Ready", bg="#102132", fg="#55d992",
+                 font=("Segoe UI", 9)).pack(side="right", padx=18)
         self.notebook = ttk.Notebook(content, style="Dark.TNotebook")
         self.notebook.pack(fill="both", expand=True, padx=16)
         self.dashboard_page = ttk.Frame(self.notebook)
@@ -349,26 +366,35 @@ class Application(tk.Tk):
         self.notebook.add(self.diagnostic_page, text="Diagnostics")
         self.notebook.add(self.favorites_page, text="Favorites")
         self._nav_buttons = {}
-        for label, page in (("Dashboard", self.dashboard_page), ("Network scan", self.scan_page),
-                            ("Diagnostics", self.diagnostic_page),
-                            ("Favorites", self.favorites_page)):
+        for label, page in (("⌂  Dashboard", self.dashboard_page), ("⌕  Network Scan", self.scan_page),
+                            ("⚙  Diagnostics", self.diagnostic_page),
+                            ("★  Favorites", self.favorites_page)):
             button = tk.Button(sidebar, text=label, anchor="w", relief="flat", bd=0,
                                bg="#132334", fg="#c6d8ea", activebackground="#254b71",
-                               activeforeground="#ffffff", font=("Segoe UI", 10), padx=20, pady=11,
+                               activeforeground="#ffffff", font=("Segoe UI", 10), padx=15, pady=11,
                                command=lambda selected=page: self._navigate(selected))
             button.pack(fill="x", padx=8, pady=2)
             self._nav_buttons[str(page)] = button
         tk.Frame(sidebar, height=1, bg="#294159").pack(fill="x", padx=16, pady=14)
-        for label, action in (("Ping", lambda: self._run_diagnostic("ping")),
-                              ("Traceroute", lambda: self._run_diagnostic("trace")),
-                              ("Packet analysis", self.open_packet_capture),
-                              ("Web security audit", self.open_web_audit)):
+        for label, action in (("⌁  Ping", lambda: self._run_diagnostic("ping")),
+                              ("↗  Traceroute", lambda: self._run_diagnostic("trace")),
+                              ("▦  Port Scan", self._open_port_scan),
+                              ("◫  Packets", self.open_packet_capture),
+                              ("⬡  Security", self.open_web_audit)):
             tk.Button(sidebar, text=label, anchor="w", relief="flat", bd=0, bg="#132334",
                       fg="#a9bfd4", activebackground="#254b71", activeforeground="#ffffff",
-                      font=("Segoe UI", 9), padx=20, pady=10,
+                      font=("Segoe UI", 9), padx=15, pady=10,
                       command=action).pack(fill="x", padx=8, pady=1)
-        tk.Label(sidebar, text=f"Version {__version__}", bg="#132334", fg="#6f8ca6",
-                 font=("Segoe UI", 8)).pack(side="bottom", anchor="w", padx=20, pady=16)
+        sidebar_bottom = tk.Frame(sidebar, bg="#132334")
+        sidebar_bottom.pack(side="bottom", fill="x", padx=8, pady=(0, 13))
+        for label, command in (("⚙  Settings", self.show_ai_settings),
+                               ("ⓘ  Help", self.show_help)):
+            tk.Button(sidebar_bottom, text=label, command=command, anchor="w", relief="flat",
+                      bd=0, bg="#132334", fg="#a9bfd4", activebackground="#254b71",
+                      activeforeground="#ffffff", font=("Segoe UI", 9), padx=15,
+                      pady=7).pack(fill="x")
+        tk.Label(sidebar_bottom, text=f"Version {__version__}", bg="#132334", fg="#6f8ca6",
+                 font=("Segoe UI", 8)).pack(anchor="w", padx=15, pady=(8, 0))
         self._navigate(self.dashboard_page)
 
         header = ttk.Frame(self.scan_page, padding=12)
@@ -557,11 +583,7 @@ class Application(tk.Tk):
         self.progress.grid(row=0, column=1, padx=18)
         footer_actions = ttk.Frame(footer)
         footer_actions.grid(row=0, column=2, sticky="e")
-        ttk.Label(footer_actions, text="© 2026 Daren Loxley (2E0LXY)").pack(side="right", padx=18)
         ttk.Label(footer_actions, text=f"Version {__version__}").pack(side="right", padx=(0, 12))
-        ttk.Button(footer_actions, text="Help", command=self.show_help).pack(side="right", padx=(0, 8))
-        ttk.Button(footer_actions, text="AI Settings", command=self.show_ai_settings).pack(
-            side="right", padx=(0, 8))
         self.discovery_button = ttk.Button(footer_actions, text="Please wait · discovering details…",
                                            style="Discovery.TButton")
         self.discovery_button.pack(side="right", padx=(0, 8))
@@ -576,7 +598,12 @@ class Application(tk.Tk):
         self.bind_all("<Control-o>", lambda _event: self.load_inventory())
         self.bind_all("<Control-s>", lambda _event: self.save_export())
         self.bind_all("<Control-Shift-C>", lambda _event: self.copy_selected_detail())
+        # Reserve the status strip before the large notebook requests space.
+        self.notebook.pack_forget()
+        footer.pack(side="bottom", fill="x")
+        self.notebook.pack(fill="both", expand=True, padx=16)
         self.refresh_subnets(show_errors=False)
+        self._refresh_dashboard()
         self.after(1500, self.check_updates)
 
     def _navigate(self, page: ttk.Frame) -> None:
@@ -587,96 +614,47 @@ class Application(tk.Tk):
                              fg="#ffffff" if active else "#c6d8ea")
 
     def _build_dashboard(self) -> None:
-        page = self.dashboard_page
-        heading = ttk.Frame(page, padding=(6, 12, 6, 12))
-        heading.pack(fill="x")
-        ttk.Label(heading, text="Dashboard", font=("Segoe UI", 23, "bold")).pack(anchor="w")
-        ttk.Label(heading, text="Your network tools and latest discovery in one place.",
-                  foreground="#8faac4", font=("Segoe UI", 10)).pack(anchor="w", pady=(2, 0))
-
-        metrics = ttk.Frame(page)
-        metrics.pack(fill="x", pady=(4, 14))
-        self.dashboard_metrics: dict[str, ttk.Label] = {}
-        for index, (key, title, color) in enumerate((
-            ("hosts", "Discovered hosts", "#62b8ff"),
-            ("ports", "Open ports", "#ffad55"),
-            ("favorites", "Saved hosts", "#62df9e"),
-            ("target", "Last scan target", "#b9a4ff"),
-        )):
-            card = tk.Frame(metrics, bg="#17283a", highlightbackground="#2b4054",
-                            highlightthickness=1, padx=18, pady=14)
-            card.grid(row=0, column=index, sticky="nsew", padx=(0, 12 if index < 3 else 0))
-            tk.Label(card, text=title.upper(), bg="#17283a", fg="#92abc4",
-                     font=("Segoe UI", 8, "bold"), anchor="w").pack(fill="x")
-            value = tk.Label(card, text="—", bg="#17283a", fg=color,
-                             font=("Segoe UI", 23, "bold"), anchor="w")
-            value.pack(fill="x", pady=(7, 0))
-            self.dashboard_metrics[key] = value
-            metrics.columnconfigure(index, weight=1, uniform="metric")
-
-        middle = ttk.Frame(page)
-        middle.pack(fill="both", expand=True)
-        actions = tk.Frame(middle, bg="#17283a", highlightbackground="#2b4054",
-                           highlightthickness=1, padx=18, pady=15)
-        actions.pack(side="left", fill="both", expand=True, padx=(0, 12))
-        tk.Label(actions, text="Quick actions", bg="#17283a", fg="#edf5ff",
-                 font=("Segoe UI", 13, "bold"), anchor="w").pack(fill="x", pady=(0, 13))
-        action_grid = tk.Frame(actions, bg="#17283a")
-        action_grid.pack(fill="both", expand=True)
-        for index, (label, command) in enumerate((
-            ("Scan network", lambda: self._navigate(self.scan_page)),
-            ("Ping selected host", lambda: self._run_diagnostic("ping")),
-            ("Traceroute", lambda: self._run_diagnostic("trace")),
-            ("Packet analysis", self.open_packet_capture),
-            ("Web security audit", self.open_web_audit),
-            ("Wake-on-LAN", self.wake_selected),
-        )):
-            button = tk.Button(action_grid, text=label, command=command, bg="#20364d", fg="#dceafa",
-                               activebackground="#2b5579", activeforeground="#ffffff", relief="flat",
-                               highlightbackground="#36506a", highlightthickness=1,
-                               font=("Segoe UI", 10), pady=13)
-            button.grid(row=index // 2, column=index % 2, sticky="nsew", padx=5, pady=5)
-        for column in range(2):
-            action_grid.columnconfigure(column, weight=1)
-        for row in range(3):
-            action_grid.rowconfigure(row, weight=1)
-
-        latest = tk.Frame(middle, bg="#17283a", highlightbackground="#2b4054",
-                          highlightthickness=1, padx=18, pady=15)
-        latest.pack(side="left", fill="both", expand=True)
-        tk.Label(latest, text="Latest discovery", bg="#17283a", fg="#edf5ff",
-                 font=("Segoe UI", 13, "bold"), anchor="w").pack(fill="x", pady=(0, 10))
-        self.dashboard_hosts = ttk.Treeview(latest, columns=("address", "hostname", "ports"),
-                                            show="headings", height=8)
-        for column, label, width in (("address", "IP address", 140), ("hostname", "Hostname", 170),
-                                     ("ports", "Ports", 70)):
-            self.dashboard_hosts.heading(column, text=label)
-            self.dashboard_hosts.column(column, width=width, stretch=True, anchor="w")
-        self.dashboard_hosts.pack(fill="both", expand=True)
-        ttk.Button(latest, text="Open scan results →",
-                   command=lambda: self._navigate(self.scan_page)).pack(anchor="e", pady=(10, 0))
-
-        bottom = tk.Frame(page, bg="#17283a", highlightbackground="#2b4054",
-                          highlightthickness=1, padx=18, pady=14)
-        bottom.pack(fill="x", pady=(12, 4))
-        tk.Label(bottom, text="Live traffic", bg="#17283a", fg="#edf5ff",
-                 font=("Segoe UI", 12, "bold"), anchor="w").pack(fill="x")
-        tk.Label(bottom, text="Open packet capture or a saved PCAP to inspect traffic and apply display filters.",
-                 bg="#17283a", fg="#9eb5cb", font=("Segoe UI", 9), anchor="w").pack(fill="x", pady=(5, 0))
+        holder = tk.Frame(self.dashboard_page, bg="#0d1b29")
+        holder.pack(fill="both", expand=True)
+        canvas = tk.Canvas(holder, bg="#0d1b29", highlightthickness=0)
+        scrollbar = ttk.Scrollbar(holder, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        self.dashboard = DashboardView(
+            canvas,
+            scan=self.start_scan,
+            ping=lambda: self._run_diagnostic("ping"),
+            trace=lambda: self._run_diagnostic("trace"),
+            port_scan=self._open_port_scan,
+            favorites=self.show_favorites,
+            interface=self._capture_interface_hint,
+        )
+        window = canvas.create_window((5, 0), window=self.dashboard, anchor="nw")
+        def resize_dashboard(event) -> None:
+            requested = self.dashboard.winfo_reqheight()
+            if requested > event.height and not scrollbar.winfo_manager():
+                scrollbar.pack(side="right", fill="y", before=canvas)
+            elif requested <= event.height and scrollbar.winfo_manager():
+                scrollbar.pack_forget()
+            canvas.itemconfigure(window, width=max(1, event.width - 10),
+                                 height=max(event.height, requested))
+        canvas.bind("<Configure>", resize_dashboard)
+        self.dashboard.bind("<Configure>", lambda _event: canvas.configure(
+            scrollregion=canvas.bbox("all")))
         self._refresh_dashboard()
 
     def _refresh_dashboard(self) -> None:
-        if not hasattr(self, "dashboard_metrics"):
-            return
-        self.dashboard_metrics["hosts"].configure(text=str(len(self.results)))
-        self.dashboard_metrics["ports"].configure(text=str(sum(len(host.ports) for host in self.results)))
-        self.dashboard_metrics["favorites"].configure(text=str(len(self.favorite_hosts_by_item)))
-        self.dashboard_metrics["target"].configure(
-            text=(self.active_scan_target or "—")[:22], font=("Segoe UI", 15, "bold"))
-        self.dashboard_hosts.delete(*self.dashboard_hosts.get_children())
-        for host in self.results[:10]:
-            self.dashboard_hosts.insert("", "end", values=(host.address, host.hostname or "—",
-                                                             len(host.ports)))
+        if hasattr(self, "dashboard"):
+            self.dashboard.refresh(
+                self.results, scanned=self.scan_scanned_count,
+                target=self.active_scan_target or self.target.get().strip(),
+                favorites=self.favorite_hosts_by_item.values(),
+            )
+
+    def _open_port_scan(self) -> None:
+        self._navigate(self.scan_page)
+        self.ports.focus_set()
 
     def _build_diagnostics(self) -> None:
         page = self.diagnostic_page
@@ -724,6 +702,8 @@ class Application(tk.Tk):
                 target = chosen[0].address
                 self.diagnostic_target.insert(0, target)
         self._navigate(self.diagnostic_page)
+        if hasattr(self, "dashboard"):
+            self.dashboard.record_activity(f"{kind.upper()} started · {target or 'local system'}")
         self.diagnostic_status.configure(text=f"Running {kind}…")
         self.diagnostic_output.configure(state="normal")
         self.diagnostic_output.delete("1.0", "end")
@@ -746,6 +726,9 @@ class Application(tk.Tk):
             self.after(50, self._drain_diagnostic_events)
             return
         self.diagnostic_status.configure(text=f"{kind}: {'failed' if failed else 'complete'}")
+        if hasattr(self, "dashboard"):
+            self.dashboard.record_activity(f"{kind.upper()} {'failed' if failed else 'completed'}",
+                                           "#ff7474" if failed else "#5adb55")
         self.diagnostic_output.configure(state="normal")
         self.diagnostic_output.insert("end", output)
         self.diagnostic_output.configure(state="disabled")
@@ -1284,6 +1267,9 @@ class Application(tk.Tk):
         self.cancel_button.configure(state="normal")
         self.cancel_scan = threading.Event()
         self.active_scan_target = self.target.get().strip()
+        self.scan_scanned_count = 0
+        self.dashboard.record_activity(f"Scan started · {self.active_scan_target}")
+        self._refresh_dashboard()
         self.progress.configure(maximum=len(targets), value=0)
         adaptive = self.profile.get() == "Adaptive"
         threading.Thread(target=self._scan_worker,
@@ -1336,6 +1322,7 @@ class Application(tk.Tk):
                 event = self.events.get_nowait()
                 if event[0] == "host":
                     _, done, total, host = event
+                    self.scan_scanned_count = done
                     if host.reachable:
                         self.results.append(host)
                         if self._matches_filter(host):
@@ -1344,8 +1331,13 @@ class Application(tk.Tk):
                     self.status.configure(text=f"Scanned {done} of {total}")
                 elif event[0] == "scan_complete":
                     scanned, total, cancelled, candidates = event[1], event[2], event[3], event[4]
+                    self.scan_scanned_count = len(scanned)
                     self.results = [host for host in scanned if host.reachable]
                     self._refresh_table()
+                    self._refresh_dashboard()
+                    self.dashboard.record_activity(
+                        f"Scan finished · {len(self.results)} hosts found",
+                        "#5adb55" if not cancelled else "#ff9b36")
                     if cancelled or not candidates:
                         prefix = "Cancelled" if cancelled else "Finished"
                         self.status.configure(text=f"{prefix}: {len(self.results)} reachable; {len(scanned)} of {total} checked")
@@ -1365,6 +1357,7 @@ class Application(tk.Tk):
                     scanned, total, cancelled, candidates = event[1], event[2], event[3], event[4]
                     self.results = [host for host in scanned if host.reachable]
                     self._refresh_table()
+                    self._refresh_dashboard()
                     self._stop_discovery_indicator()
                     self.scan_button.configure(state="normal")
                     self.cancel_button.configure(state="disabled")
@@ -1554,6 +1547,7 @@ class Application(tk.Tk):
         self.target.delete(0, "end")
         self.target.insert(0, network)
         self.status.configure(text=f"Selected {network} on {interface}")
+        self._refresh_dashboard()
 
     def selected_hosts(self) -> list[Host]:
         selected: list[Host] = []

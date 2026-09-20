@@ -20,14 +20,16 @@ Wireshark.
 
 ![Scanner overview](docs/images/scanner-overview.png)
 
-The main window combines target selection, scan profiles, TCP-port controls,
-live progress, expandable service results, favorites, inventory exchange, remote
-actions, packet tools, and verified updates in one interface.
+The first page is a dark network dashboard with scan totals, live interface
+traffic, recent tool activity, favorite hosts, and local adapter details. The
+Network Scan page combines target selection, scan profiles, TCP-port controls,
+live progress, expandable service results, inventory exchange, and remote actions.
 
 ## Feature map
 
 | Area | Features |
 | --- | --- |
+| Dashboard | Live scan metrics, interface traffic, recent actions, favorite hosts, local IP/MAC/gateway details, and direct access to common tools |
 | Network discovery | IPv4/IPv6 addresses, CIDRs, inclusive ranges, exclusions, recurring scans, active-interface presets, `/24` shortcut, reachability, connection or ICMP latency, DNS/NetBIOS names, local MAC addresses, cached IEEE vendor lookup |
 | Asset profiles | Conservative device type, operating system/version, model, and confidence inferred from manufacturer, services, HTTP metadata, and protocol banners without credentials or agents |
 | TCP services | Custom ports/ranges, common and web presets, optional all-65,535-port scan, expandable port rows, safe HTTP/TLS/banner metadata, cancellable two-stage discovery |
@@ -69,7 +71,7 @@ then run:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.4.1_all.deb
+sudo apt install ./advanced-ip-analyser_2.5.0_all.deb
 ```
 
 Launch it from the desktop application menu or run:
@@ -78,7 +80,7 @@ Launch it from the desktop application menu or run:
 advanced-ip-analyser-gui
 ```
 
-The package installs Python, Tk, hardened XML parsing, ping, IP-route tools,
+The package installs Python, Tk, hardened XML parsing, psutil traffic counters, ping, IP-route tools,
 desktop integration, PolicyKit, and `libsecret-tools` for secure AI-key storage. `iw` is recommended for Passive
 Wi-Fi Watch. Optional service launchers use Debian packages such as OpenSSH,
 FreeRDP, GVfs, Tracepath, and Telnet when installed.
@@ -87,7 +89,7 @@ FreeRDP, GVfs, Tracepath, and Telnet when installed.
 
 ```sh
 sudo apt update
-sudo apt install python3 python3-venv python3-tk python3-defusedxml \
+sudo apt install python3 python3-venv python3-tk python3-defusedxml python3-psutil \
   iputils-ping iproute2 pkexec libsecret-tools iw xdg-utils
 git clone https://github.com/2E0LXY/Advanced-IP-Analyser.git
 cd Advanced-IP-Analyser

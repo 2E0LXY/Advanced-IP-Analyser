@@ -1,4 +1,4 @@
-# Advanced IP Analyser 2.4.1 Instruction Book
+# Advanced IP Analyser 2.5.0 Instruction Book
 
 Windows 10/11 and Debian 13 edition
 
@@ -38,7 +38,7 @@ service, disconnect Wi-Fi clients, inject frames, or recover passwords.
 
 - Debian GNU/Linux 13 (Trixie), with a graphical desktop for the GUI.
 - Python 3.11 or newer and Tk.
-- `iproute2`, `iputils-ping`, `xdg-utils`, `pkexec`, `libsecret-tools`, and `python3-defusedxml`.
+- `iproute2`, `iputils-ping`, `xdg-utils`, `pkexec`, `libsecret-tools`, `python3-defusedxml`, and `python3-psutil`.
 - Authorization for every network and device placed in scope.
 
 ### Windows 10/11 requirements
@@ -62,7 +62,7 @@ service, disconnect Wi-Fi clients, inject frames, or recover passwords.
 
 ### Install on Windows
 
-Download `Advanced-IP-Analyser-Setup-2.4.1.exe` from the project release page
+Download `Advanced-IP-Analyser-Setup-2.5.0.exe` from the project release page
 and run it. The per-user installer normally needs no administrator rights and
 offers Start-menu and desktop shortcuts. Windows supports network scanning,
 inventory, web auditing, AI analysis, and saved capture-file inspection. Linux
@@ -71,12 +71,12 @@ visibly disabled because the project does not bundle a Windows capture driver.
 
 ### Install on Debian 13
 
-Download `advanced-ip-analyser_2.4.1_all.deb` from the project release page.
+Download `advanced-ip-analyser_2.5.0_all.deb` from the project release page.
 In a terminal:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.4.1_all.deb
+sudo apt install ./advanced-ip-analyser_2.5.0_all.deb
 ```
 
 Use `apt install ./file.deb`, not `dpkg -i`, because APT resolves dependencies.
@@ -109,7 +109,14 @@ before manually removing personal data.
 
 ![Scanner overview](images/scanner-overview.png)
 
-The main window is arranged from setup to action:
+The app opens on a network dashboard. Its cards use the current scan for host,
+port, service, and range totals. The traffic graph reads counters from the
+selected local adapter; it does not show packet contents. Recent activity lists
+tools used in the current session, and the lower panels show saved favorite
+hosts and local adapter information. Use the left navigation or the dashboard
+buttons to open a tool.
+
+The Network Scan page is arranged from setup to action:
 
 - **Target:** an address, inclusive range, or CIDR.
 - **Interfaces:** refresh active IPv4 interface/subnet presets.
@@ -123,7 +130,8 @@ The main window is arranged from setup to action:
 - **Action row:** copy, favorites, Wake-on-LAN, Ping, Trace, and packet tools.
 - **Remote administration:** Shutdown, Reboot, and Abort shutdown.
 - **Scan results/Favorites:** inventory tables.
-- **Footer:** status, centered green progress, AI Settings, Help, version, and Update.
+- **Sidebar:** Dashboard, Network Scan, Diagnostics, Favorites, packet and security tools, Settings, and Help.
+- **Footer:** status, centered green progress, version, and Update.
 
 ### AI settings and analysis
 
