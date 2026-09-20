@@ -6,6 +6,8 @@ import os
 import re
 import subprocess
 
+CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
 
 def ipv4_24_target(value: str) -> str:
     """Return the containing /24 for an IPv4 address or interface value."""
@@ -46,7 +48,8 @@ def _windows_ipv4_networks() -> list[tuple[str, str, str]]:
     try:
         output = subprocess.run(
             ["powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command],
-            text=True, capture_output=True, timeout=5, check=True).stdout
+            text=True, capture_output=True, timeout=5, check=True,
+            creationflags=CREATE_NO_WINDOW).stdout
     except (FileNotFoundError, subprocess.SubprocessError) as error:
         raise RuntimeError("could not read Windows network interfaces") from error
     try:

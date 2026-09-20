@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.3.1 - 2026-09-08
+
+- Prevent background Windows interface, ping, and ARP probes from opening console windows.
+- Report the quickest successful network probe time instead of the duration of the entire
+  multi-port scan in the Latency column.
+- Populate conservative device classifications during the initial scan instead of waiting
+  for the later service-detail phase.
+
 ## 2.3.0 - 2026-09-07
 
 - Add a self-contained Windows 10/11 x64 application and per-user Inno Setup installer.

@@ -27,6 +27,7 @@ DEFAULT_PORTS = {
     8080: "http", 8081: "http", 8443: "https", 8888: "http", 9000: "http",
     9090: "http", 9100: "printer", 9200: "elasticsearch", 27017: "mongodb",
 }
+CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
 class Scanner:
@@ -72,7 +73,7 @@ class Scanner:
             open_ports = []
             connection_times = []
             with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(port_items))) as pool:
-                checks = {pool.submit(self._timed_port_probe, address, port): (port, name)
+                checks = {pool.submit(self._timed_port_open, address, port): (port, name)
                           for port, name in port_items}
                 for future in concurrent.futures.as_completed(checks):
                     opened, elapsed_ms = future.result()
@@ -85,7 +86,7 @@ class Scanner:
             connection_times = []
             with concurrent.futures.ThreadPoolExecutor(max_workers=min(128, max(8, self.workers))) as pool:
                 for start in range(0, len(port_items), 2048):
-                    checks = {pool.submit(self._timed_port_probe, address, port): (port, name)
+                    checks = {pool.submit(self._timed_port_open, address, port): (port, name)
                               for port, name in port_items[start:start + 2048]}
                     for future in concurrent.futures.as_completed(checks):
                         opened, elapsed_ms = future.result()
@@ -107,10 +108,10 @@ class Scanner:
         profile = infer_asset_profile(host)
         return replace(host, device_type=profile.device_type)
 
-    def _timed_port_probe(self, address: str, port: int) -> tuple[bool, float]:
+    def _timed_port_open(self, address: str, port: int) -> tuple[bool, float]:
         started = time.monotonic()
         opened = self._port_open(address, port)
-        return opened, (time.monotonic() - started) * 1000
+        return opened, max(0.1, round((time.monotonic() - started) * 1000, 1))
 
     def discover(self, host: Host) -> Host:
         """Enrich one completed host result without delaying its initial display."""
@@ -139,7 +140,8 @@ class Scanner:
         try:
             output = subprocess.run(["nslookup", "-timeout=1", "-retry=1", address],
                                     capture_output=True, text=True, errors="replace",
-                                    timeout=2, check=False).stdout
+                                    timeout=2, check=False,
+                                    creationflags=(CREATE_NO_WINDOW if os.name == "nt" else 0)).stdout
             match = re.search(r"(?:^Name:\s*|\bname\s*=\s*)([^\s]+)", output,
                               flags=re.MULTILINE | re.IGNORECASE)
             if match:
@@ -149,7 +151,8 @@ class Scanner:
         if os.name == "nt":
             try:
                 output = subprocess.run(["nbtstat.exe", "-A", address], capture_output=True,
-                                        text=True, errors="replace", timeout=2, check=False).stdout
+                                        text=True, errors="replace", timeout=2, check=False,
+                                        creationflags=CREATE_NO_WINDOW).stdout
                 match = re.search(r"^\s*([^\s<>]{1,15})\s+<00>\s+UNIQUE\b", output,
                                   flags=re.MULTILINE | re.IGNORECASE)
                 if match:
@@ -222,10 +225,11 @@ class Scanner:
                        ["ping", "-n", "-c", "1", "-W", "1", address])
             started = time.monotonic()
             result = subprocess.run(command,
-                                    capture_output=True, timeout=2, check=False)
+                                    capture_output=True, timeout=2, check=False,
+                                    creationflags=(CREATE_NO_WINDOW if os.name == "nt" else 0))
             if result.returncode != 0:
                 return None
-            output = result.stdout.decode(errors="replace")
+            output = result.stdout.decode(errors="replace") if isinstance(result.stdout, bytes) else str(result.stdout)
             match = re.search(r"\btime\s*([=<])\s*([\d.,]+)\s*ms\b", output, re.IGNORECASE)
             if match:
                 if match.group(1) == "<":
@@ -240,7 +244,8 @@ class Scanner:
         try:
             if os.name == "nt":
                 output = subprocess.run(["arp.exe", "-a", address], text=True,
-                                        capture_output=True, timeout=1, check=False).stdout
+                                        capture_output=True, timeout=1, check=False,
+                                        creationflags=CREATE_NO_WINDOW).stdout
                 match = re.search(r"\b([0-9a-f]{2}(?:-[0-9a-f]{2}){5})\b", output,
                                   flags=re.IGNORECASE)
                 return match.group(1).replace("-", ":").upper() if match else ""
