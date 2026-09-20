@@ -28,7 +28,7 @@ actions, packet tools, and verified updates in one interface.
 
 | Area | Features |
 | --- | --- |
-| Network discovery | IPv4/IPv6 addresses, CIDRs, inclusive ranges, exclusions, recurring scans, active-interface presets, `/24` shortcut, reachability, latency, DNS names, local MAC addresses, offline vendor lookup |
+| Network discovery | IPv4/IPv6 addresses, CIDRs, inclusive ranges, exclusions, recurring scans, active-interface presets, `/24` shortcut, reachability, connection or ICMP latency, DNS/NetBIOS names, local MAC addresses, cached IEEE vendor lookup |
 | Asset profiles | Conservative device type, operating system/version, model, and confidence inferred from manufacturer, services, HTTP metadata, and protocol banners without credentials or agents |
 | TCP services | Custom ports/ranges, common and web presets, optional all-65,535-port scan, expandable port rows, safe HTTP/TLS/banner metadata, cancellable two-stage discovery |
 | Results workflow | Live filtering and sorting, alternating rows, clickable services, copy IP/detail, selection-aware export, keyboard and context-menu actions |
@@ -44,6 +44,8 @@ actions, packet tools, and verified updates in one interface.
 | Updates | Automatic GitHub release check, flashing button, platform-specific asset selection, trusted release URL, SHA-256 verification, package/installer checks, close/install/restart workflow |
 | Debian packaging | Reproducible `.deb`, Lintian/AppStream/desktop validation, install/GUI/remove smoke test, release checksum, optional signed GitHub Pages APT feed |
 | Windows packaging | Self-contained x64 application, per-user Inno Setup installer, native launcher adaptations, smoke test, checksum, and GitHub build-provenance attestation |
+
+Scan rows appear as each host finishes its bounded port checks. Hostnames, vendor names, and service fingerprints are added as discovery completes. The first vendor lookup downloads public IEEE MA-L/MA-M/MA-S assignment lists into the local cache; no device MAC address is sent to IEEE. A blank hostname or OS means the network did not provide enough evidence to identify it reliably.
 
 ## Windows 10/11 installation
 

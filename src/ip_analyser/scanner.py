@@ -47,7 +47,9 @@ class Scanner:
              discovery_progress: Callable[[int, int, Host], None] | None = None) -> list[Host]:
         addresses = list(targets)
         results: list[Host] = []
-        host_workers = self.workers if len(self.ports) <= 1024 else min(4, self.workers)
+        # Keep the combined host/port fan-out bounded. A host now probes several
+        # ports concurrently, so 64 hosts each with 64 sockets would overwhelm a LAN.
+        host_workers = min(self.workers, 32) if len(self.ports) <= 1024 else min(4, self.workers)
         pool = concurrent.futures.ThreadPoolExecutor(max_workers=host_workers)
         futures = {pool.submit(self.inspect, address): address for address in addresses}
         try:
@@ -65,35 +67,55 @@ class Scanner:
         return self.discover_all(results, discovery_progress, cancel) if discover_services else results
 
     def inspect(self, address: str) -> Host:
-        started = time.monotonic()
+        port_items = list(self.ports.items())
         if len(self.ports) <= 1024:
-            open_ports = [(port, name) for port, name in self.ports.items() if self._port_open(address, port)]
+            open_ports = []
+            connection_times = []
+            with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(port_items))) as pool:
+                checks = {pool.submit(self._timed_port_probe, address, port): (port, name)
+                          for port, name in port_items}
+                for future in concurrent.futures.as_completed(checks):
+                    opened, elapsed_ms = future.result()
+                    if opened:
+                        open_ports.append(checks[future])
+                        connection_times.append(elapsed_ms)
+            open_ports.sort()
         else:
             open_ports = []
-            port_items = list(self.ports.items())
+            connection_times = []
             with concurrent.futures.ThreadPoolExecutor(max_workers=min(128, max(8, self.workers))) as pool:
                 for start in range(0, len(port_items), 2048):
-                    checks = {pool.submit(self._port_open, address, port): (port, name)
+                    checks = {pool.submit(self._timed_port_probe, address, port): (port, name)
                               for port, name in port_items[start:start + 2048]}
-                    open_ports.extend(checks[future] for future in concurrent.futures.as_completed(checks)
-                                      if future.result())
+                    for future in concurrent.futures.as_completed(checks):
+                        opened, elapsed_ms = future.result()
+                        if opened:
+                            open_ports.append(checks[future])
+                            connection_times.append(elapsed_ms)
             open_ports.sort()
         services = [name for _port, name in open_ports]
-        reachable = bool(services) or self._ping(address)
-        latency = round((time.monotonic() - started) * 1000, 1) if reachable else None
-        hostname = ""
-        if reachable:
-            try:
-                hostname = socket.gethostbyaddr(address)[0]
-            except (socket.herror, socket.gaierror, TimeoutError):
-                pass
+        ping_started = time.monotonic()
+        ping_latency = self._ping(address) if not open_ports else None
+        pinged = bool(ping_latency)
+        reachable = bool(open_ports) or pinged
+        latency = (round(min(connection_times), 1) if connection_times else
+                   round(float(ping_latency), 1) if pinged and not isinstance(ping_latency, bool) else
+                   round((time.monotonic() - ping_started) * 1000, 1) if pinged else None)
         mac = self._neighbour_mac(address)
-        return Host(address=address, reachable=reachable, hostname=hostname, latency_ms=latency,
-                    mac=mac, manufacturer=self.vendors.lookup(mac) if mac else "", services=services,
-                    ports=[port for port, _name in open_ports])
+        host = Host(address=address, reachable=reachable, latency_ms=latency, mac=mac,
+                    services=services, ports=[port for port, _name in open_ports])
+        profile = infer_asset_profile(host)
+        return replace(host, device_type=profile.device_type)
+
+    def _timed_port_probe(self, address: str, port: int) -> tuple[bool, float]:
+        started = time.monotonic()
+        opened = self._port_open(address, port)
+        return opened, (time.monotonic() - started) * 1000
 
     def discover(self, host: Host) -> Host:
         """Enrich one completed host result without delaying its initial display."""
+        hostname = host.hostname or (self._resolve_hostname(host.address) if host.reachable else "")
+        manufacturer = self.vendors.lookup(host.mac) if host.mac else ""
         service_info: dict[str, dict[str, str]] = {}
         services = list(zip(host.ports, host.services))
         if services:
@@ -104,19 +126,44 @@ class Scanner:
                 for future in concurrent.futures.as_completed(probes):
                     if details := future.result():
                         service_info[str(probes[future])] = details
-        enriched = replace(host, service_info=service_info)
+        enriched = replace(host, hostname=hostname, manufacturer=manufacturer,
+                           service_info=service_info)
         profile = infer_asset_profile(enriched)
         return replace(enriched, device_type=profile.device_type,
                        operating_system=profile.operating_system,
                        os_version=profile.os_version, model=profile.model,
                        profile_confidence=profile.confidence)
 
+    @staticmethod
+    def _resolve_hostname(address: str) -> str:
+        try:
+            output = subprocess.run(["nslookup", "-timeout=1", "-retry=1", address],
+                                    capture_output=True, text=True, errors="replace",
+                                    timeout=2, check=False).stdout
+            match = re.search(r"(?:^Name:\s*|\bname\s*=\s*)([^\s]+)", output,
+                              flags=re.MULTILINE | re.IGNORECASE)
+            if match:
+                return match.group(1).rstrip(".")
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+        if os.name == "nt":
+            try:
+                output = subprocess.run(["nbtstat.exe", "-A", address], capture_output=True,
+                                        text=True, errors="replace", timeout=2, check=False).stdout
+                match = re.search(r"^\s*([^\s<>]{1,15})\s+<00>\s+UNIQUE\b", output,
+                                  flags=re.MULTILINE | re.IGNORECASE)
+                if match:
+                    return match.group(1)
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                pass
+        return ""
+
     def discover_all(self, hosts: Iterable[Host],
                      progress: Callable[[int, int, Host], None] | None = None,
                      cancel: threading.Event | None = None) -> list[Host]:
         """Run the second discovery phase concurrently after host scanning."""
         hosts = list(hosts)
-        candidates = [host for host in hosts if host.reachable and host.ports]
+        candidates = [host for host in hosts if host.reachable]
         discovered = {host.identity: host for host in hosts}
         if not candidates:
             return hosts
@@ -168,15 +215,25 @@ class Scanner:
                 self._probe_delay = max(0.0, self._probe_delay / 2 - 0.0005)
             self._probe_samples.clear()
 
-    def _ping(self, address: str) -> bool:
+    def _ping(self, address: str) -> float | None:
+        """Return the reported ICMP round-trip time, or None when unavailable."""
         try:
             command = (["ping", "-n", "1", "-w", "1000", address] if os.name == "nt" else
                        ["ping", "-n", "-c", "1", "-W", "1", address])
+            started = time.monotonic()
             result = subprocess.run(command,
                                     capture_output=True, timeout=2, check=False)
-            return result.returncode == 0
+            if result.returncode != 0:
+                return None
+            output = result.stdout.decode(errors="replace")
+            match = re.search(r"\btime\s*([=<])\s*([\d.,]+)\s*ms\b", output, re.IGNORECASE)
+            if match:
+                if match.group(1) == "<":
+                    return 0.5
+                return max(0.1, float(match.group(2).replace(",", ".")))
+            return max(0.1, (time.monotonic() - started) * 1000)
         except (FileNotFoundError, subprocess.TimeoutExpired):
-            return False
+            return None
 
     @staticmethod
     def _neighbour_mac(address: str) -> str:

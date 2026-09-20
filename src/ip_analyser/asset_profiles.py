@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 
 from .models import Host
 
@@ -41,7 +41,8 @@ def infer_asset_profile(host: Host) -> AssetProfile:
         device_type = "NAS / storage"
     elif services & {"rdp", "smb", "rpc"}:
         device_type = "Computer / server"
-    elif any(name in lower for name in ("router", "gateway", "mikrotik", "openwrt", "ubiquiti", "unifi")):
+    elif any(name in lower for name in ("router", "gateway", "mikrotik", "openwrt", "ubiquiti",
+                                        "unifi", "gl technologies")):
         device_type = "Network device"
     elif services & {"postgresql", "mysql", "mssql", "oracle", "mongodb", "redis", "elasticsearch"}:
         device_type = "Database server"

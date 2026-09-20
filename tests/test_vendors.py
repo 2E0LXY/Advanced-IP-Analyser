@@ -1,11 +1,20 @@
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 
 from ip_analyser.vendors import MacVendorLookup
 
 
 class VendorTests(unittest.TestCase):
+    def test_longest_ieee_assignment_wins(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "oui.csv"
+            database.write_text("Registry,Assignment,Organization Name,Organization Address\n"
+                                "MA-L,B0B353,Shared authority,\n"
+                                "MA-M,B0B3530,Specific manufacturer,\n")
+            lookup = MacVendorLookup((database,))
+            self.assertEqual(lookup.lookup("B0:B3:53:01:3C:D0"), "Specific manufacturer")
+
     def test_ieee_database(self):
         with tempfile.TemporaryDirectory() as directory:
             database = Path(directory) / "oui.txt"

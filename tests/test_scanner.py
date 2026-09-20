@@ -1,3 +1,4 @@
+import time
 import unittest
 from unittest.mock import patch
 
@@ -6,6 +7,22 @@ from ip_analyser.scanner import Scanner
 
 
 class ScannerPortDetailTests(unittest.TestCase):
+    @patch.object(Scanner, "_neighbour_mac", return_value="")
+    @patch.object(Scanner, "_port_open")
+    def test_port_checks_are_parallel_and_latency_is_a_probe_not_scan_duration(self, port_open, _mac):
+        def probe(_address, port):
+            time.sleep(0.005 if port == 1000 else 0.06)
+            return port == 1000
+
+        port_open.side_effect = probe
+        scanner = Scanner(ports={port: "test" for port in range(1000, 1016)})
+        started = time.monotonic()
+        host = scanner.inspect("192.0.2.20")
+        total_ms = (time.monotonic() - started) * 1000
+        self.assertEqual(host.ports, [1000])
+        self.assertLess(host.latency_ms, total_ms / 2)
+        self.assertLess(total_ms, 800)
+
     @patch.object(Scanner, "discover")
     @patch.object(Scanner, "inspect")
     def test_scan_completes_host_phase_before_discovery(self, inspect, discover):
