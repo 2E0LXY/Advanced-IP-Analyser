@@ -69,7 +69,7 @@ then run:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.4.0_all.deb
+sudo apt install ./advanced-ip-analyser_2.4.1_all.deb
 ```
 
 Launch it from the desktop application menu or run:

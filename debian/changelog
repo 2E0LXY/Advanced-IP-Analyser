@@ -1,3 +1,10 @@
+advanced-ip-analyser (2.4.1-1) UNRELEASED; urgency=medium
+
+  * Ignore ICMP unreachable replies from other hosts during Windows discovery.
+  * Resolve LAN hostnames through the local gateway before public DNS.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Sun, 20 Sep 2026 16:00:00 +0100
+
 advanced-ip-analyser (2.4.0-1) UNRELEASED; urgency=medium
 
   * Add a dark desktop dashboard, diagnostic workbench, and SVG topology export.

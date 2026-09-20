@@ -55,12 +55,55 @@ class ScannerPortDetailTests(unittest.TestCase):
     @patch("ip_analyser.scanner.os.name", "nt")
     @patch("ip_analyser.scanner.subprocess.run")
     def test_windows_background_ping_and_arp_never_open_consoles(self, run):
-        run.side_effect = [Mock(returncode=0), Mock(stdout="  192.0.2.20  aa-bb-cc-dd-ee-ff dynamic")]
+        run.side_effect = [Mock(returncode=0, stdout=b"Reply from 192.0.2.20: bytes=32 time<1ms TTL=64"),
+                           Mock(stdout="  192.0.2.20  aa-bb-cc-dd-ee-ff dynamic")]
         scanner = Scanner(ports={80: "http"})
-        self.assertTrue(scanner._ping("192.0.2.20"))
+        self.assertEqual(scanner._ping("192.0.2.20"), 0.5)
         self.assertEqual(scanner._neighbour_mac("192.0.2.20"), "AA:BB:CC:DD:EE:FF")
         self.assertTrue(all(call.kwargs["creationflags"] == CREATE_NO_WINDOW
                             for call in run.call_args_list))
+
+    @patch("ip_analyser.scanner.os.name", "nt")
+    @patch("ip_analyser.scanner.subprocess.run")
+    def test_windows_unreachable_reply_does_not_mark_host_up(self, run):
+        # Windows can report success and one received packet for an ICMP error
+        # sent by the local PC or router rather than by the target.
+        run.return_value = Mock(returncode=0, stdout=(
+            b"Reply from 192.0.2.201: Destination host unreachable.\r\n"
+            b"Packets: Sent = 1, Received = 1, Lost = 0 (0% loss)"))
+        scanner = Scanner(ports={80: "http"})
+        self.assertIsNone(scanner._ping("192.0.2.20"))
+
+    @patch("ip_analyser.scanner.os.name", "nt")
+    @patch("ip_analyser.scanner.subprocess.run")
+    def test_ping_rejects_timed_reply_from_another_host(self, run):
+        run.return_value = Mock(returncode=0, stdout=b"Reply from 192.0.2.1: bytes=32 time=4ms TTL=64")
+        self.assertIsNone(Scanner()._ping("192.0.2.20"))
+
+    @patch("ip_analyser.scanner.os.name", "posix")
+    @patch("ip_analyser.scanner.subprocess.run")
+    def test_linux_ping_accepts_only_target_reply(self, run):
+        run.return_value = Mock(returncode=0, stdout=(
+            b"64 bytes from 192.0.2.20: icmp_seq=1 ttl=64 time=0.312 ms\n"))
+        self.assertEqual(Scanner()._ping("192.0.2.20"), 0.312)
+
+    @patch("ip_analyser.scanner.os.name", "nt")
+    @patch("ip_analyser.scanner.subprocess.run")
+    def test_local_router_supplies_names_when_public_dns_does_not(self, run):
+        route_table = ("0.0.0.0  0.0.0.0  192.168.1.1  192.168.1.201  25\n"
+                       "192.168.1.0  255.255.255.0  On-link  192.168.1.201  281\n")
+        def command(args, **_kwargs):
+            if args[0] == "route.exe":
+                return Mock(stdout=route_table)
+            if args[0] == "nslookup":
+                self.assertEqual(args[-1], "192.168.1.1")
+                return Mock(stdout="Name: Tapo_SmartPlug.lan\nAddress: 192.168.1.45")
+            self.fail(f"unexpected command: {args}")
+        run.side_effect = command
+        scanner = Scanner()
+        self.assertEqual(scanner._resolve_hostname("192.168.1.45"), "Tapo_SmartPlug.lan")
+        self.assertEqual(scanner._local_gateway("192.168.2.45"), "")
+        self.assertEqual(scanner._local_gateway("8.8.8.8"), "")
 
     @patch("ip_analyser.scanner.time.monotonic", side_effect=[10.0, 10.012])
     @patch.object(Scanner, "_port_open", return_value=True)

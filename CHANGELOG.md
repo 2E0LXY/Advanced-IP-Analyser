@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.4.1 - 2026-09-20
+
+- Reject Windows ICMP unreachable messages sent by the local PC or a router so absent addresses are not marked Up.
+- Ask the local gateway for reverse DNS names on its LAN when the configured public DNS server has no local records.
+
 ## 2.4.0 - 2026-09-20
 
 - Add a dark desktop dashboard with direct access to scanning, diagnostics, favorites, packet analysis, and web auditing.

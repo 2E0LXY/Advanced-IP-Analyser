@@ -42,6 +42,8 @@ class Scanner:
         self._probe_samples: deque[bool] = deque(maxlen=32)
         self._probe_delay = 0.0
         self._next_probe_at = 0.0
+        self._route_lock = threading.Lock()
+        self._local_routes: list[tuple[ipaddress.IPv4Network, str]] | None = None
 
     def scan(self, targets: Iterable[str], progress: Callable[[int, int, Host], None] | None = None,
              cancel: threading.Event | None = None, discover_services: bool = True,
@@ -135,19 +137,15 @@ class Scanner:
                        os_version=profile.os_version, model=profile.model,
                        profile_confidence=profile.confidence)
 
-    @staticmethod
-    def _resolve_hostname(address: str) -> str:
-        try:
-            output = subprocess.run(["nslookup", "-timeout=1", "-retry=1", address],
-                                    capture_output=True, text=True, errors="replace",
-                                    timeout=2, check=False,
-                                    creationflags=(CREATE_NO_WINDOW if os.name == "nt" else 0)).stdout
-            match = re.search(r"(?:^Name:\s*|\bname\s*=\s*)([^\s]+)", output,
-                              flags=re.MULTILINE | re.IGNORECASE)
-            if match:
-                return match.group(1).rstrip(".")
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            pass
+    def _resolve_hostname(self, address: str) -> str:
+        gateway = self._local_gateway(address)
+        if gateway:
+            name = self._reverse_lookup(address, gateway)
+            if name:
+                return name
+        name = self._reverse_lookup(address)
+        if name:
+            return name
         if os.name == "nt":
             try:
                 output = subprocess.run(["nbtstat.exe", "-A", address], capture_output=True,
@@ -160,6 +158,70 @@ class Scanner:
             except (FileNotFoundError, subprocess.TimeoutExpired):
                 pass
         return ""
+
+    @staticmethod
+    def _reverse_lookup(address: str, server: str = "") -> str:
+        try:
+            command = ["nslookup", "-timeout=1", "-retry=1", address]
+            if server:
+                command.append(server)
+            output = subprocess.run(command,
+                                    capture_output=True, text=True, errors="replace",
+                                    timeout=2, check=False,
+                                    creationflags=(CREATE_NO_WINDOW if os.name == "nt" else 0)).stdout
+            match = re.search(r"(?:^Name:\s*|\bname\s*=\s*)([^\s]+)", output,
+                              flags=re.MULTILINE | re.IGNORECASE)
+            if match:
+                return match.group(1).rstrip(".")
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+        return ""
+
+    def _local_gateway(self, address: str) -> str:
+        if os.name != "nt":
+            return ""
+        try:
+            target = ipaddress.ip_address(address)
+        except ValueError:
+            return ""
+        if not isinstance(target, ipaddress.IPv4Address) or not target.is_private:
+            return ""
+        if self._local_routes is None:
+            with self._route_lock:
+                if self._local_routes is None:
+                    self._local_routes = self._windows_local_routes()
+        for network, gateway in self._local_routes:
+            if target in network:
+                return gateway
+        return ""
+
+    @staticmethod
+    def _windows_local_routes() -> list[tuple[ipaddress.IPv4Network, str]]:
+        """Match default gateways to on-link networks on the same interface."""
+        try:
+            output = subprocess.run(["route.exe", "print", "-4"], capture_output=True,
+                                    text=True, errors="replace", timeout=3, check=False,
+                                    creationflags=CREATE_NO_WINDOW).stdout
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            return []
+        rows = re.findall(r"^\s*(\d+(?:\.\d+){3})\s+(\d+(?:\.\d+){3})\s+(\S+)\s+"
+                          r"(\d+(?:\.\d+){3})\s+\d+\s*$", output, re.MULTILINE)
+        gateways = [(ipaddress.IPv4Address(gateway), interface)
+                    for destination, mask, gateway, interface in rows
+                    if destination == "0.0.0.0" and mask == "0.0.0.0"
+                    and re.fullmatch(r"\d+(?:\.\d+){3}", gateway)]
+        routes = []
+        for destination, mask, gateway, interface in rows:
+            if gateway.casefold() != "on-link":
+                continue
+            try:
+                network = ipaddress.IPv4Network(f"{destination}/{mask}", strict=False)
+                for default_gateway, gateway_interface in gateways:
+                    if interface == gateway_interface and default_gateway in network:
+                        routes.append((network, str(default_gateway)))
+            except ValueError:
+                continue
+        return sorted(routes, key=lambda route: route[0].prefixlen, reverse=True)
 
     def discover_all(self, hosts: Iterable[Host],
                      progress: Callable[[int, int, Host], None] | None = None,
@@ -219,23 +281,34 @@ class Scanner:
             self._probe_samples.clear()
 
     def _ping(self, address: str) -> float | None:
-        """Return the reported ICMP round-trip time, or None when unavailable."""
+        """Return a round-trip time only for an echo reply from this target."""
         try:
             command = (["ping", "-n", "1", "-w", "1000", address] if os.name == "nt" else
                        ["ping", "-n", "-c", "1", "-W", "1", address])
-            started = time.monotonic()
             result = subprocess.run(command,
                                     capture_output=True, timeout=2, check=False,
                                     creationflags=(CREATE_NO_WINDOW if os.name == "nt" else 0))
             if result.returncode != 0:
                 return None
             output = result.stdout.decode(errors="replace") if isinstance(result.stdout, bytes) else str(result.stdout)
-            match = re.search(r"\btime\s*([=<])\s*([\d.,]+)\s*ms\b", output, re.IGNORECASE)
-            if match:
-                if match.group(1) == "<":
+            for line in output.splitlines():
+                if os.name == "nt":
+                    reply = re.match(r"^\s*Reply from\s+(.+?):\s+.*\btime\s*([=<])\s*([\d.,]+)\s*ms\b",
+                                     line, re.IGNORECASE)
+                else:
+                    reply = re.match(r"^\s*\d+\s+bytes from\s+(.+?):\s+.*\btime\s*([=<])\s*([\d.,]+)\s*ms\b",
+                                     line, re.IGNORECASE)
+                if not reply:
+                    continue
+                try:
+                    if ipaddress.ip_address(reply.group(1)) != ipaddress.ip_address(address):
+                        continue
+                except ValueError:
+                    continue
+                if reply.group(2) == "<":
                     return 0.5
-                return max(0.1, float(match.group(2).replace(",", ".")))
-            return max(0.1, (time.monotonic() - started) * 1000)
+                return max(0.1, float(reply.group(3).replace(",", ".")))
+            return None
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return None
 
