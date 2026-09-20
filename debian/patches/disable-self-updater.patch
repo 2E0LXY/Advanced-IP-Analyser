@@ -9,13 +9,8 @@ Last-Update: 2026-09-20
 ---
 --- a/src/ip_analyser/gui.py
 +++ b/src/ip_analyser/gui.py
-@@ -604,6 +604,5 @@ class Application(tk.Tk):
-         self.notebook.pack(fill="both", expand=True, padx=16)
-         self.refresh_subnets(show_errors=False)
-         self._refresh_dashboard()
+@@ -607 +607,0 @@ class Application(tk.Tk):
 -        self.after(1500, self.check_updates)
- 
-     def _navigate(self, page: ttk.Frame) -> None:
 @@ -1065,7 +1064,5 @@ class Application(tk.Tk):
                    font=("TkDefaultFont", 16, "bold")).pack(side="left")
          ttk.Button(heading, text="Close", command=window.destroy).pack(side="right", padx=(12, 0))
