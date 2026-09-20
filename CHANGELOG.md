@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.4.0 - 2026-09-20
+
+- Add a dark desktop dashboard with direct access to scanning, diagnostics, favorites, packet analysis, and web auditing.
+- Add built-in ping, traceroute, DNS and email-record lookup, connection listing, TLS inspection, and HTTP response inspection.
+- Show host scan rows sooner by checking a bounded set of ports concurrently; report connection or ICMP response time rather than total scan time.
+- Refresh each host row as hostname, manufacturer, and service evidence arrives; keep uncertain OS and model fields honest.
+- Cache public IEEE MA-L, MA-M, and MA-S assignments for manufacturer lookup without sending device MAC addresses.
+- Export discovered hosts as an SVG topology map.
+
 ## 2.3.1 - 2026-09-08
 
 - Prevent background Windows interface, ping, and ARP probes from opening console windows.
