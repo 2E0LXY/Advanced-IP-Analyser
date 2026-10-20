@@ -121,6 +121,8 @@ The Network Scan page is arranged from setup to action:
 - **Target:** an address, inclusive range, or CIDR.
 - **Interfaces:** refresh active IPv4 interface/subnet presets.
 - **/24:** use the current host's class-C-style subnet.
+- **IPv6 LAN:** discover local IPv6 nodes through multicast and the NDP neighbour
+  table, then scan only the bounded discovered set instead of enumerating a `/64`.
 - **TCP ports:** comma-separated ports and ranges.
 - **Exclude:** optional addresses, ranges, or CIDRs removed from the target scope.
 - **Repeat:** rescan every 5, 15, 30, or 60 minutes while the app remains open.
@@ -534,6 +536,17 @@ of the release security boundary and must remain enabled.
 ```sh
 advanced-ip-analyser scan TARGET [--timeout SECONDS] [--workers COUNT] [--output FILE]
 ```
+
+### Local IPv6 discovery and scan
+
+```sh
+advanced-ip-analyser scan-local-ipv6 [--interface NAME_OR_INDEX] \
+  [--timeout SECONDS] [--workers COUNT] [--output FILE]
+```
+
+This command stimulates IPv6 neighbour discovery and scans only local addresses
+reported by active interfaces and the operating system's NDP cache. It does not
+attempt to enumerate an IPv6 `/64`.
 
 ### Wake-on-LAN
 

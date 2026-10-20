@@ -40,6 +40,7 @@ from .network import (
     active_ipv4_networks,
     broadcasts_for_host,
     current_ipv4_subnet,
+    discover_local_ipv6_hosts,
     ipv4_24_target,
 )
 from .packet_filters import (
@@ -278,6 +279,7 @@ class Application(tk.Tk):
         self.discovery_active = False
         self.discovery_flash_on = False
         self.scheduled_scan_id: str | None = None
+        self.repeat_scan_callback = self.start_scan
         self.active_scan_target = ""
         self.scan_scanned_count = 0
         self.ssh_username = getpass.getuser()
@@ -410,6 +412,9 @@ class Application(tk.Tk):
         self.subnets.bind("<<ComboboxSelected>>", self.use_selected_subnet)
         ttk.Button(header, text="Interfaces", command=self.refresh_subnets).pack(side="left", padx=(0, 8))
         ttk.Button(header, text="/24", command=self.use_24_subnet).pack(side="left", padx=(0, 8))
+        self.ipv6_scan_button = ttk.Button(
+            header, text="IPv6 LAN", command=self.start_ipv6_scan)
+        self.ipv6_scan_button.pack(side="left", padx=(0, 8))
         self.scan_button = ttk.Button(header, text="Scan", command=self.start_scan, style="Accent.TButton")
         self.scan_button.pack(side="left")
         self.cancel_button = ttk.Button(header, text="Cancel", command=self.cancel_current_scan, state="disabled")
@@ -528,8 +533,10 @@ class Application(tk.Tk):
         self.table.configure(xscrollcommand=table_scroll.set)
         self.table.pack(fill="both", expand=True)
         table_scroll.pack(fill="x")
-        self.table.tag_configure("even", background="#142438")
-        self.table.tag_configure("odd", background="#172a3f")
+        self.table.tag_configure("ipv4_even", background="#f5f7fa", foreground="#000000")
+        self.table.tag_configure("ipv4_odd", background="#e8edf2", foreground="#000000")
+        self.table.tag_configure("ipv6_even", background="#f5f7fa", foreground="#006400")
+        self.table.tag_configure("ipv6_odd", background="#e8edf2", foreground="#006400")
         self.table.tag_configure("detail", background="#1a3148", foreground="#a9c8df")
         self.table.tag_configure("detail_click", background="#1a3148", foreground="#69bfff",
                                  font=("TkDefaultFont", 9, "underline"))
@@ -1239,7 +1246,8 @@ class Application(tk.Tk):
             self.update_events.put(("download_error", error, True))
 
 
-    def start_scan(self) -> None:
+    def start_scan(self, targets_override: list[str] | None = None,
+                   target_label: str | None = None) -> None:
         self._navigate(self.scan_page)
         if self.scheduled_scan_id is not None:
             try:
@@ -1248,7 +1256,7 @@ class Application(tk.Tk):
                 pass
             self.scheduled_scan_id = None
         try:
-            targets = parse_targets(self.target.get())
+            targets = list(targets_override) if targets_override is not None else parse_targets(self.target.get())
             if self.exclusions.get().strip():
                 excluded = set(parse_targets(self.exclusions.get()))
                 targets = [target for target in targets if target not in excluded]
@@ -1274,9 +1282,11 @@ class Application(tk.Tk):
         self.table.delete(*self.table.get_children())
         self._stop_discovery_indicator()
         self.scan_button.configure(state="disabled")
+        self.ipv6_scan_button.configure(state="disabled")
         self.cancel_button.configure(state="normal")
         self.cancel_scan = threading.Event()
-        self.active_scan_target = self.target.get().strip()
+        self.active_scan_target = target_label or self.target.get().strip()
+        self.repeat_scan_callback = self.start_ipv6_scan if targets_override is not None else self.start_scan
         self.scan_scanned_count = 0
         self.dashboard.record_activity(f"Scan started · {self.active_scan_target}")
         self._refresh_dashboard()
@@ -1285,6 +1295,28 @@ class Application(tk.Tk):
         threading.Thread(target=self._scan_worker,
                          args=(targets, ports, timeout, workers, adaptive), daemon=True).start()
         self.after(50, self._drain_events)
+
+    def start_ipv6_scan(self) -> None:
+        """Discover local IPv6 neighbours, then run the normal bounded host scan."""
+        self._navigate(self.scan_page)
+        self.status.configure(text="Discovering local IPv6 neighbours…")
+        self.update_idletasks()
+        try:
+            targets = discover_local_ipv6_hosts(self._capture_interface_hint())
+        except (RuntimeError, ValueError) as error:
+            # The selected preset is commonly IPv4-only; fall back to all IPv6 interfaces.
+            try:
+                targets = discover_local_ipv6_hosts()
+            except (RuntimeError, ValueError):
+                messagebox.showerror("IPv6 discovery unavailable", str(error))
+                return
+        if not targets:
+            messagebox.showinfo(
+                "No IPv6 neighbours",
+                "No usable local IPv6 addresses were found. Ensure IPv6 is enabled and try again.")
+            return
+        self.start_scan(targets_override=targets,
+                        target_label=f"Local IPv6 discovery ({len(targets)} addresses)")
 
     def _show_ports_menu(self, event) -> None:
         self.ports_menu.tk_popup(event.x_root, event.y_root)
@@ -1370,6 +1402,7 @@ class Application(tk.Tk):
                     self._refresh_dashboard()
                     self._stop_discovery_indicator()
                     self.scan_button.configure(state="normal")
+                    self.ipv6_scan_button.configure(state="normal")
                     self.cancel_button.configure(state="disabled")
                     prefix = "Cancelled" if cancelled else "Finished"
                     suffix = " · discovery cancelled" if cancelled and candidates else (" · discovery complete" if candidates else "")
@@ -1400,6 +1433,7 @@ class Application(tk.Tk):
                 else:
                     self._stop_discovery_indicator()
                     self.scan_button.configure(state="normal")
+                    self.ipv6_scan_button.configure(state="normal")
                     self.cancel_button.configure(state="disabled")
                     messagebox.showerror("Scan failed", str(event[1]))
                     return
@@ -1425,7 +1459,7 @@ class Application(tk.Tk):
         self.status.configure(text=f"{self.status.cget('text')} · next scan in {minutes} minutes")
         if self.scheduled_scan_id is not None:
             self.after_cancel(self.scheduled_scan_id)
-        self.scheduled_scan_id = self.after(minutes * 60_000, self.start_scan)
+        self.scheduled_scan_id = self.after(minutes * 60_000, self.repeat_scan_callback)
 
     def _start_discovery_indicator(self, total: int) -> None:
         self.discovery_active = True
@@ -1451,6 +1485,7 @@ class Application(tk.Tk):
         web_services = [service_url(service, host.address, port) if service in {"http", "https"} else service
                         for port, service in zip(host.ports, host.services)]
         stripe = "even" if len(self.table.get_children("")) % 2 == 0 else "odd"
+        address_family = "ipv6" if ipaddress.ip_address(host.address.split("%", 1)[0]).version == 6 else "ipv4"
         hostname = host.hostname or ("Not resolved" if host.profile_confidence else "Resolving…")
         manufacturer = host.manufacturer or ("Not found" if host.profile_confidence else "Looking up…")
         operating_system = " ".join(value for value in (host.operating_system, host.os_version) if value)
@@ -1458,7 +1493,7 @@ class Application(tk.Tk):
         item = self.table.insert("", index, text=f"{len(host.ports)} port{'s' if len(host.ports) != 1 else ''}",
             values=(host.address, "Up", hostname, host.latency_ms or "", host.mac,
                     manufacturer, host.device_type, operating_system,
-                    host.model, ", ".join(web_services)), tags=(stripe,))
+                    host.model, ", ".join(web_services)), tags=(f"{address_family}_{stripe}",))
         self.hosts_by_item[item] = host
         for port, service in zip(host.ports, host.services):
             detail = service_url(service, host.address, port) if service in {"http", "https", "ftp"} else f"TCP {port} · {service}"

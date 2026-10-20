@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Add bounded local IPv6 discovery on Windows and Debian using all-nodes multicast
+  stimulation plus the operating system's NDP neighbour table, with scoped link-local
+  scanning in the desktop app and the new `scan-local-ipv6` CLI command.
+
 ## 2.5.0 - 2026-09-20
 
 - Rebuild the desktop dashboard around the supplied dark network overview: navigation, scan metrics, traffic chart, recent activity, favorite hosts, and system information.

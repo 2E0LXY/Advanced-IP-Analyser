@@ -30,7 +30,7 @@ live progress, expandable service results, inventory exchange, and remote action
 | Area | Features |
 | --- | --- |
 | Dashboard | Live scan metrics, interface traffic, recent actions, favorite hosts, local IP/MAC/gateway details, and direct access to common tools |
-| Network discovery | IPv4/IPv6 addresses, CIDRs, inclusive ranges, exclusions, recurring scans, active-interface presets, `/24` shortcut, reachability, connection or ICMP latency, DNS/NetBIOS names, local MAC addresses, cached IEEE vendor lookup |
+| Network discovery | IPv4/IPv6 addresses, CIDRs, inclusive ranges, exclusions, recurring scans, active-interface presets, `/24` shortcut, bounded local IPv6 NDP discovery, reachability, connection or ICMP latency, DNS/NetBIOS names, local MAC addresses, cached IEEE vendor lookup |
 | Asset profiles | Conservative device type, operating system/version, model, and confidence inferred from manufacturer, services, HTTP metadata, and protocol banners without credentials or agents |
 | TCP services | Custom ports/ranges, common and web presets, optional all-65,535-port scan, expandable port rows, safe HTTP/TLS/banner metadata, cancellable two-stage discovery |
 | Results workflow | Live filtering and sorting, alternating rows, clickable services, copy IP/detail, selection-aware export, keyboard and context-menu actions |
@@ -105,8 +105,8 @@ the complete GUI with `sudo`.
 
 ## Scanning and service discovery
 
-1. Select an interface subnet, enter one address/range/CIDR, or use the `/24`
-   shortcut.
+1. Select an interface subnet, enter one address/range/CIDR, use the `/24`
+   shortcut, or press **IPv6 LAN** to discover local IPv6 neighbours.
 2. Optionally enter excluded addresses/ranges/CIDRs and choose an in-app repeat
    interval for scheduled inventory refreshes.
 3. Choose Fast, Balanced, or Accurate, or set timeout/workers manually.
@@ -124,6 +124,12 @@ log in to a service.
 Supported targets are single IPv4/IPv6 addresses, CIDRs, and inclusive ranges.
 Each invocation is limited to 65,536 addresses. Full TCP-port scans should be
 restricted to a small number of authorized targets.
+
+Normal IPv6 LANs use `/64` prefixes and cannot be exhaustively enumerated. The
+**IPv6 LAN** action sends a bounded all-nodes multicast probe on active interfaces,
+reads the operating system's NDP neighbour table, adds the machine's own usable
+IPv6 addresses, and scans only that discovered set. Link-local addresses retain
+their interface scope.
 
 ## Favorites, inventories, and device actions
 
@@ -318,6 +324,7 @@ Use **Help → Check for updates** for a manual check.
 # Scan and export
 advanced-ip-analyser scan 192.168.1.0/24 --output inventory.csv
 advanced-ip-analyser scan 192.168.1.10-192.168.1.30
+advanced-ip-analyser scan-local-ipv6 --interface eth0 --output ipv6-inventory.csv
 
 # Wake-on-LAN
 advanced-ip-analyser wake AA:BB:CC:DD:EE:FF

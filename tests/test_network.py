@@ -5,8 +5,10 @@ from unittest.mock import patch
 from ip_analyser.network import (
     CREATE_NO_WINDOW,
     active_ipv4_networks,
+    active_ipv6_networks,
     broadcasts_for_host,
     current_ipv4_subnet,
+    discover_local_ipv6_hosts,
     ipv4_24_target,
 )
 
@@ -54,3 +56,39 @@ class NetworkTests(unittest.TestCase):
         networks = [("lan0", "192.168.42.0/24", "192.168.42.255"),
                     ("vpn0", "10.0.0.0/24", "10.0.0.255")]
         self.assertEqual(broadcasts_for_host("192.168.42.20", networks), ["192.168.42.255"])
+
+    @patch("ip_analyser.network.subprocess.run")
+    @patch("ip_analyser.network.os.name", "posix")
+    def test_linux_ipv6_interfaces_are_parsed(self, run):
+        run.return_value.stdout = (
+            "2: eth0    inet6 2001:db8:1::20/64 scope global dynamic\n"
+            "2: eth0    inet6 fe80::20/64 scope link\n")
+        self.assertEqual(active_ipv6_networks(), [
+            ("eth0", "2001:db8:1::/64", "2001:db8:1::20", 2),
+            ("eth0", "fe80::/64", "fe80::20", 2),
+        ])
+
+    @patch("ip_analyser.network.subprocess.run")
+    @patch("ip_analyser.network.os.name", "nt")
+    def test_windows_ipv6_interfaces_are_parsed(self, run):
+        run.return_value.stdout = (
+            '[{"InterfaceAlias":"Ethernet","InterfaceIndex":12,'
+            '"IPAddress":"fe80::20","PrefixLength":64}]')
+        self.assertEqual(active_ipv6_networks(), [
+            ("Ethernet", "fe80::/64", "fe80::20", 12)])
+        self.assertEqual(run.call_args.kwargs["creationflags"], CREATE_NO_WINDOW)
+
+    @patch("ip_analyser.network.subprocess.run")
+    @patch("ip_analyser.network.os.name", "posix")
+    def test_local_ipv6_discovery_uses_ndp_neighbours_and_scopes_link_local(self, run):
+        run.side_effect = [
+            unittest.mock.Mock(stdout=(
+                "2: eth0    inet6 2001:db8:1::20/64 scope global\n"
+                "2: eth0    inet6 fe80::20/64 scope link\n")),
+            unittest.mock.Mock(stdout=""),
+            unittest.mock.Mock(stdout=(
+                "fe80::1 dev eth0 lladdr aa:bb:cc:dd:ee:ff router STALE\n"
+                "2001:db8:1::30 dev eth0 lladdr 00:11:22:33:44:55 REACHABLE\n")),
+        ]
+        self.assertEqual(discover_local_ipv6_hosts("eth0"), [
+            "2001:db8:1::20", "fe80::20%eth0", "fe80::1%eth0", "2001:db8:1::30"])

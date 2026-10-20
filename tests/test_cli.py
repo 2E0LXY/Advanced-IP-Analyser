@@ -1,13 +1,26 @@
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
-from ip_analyser.cli import main
 from test_packet_filters import tcp_record
+
+from ip_analyser.cli import main
+from ip_analyser.models import Host
 
 
 class CliPacketTests(unittest.TestCase):
+    @patch("ip_analyser.cli.Scanner")
+    @patch("ip_analyser.cli.discover_local_ipv6_hosts",
+           return_value=["2001:db8:1::20", "fe80::1%eth0"])
+    def test_local_ipv6_scan_uses_discovered_neighbours(self, discover, scanner_type):
+        scanner_type.return_value.scan.return_value = [
+            Host("2001:db8:1::20", reachable=True)]
+        self.assertEqual(main(["scan-local-ipv6", "--interface", "eth0"]), 0)
+        discover.assert_called_once_with("eth0")
+        targets = scanner_type.return_value.scan.call_args.args[0]
+        self.assertEqual(targets, ["2001:db8:1::20", "fe80::1%eth0"])
+
     @patch("ip_analyser.cli.capture_live")
     def test_capture_command_expands_target_and_uses_native_capture(self, capture):
         capture.return_value = Path("capture.pcap")
