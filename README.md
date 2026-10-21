@@ -37,6 +37,7 @@ live progress, expandable service results, inventory exchange, and remote action
 | Favorites | Persistent saved devices, MAC-first identity, refreshed IP observations, editable notes, rescan, removal, import, selected export |
 | Inventory | CSV/JSON/XML/escaped-HTML export, bounded JSON/XML import, spreadsheet-formula protection, atomic favorites updates |
 | Device access | HTTP, HTTPS, FTP, SMB, SSH, RDP and Telnet launchers; Ping, Tracepath, Wake-on-LAN; confirmed delayed SSH shutdown/reboot and abort |
+| Smart home | Direct local control for TP-Link Kasa/Tapo, Smart Life/Tuya, Shelly Gen1/Gen2+, Tasmota, WLED, and Philips Hue; local Home Assistant connection for lights, switches, fans, locks, covers, climate, media, vacuums, scenes and other controllable entities; generic local action runner; secure VPN-routed remote use |
 | Packet engine | Native Linux `AF_PACKET` capture, selected-host/service scope, interface discovery, Ethernet PCAP/PCAPNG/gzip reading, endpoint/port/protocol summaries, byte preview |
 | Display filters | IP/CIDR, TCP/UDP ports, DNS, HTTP, TLS, ICMP, ARP, TCP flags, lengths, comparisons, text/regex matching, boolean expressions, 20 quick filters, saved named filters |
 | Network Security Monitor | Up to 24-hour sessions across all observed ports and both directions, minute timeline, conversations, devices, DNS, TCP diagnostics, behavioural baselines, colour-coded findings, alerts, bookmarks, reports, retention, history |
@@ -57,7 +58,8 @@ and run it. The per-user installer does not require Python and normally does not
 require administrator rights. It adds Start-menu and optional desktop shortcuts.
 
 Windows supports scanning, inventory, fingerprinting, Wake-on-LAN, web auditing,
-AI analysis, saved PCAP/PCAPNG inspection, display filters, reports, and Windows-native
+AI analysis, TP-Link Kasa/Tapo smart-home control, saved PCAP/PCAPNG inspection,
+display filters, reports, and Windows-native
 Ping, Traceroute, SMB, SSH, and Remote Desktop launchers. Linux `AF_PACKET` live
 capture, Network Security Monitor live capture, and monitor-mode Passive Wi-Fi are
 shown as Debian 13-only because the Windows build does not bundle a third-party
@@ -71,7 +73,7 @@ then run:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.5.1_all.deb
+sudo apt install ./advanced-ip-analyser_2.6.0_all.deb
 ```
 
 Launch it from the desktop application menu or run:

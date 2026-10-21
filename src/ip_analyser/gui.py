@@ -60,6 +60,7 @@ from .packet_tools import (
 )
 from .scan_history import latest_evidence, latest_network_watch_evidence, record_scan
 from .scanner import DEFAULT_PORTS, Scanner
+from .smart_home_gui import SmartHomeView
 from .storage import (
     export,
     import_inventory,
@@ -363,14 +364,17 @@ class Application(tk.Tk):
         self.notebook.pack(fill="both", expand=True, padx=16)
         self.dashboard_page = ttk.Frame(self.notebook)
         self.scan_page = ttk.Frame(self.notebook)
+        self.smart_home_page = ttk.Frame(self.notebook)
         self.diagnostic_page = ttk.Frame(self.notebook)
         self.favorites_page = ttk.Frame(self.notebook)
         self.notebook.add(self.dashboard_page, text="Dashboard")
         self.notebook.add(self.scan_page, text="Network scan")
+        self.notebook.add(self.smart_home_page, text="Smart home")
         self.notebook.add(self.diagnostic_page, text="Diagnostics")
         self.notebook.add(self.favorites_page, text="Favorites")
         self._nav_buttons = {}
         for label, page in (("⌂  Dashboard", self.dashboard_page), ("⌕  Network Scan", self.scan_page),
+                            ("⌁  Smart Home", self.smart_home_page),
                             ("⚙  Diagnostics", self.diagnostic_page),
                             ("★  Favorites", self.favorites_page)):
             button = tk.Button(sidebar, text=label, anchor="w", relief="flat", bd=0,
@@ -573,6 +577,7 @@ class Application(tk.Tk):
         ttk.Button(favorite_actions, text="Refresh devices", command=self.refresh_favorites).pack(side="left", padx=(8, 0))
         self._refresh_favorites_table()
         self._build_dashboard()
+        self._build_smart_home()
         self._build_diagnostics()
 
         self.links = ttk.Frame(self.scan_page, padding=(12, 8, 12, 0))
@@ -660,6 +665,10 @@ class Application(tk.Tk):
                 target=self.active_scan_target or self.target.get().strip(),
                 favorites=self.favorite_hosts_by_item.values(),
             )
+
+    def _build_smart_home(self) -> None:
+        self.smart_home = SmartHomeView(self.smart_home_page)
+        self.smart_home.pack(fill="both", expand=True)
 
     def _open_port_scan(self) -> None:
         self._navigate(self.scan_page)

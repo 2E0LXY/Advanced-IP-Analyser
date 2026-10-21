@@ -37,7 +37,8 @@ VSVersionInfo(
     --name "Advanced-IP-Analyser" `
     --distpath "dist\windows" --workpath "build\windows\pyinstaller" `
     --specpath "build\windows" --paths $sourcePath `
-    --collect-data "ip_analyser" --collect-all "keyring" `
+    --collect-data "ip_analyser" --collect-all "keyring" --collect-all "kasa" `
+    --collect-all "tinytuya" `
     --icon $iconPath --version-file $versionFile $entryPath
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 
