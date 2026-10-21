@@ -87,6 +87,15 @@ class ScannerPortDetailTests(unittest.TestCase):
             b"64 bytes from 192.0.2.20: icmp_seq=1 ttl=64 time=0.312 ms\n"))
         self.assertEqual(Scanner()._ping("192.0.2.20"), 0.312)
 
+    @patch("ip_analyser.scanner.os.name", "posix")
+    @patch("ip_analyser.scanner.subprocess.run")
+    def test_ipv6_ping_uses_ipv6_mode_and_accepts_scoped_target(self, run):
+        run.return_value = Mock(
+            returncode=0,
+            stdout=b"64 bytes from fe80::1%eth0: icmp_seq=1 ttl=64 time=0.420 ms\n")
+        self.assertEqual(Scanner()._ping("fe80::1%eth0"), 0.42)
+        self.assertEqual(run.call_args.args[0][:2], ["ping", "-6"])
+
     @patch("ip_analyser.scanner.os.name", "nt")
     @patch("ip_analyser.scanner.subprocess.run")
     def test_local_router_supplies_names_when_public_dns_does_not(self, run):

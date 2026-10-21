@@ -11,6 +11,7 @@ from .monitoring import (
     enforce_capture_retention,
     export_analysis,
 )
+from .network import discover_local_ipv6_hosts
 from .packet_filters import compile_filter
 from .packet_tools import (
     capture_live,
@@ -32,6 +33,12 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--timeout", type=float, default=.35)
     scan.add_argument("--workers", type=int, default=64)
     scan.add_argument("--output", type=Path)
+    ipv6_scan = commands.add_parser(
+        "scan-local-ipv6", help="discover and scan IPv6 neighbours on the local network")
+    ipv6_scan.add_argument("--interface", help="interface name or Windows interface index")
+    ipv6_scan.add_argument("--timeout", type=float, default=.35)
+    ipv6_scan.add_argument("--workers", type=int, default=64)
+    ipv6_scan.add_argument("--output", type=Path)
     wol = commands.add_parser("wake", help="send a Wake-on-LAN packet")
     wol.add_argument("mac")
     wol.add_argument("--broadcast", default="255.255.255.255")
@@ -138,7 +145,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Audited {len(report.pages)} page(s), found {len(report.findings)} observation(s), "
               f"and saved {args.report}")
         return 0
-    targets = parse_targets(args.target)
+    if args.command == "scan-local-ipv6":
+        targets = discover_local_ipv6_hosts(args.interface)
+        if not targets:
+            print("No local IPv6 hosts were discovered")
+            return 0
+        print(f"Discovered {len(targets)} local IPv6 address(es); starting bounded scan")
+    else:
+        targets = parse_targets(args.target)
     scanner = Scanner(args.timeout, args.workers)
     hosts = scanner.scan(targets, lambda done, total, host: print(
         f"[{done}/{total}] {host.address:>39} {'up' if host.reachable else 'down':4} {','.join(host.services)}"))

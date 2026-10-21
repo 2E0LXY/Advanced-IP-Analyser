@@ -181,7 +181,7 @@ class Scanner:
         if os.name != "nt":
             return ""
         try:
-            target = ipaddress.ip_address(address)
+            target = ipaddress.ip_address(address.split("%", 1)[0])
         except ValueError:
             return ""
         if not isinstance(target, ipaddress.IPv4Address) or not target.is_private:
@@ -283,8 +283,10 @@ class Scanner:
     def _ping(self, address: str) -> float | None:
         """Return a round-trip time only for an echo reply from this target."""
         try:
-            command = (["ping", "-n", "1", "-w", "1000", address] if os.name == "nt" else
-                       ["ping", "-n", "-c", "1", "-W", "1", address])
+            target = ipaddress.ip_address(address.split("%", 1)[0])
+            family = ["-6"] if target.version == 6 else []
+            command = (["ping", *family, "-n", "1", "-w", "1000", address] if os.name == "nt" else
+                       ["ping", *family, "-n", "-c", "1", "-W", "1", address])
             result = subprocess.run(command,
                                     capture_output=True, timeout=2, check=False,
                                     creationflags=(CREATE_NO_WINDOW if os.name == "nt" else 0))
@@ -301,7 +303,9 @@ class Scanner:
                 if not reply:
                     continue
                 try:
-                    if ipaddress.ip_address(reply.group(1)) != ipaddress.ip_address(address):
+                    reply_address = reply.group(1).split("%", 1)[0]
+                    target_address = address.split("%", 1)[0]
+                    if ipaddress.ip_address(reply_address) != ipaddress.ip_address(target_address):
                         continue
                 except ValueError:
                     continue
@@ -315,14 +319,25 @@ class Scanner:
     @staticmethod
     def _neighbour_mac(address: str) -> str:
         try:
+            target = ipaddress.ip_address(address)
+            unscoped = address.split("%", 1)[0]
             if os.name == "nt":
-                output = subprocess.run(["arp.exe", "-a", address], text=True,
-                                        capture_output=True, timeout=1, check=False,
-                                        creationflags=CREATE_NO_WINDOW).stdout
+                if target.version == 6:
+                    command = ("Get-NetNeighbor -AddressFamily IPv6 -IPAddress '" + unscoped +
+                               "' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty LinkLayerAddress")
+                    output = subprocess.run(
+                        ["powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command],
+                        text=True, capture_output=True, timeout=2, check=False,
+                        creationflags=CREATE_NO_WINDOW).stdout
+                else:
+                    output = subprocess.run(["arp.exe", "-a", address], text=True,
+                                            capture_output=True, timeout=1, check=False,
+                                            creationflags=CREATE_NO_WINDOW).stdout
                 match = re.search(r"\b([0-9a-f]{2}(?:-[0-9a-f]{2}){5})\b", output,
                                   flags=re.IGNORECASE)
                 return match.group(1).replace("-", ":").upper() if match else ""
-            output = subprocess.run(["ip", "neigh", "show", address], text=True,
+            family = ["-6"] if target.version == 6 else []
+            output = subprocess.run(["ip", *family, "neigh", "show", unscoped], text=True,
                                     capture_output=True, timeout=1, check=False).stdout
             words = output.split()
             return words[words.index("lladdr") + 1].upper() if "lladdr" in words else ""

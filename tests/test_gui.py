@@ -18,6 +18,18 @@ class _Status:
         self.text = text
 
 
+class _InsertTable:
+    def __init__(self):
+        self.rows = []
+
+    def get_children(self, _item=""):
+        return ()
+
+    def insert(self, parent, index, **options):
+        self.rows.append((parent, index, options))
+        return f"row-{len(self.rows)}"
+
+
 class ServiceRowInteractionTests(unittest.TestCase):
     @patch("ip_analyser.gui.open_service")
     def test_enter_or_double_click_opens_service_row(self, open_service):
@@ -45,6 +57,25 @@ class ServiceRowInteractionTests(unittest.TestCase):
 
         self.assertEqual(hosts, [host])
         self.assertEqual(port, 443)
+
+
+class HostAddressColourTests(unittest.TestCase):
+    def _insert_host(self, address):
+        app = object.__new__(Application)
+        app.table = _InsertTable()
+        app.hosts_by_item = {}
+        app.services_by_item = {}
+        app.metadata_by_item = {}
+
+        app._insert_host(Host(address, reachable=True))
+
+        return app.table.rows[0][2]["tags"]
+
+    def test_ipv4_host_row_uses_black_colour_tag(self):
+        self.assertEqual(self._insert_host("192.0.2.20"), ("ipv4_even",))
+
+    def test_ipv6_host_row_uses_dark_green_colour_tag(self):
+        self.assertEqual(self._insert_host("fe80::20%18"), ("ipv6_even",))
 
 
 if __name__ == "__main__":

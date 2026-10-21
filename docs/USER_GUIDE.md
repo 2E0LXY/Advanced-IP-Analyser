@@ -1,4 +1,4 @@
-# Advanced IP Analyser 2.5.1 Instruction Book
+# Advanced IP Analyser 2.6.0 Instruction Book
 
 Windows 10/11 and Debian 13 edition
 
@@ -18,7 +18,7 @@ authorization and does not determine whether a particular capture is lawful.
 
 ## 1. What Advanced IP Analyser does
 
-Advanced IP Analyser combines four workflows:
+Advanced IP Analyser combines five workflows:
 
 1. **Inventory:** find reachable IPv4/IPv6 devices and open TCP services.
 2. **Administration:** save devices, exchange inventories, launch services,
@@ -27,6 +27,8 @@ Advanced IP Analyser combines four workflows:
    inspect metadata/bytes, and apply Wireshark-style display filters.
 4. **Monitoring:** analyze traffic over time and passively observe compatible
    Wi-Fi monitor-mode traffic.
+5. **Smart home:** discover and control supported TP-Link Kasa and Tapo devices
+   locally, or through a secure VPN route into the home LAN.
 
 It is a focused network administration utility, not a complete protocol-forensics
 suite. It does not decrypt TLS, reconstruct every application stream, exploit a
@@ -62,7 +64,7 @@ service, disconnect Wi-Fi clients, inject frames, or recover passwords.
 
 ### Install on Windows
 
-Download `Advanced-IP-Analyser-Setup-2.5.1.exe` from the project release page
+Download `Advanced-IP-Analyser-Setup-2.6.0.exe` from the project release page
 and run it. The per-user installer normally needs no administrator rights and
 offers Start-menu and desktop shortcuts. Windows supports network scanning,
 inventory, web auditing, AI analysis, and saved capture-file inspection. Linux
@@ -71,12 +73,12 @@ visibly disabled because the project does not bundle a Windows capture driver.
 
 ### Install on Debian 13
 
-Download `advanced-ip-analyser_2.5.1_all.deb` from the project release page.
+Download `advanced-ip-analyser_2.6.0_all.deb` from the project release page.
 In a terminal:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.5.1_all.deb
+sudo apt install ./advanced-ip-analyser_2.6.0_all.deb
 ```
 
 Use `apt install ./file.deb`, not `dpkg -i`, because APT resolves dependencies.
@@ -116,11 +118,47 @@ tools used in the current session, and the lower panels show saved favorite
 hosts and local adapter information. Use the left navigation or the dashboard
 buttons to open a tool.
 
+The **Smart Home** page discovers supported TP-Link Kasa and Tapo plugs, bulbs,
+switches, and strips. Enter the account email and password for newer devices that
+require local authentication; these values remain in memory only. Use **Discover
+LAN** for local broadcast discovery. For remote operation, first connect the PC to
+the home LAN through Tailscale, WireGuard, or another trusted VPN, then enter a
+VPN-routed device address under **Direct / VPN address**. Never publish a smart
+device's local management port directly to the internet.
+
+For broader local-device coverage, enter the URL of a Home Assistant instance and
+a long-lived access token, then choose **Load all local devices**. The app lists
+controllable entity domains and supplies common activation, deactivation, and light
+brightness controls. The advanced action box accepts any registered Home Assistant
+action in `domain.service` form plus an optional JSON object, so device-specific
+functions remain available. The app refuses to send the token to a host that resolves
+outside private, loopback, link-local, or VPN address space.
+
+The **Other common local devices** row provides direct adapters for devices that
+are not routed through Home Assistant:
+
+- **Smart Life / Tuya:** enter the device IP, device ID, local key, and a configuration
+  in `version,power-DP,brightness-DP` form, such as `3.3,1,3`. Local keys are device
+  secrets obtained from the owner's Tuya developer account and can change after pairing.
+- **Shelly:** enter the device address, optional local username/password, and switch or
+  light channel. Both Gen1 HTTP endpoints and Gen2+ RPC are supported.
+- **Tasmota:** enter the address, web username/password, and relay number.
+- **WLED:** enter the local address. Power, brightness, and arbitrary JSON state updates
+  use WLED's local JSON API.
+- **Philips Hue:** enter the bridge address, locally authorized application key in the
+  ID field, and light ID in the configuration field.
+
+Direct-adapter secrets remain in application memory only. The advanced action row supports
+Tuya `dp.NUMBER`, Shelly RPC methods, Tasmota commands, WLED JSON state objects, and Hue
+light-state objects.
+
 The Network Scan page is arranged from setup to action:
 
 - **Target:** an address, inclusive range, or CIDR.
 - **Interfaces:** refresh active IPv4 interface/subnet presets.
 - **/24:** use the current host's class-C-style subnet.
+- **IPv6 LAN:** discover local IPv6 nodes through multicast and the NDP neighbour
+  table, then scan only the bounded discovered set instead of enumerating a `/64`.
 - **TCP ports:** comma-separated ports and ranges.
 - **Exclude:** optional addresses, ranges, or CIDRs removed from the target scope.
 - **Repeat:** rescan every 5, 15, 30, or 60 minutes while the app remains open.
@@ -534,6 +572,17 @@ of the release security boundary and must remain enabled.
 ```sh
 advanced-ip-analyser scan TARGET [--timeout SECONDS] [--workers COUNT] [--output FILE]
 ```
+
+### Local IPv6 discovery and scan
+
+```sh
+advanced-ip-analyser scan-local-ipv6 [--interface NAME_OR_INDEX] \
+  [--timeout SECONDS] [--workers COUNT] [--output FILE]
+```
+
+This command stimulates IPv6 neighbour discovery and scans only local addresses
+reported by active interfaces and the operating system's NDP cache. It does not
+attempt to enumerate an IPv6 `/64`.
 
 ### Wake-on-LAN
 

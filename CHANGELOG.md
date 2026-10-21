@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.6.0 - 2026-10-20
+
+- Add a Smart Home page for local discovery and control of supported TP-Link Kasa
+  and Tapo plugs, bulbs, switches, and strips, including secure VPN-routed direct
+  connections for remote use.
+- Add a local Home Assistant controller that enumerates controllable entities,
+  offers common activate/deactivate and brightness controls, and exposes a generic
+  authenticated action runner for device-specific local functions.
+- Add direct local adapters for Smart Life/Tuya devices using local keys, Shelly
+  Gen1/Gen2+, Tasmota, WLED, and Philips Hue bridges, with provider-specific
+  authentication, power, brightness, channel/datapoint selection, and advanced actions.
+- Add bounded local IPv6 discovery on Windows and Debian using all-nodes multicast
+  stimulation plus the operating system's NDP neighbour table, with scoped link-local
+  scanning in the desktop app and the new `scan-local-ipv6` CLI command.
+
 ## 2.5.0 - 2026-09-20
 
 - Rebuild the desktop dashboard around the supplied dark network overview: navigation, scan metrics, traffic chart, recent activity, favorite hosts, and system information.

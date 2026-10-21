@@ -30,13 +30,14 @@ live progress, expandable service results, inventory exchange, and remote action
 | Area | Features |
 | --- | --- |
 | Dashboard | Live scan metrics, interface traffic, recent actions, favorite hosts, local IP/MAC/gateway details, and direct access to common tools |
-| Network discovery | IPv4/IPv6 addresses, CIDRs, inclusive ranges, exclusions, recurring scans, active-interface presets, `/24` shortcut, reachability, connection or ICMP latency, DNS/NetBIOS names, local MAC addresses, cached IEEE vendor lookup |
+| Network discovery | IPv4/IPv6 addresses, CIDRs, inclusive ranges, exclusions, recurring scans, active-interface presets, `/24` shortcut, bounded local IPv6 NDP discovery, reachability, connection or ICMP latency, DNS/NetBIOS names, local MAC addresses, cached IEEE vendor lookup |
 | Asset profiles | Conservative device type, operating system/version, model, and confidence inferred from manufacturer, services, HTTP metadata, and protocol banners without credentials or agents |
 | TCP services | Custom ports/ranges, common and web presets, optional all-65,535-port scan, expandable port rows, safe HTTP/TLS/banner metadata, cancellable two-stage discovery |
 | Results workflow | Live filtering and sorting, alternating rows, clickable services, copy IP/detail, selection-aware export, keyboard and context-menu actions |
 | Favorites | Persistent saved devices, MAC-first identity, refreshed IP observations, editable notes, rescan, removal, import, selected export |
 | Inventory | CSV/JSON/XML/escaped-HTML export, bounded JSON/XML import, spreadsheet-formula protection, atomic favorites updates |
 | Device access | HTTP, HTTPS, FTP, SMB, SSH, RDP and Telnet launchers; Ping, Tracepath, Wake-on-LAN; confirmed delayed SSH shutdown/reboot and abort |
+| Smart home | Direct local control for TP-Link Kasa/Tapo, Smart Life/Tuya, Shelly Gen1/Gen2+, Tasmota, WLED, and Philips Hue; local Home Assistant connection for lights, switches, fans, locks, covers, climate, media, vacuums, scenes and other controllable entities; generic local action runner; secure VPN-routed remote use |
 | Packet engine | Native Linux `AF_PACKET` capture, selected-host/service scope, interface discovery, Ethernet PCAP/PCAPNG/gzip reading, endpoint/port/protocol summaries, byte preview |
 | Display filters | IP/CIDR, TCP/UDP ports, DNS, HTTP, TLS, ICMP, ARP, TCP flags, lengths, comparisons, text/regex matching, boolean expressions, 20 quick filters, saved named filters |
 | Network Security Monitor | Up to 24-hour sessions across all observed ports and both directions, minute timeline, conversations, devices, DNS, TCP diagnostics, behavioural baselines, colour-coded findings, alerts, bookmarks, reports, retention, history |
@@ -57,7 +58,8 @@ and run it. The per-user installer does not require Python and normally does not
 require administrator rights. It adds Start-menu and optional desktop shortcuts.
 
 Windows supports scanning, inventory, fingerprinting, Wake-on-LAN, web auditing,
-AI analysis, saved PCAP/PCAPNG inspection, display filters, reports, and Windows-native
+AI analysis, TP-Link Kasa/Tapo smart-home control, saved PCAP/PCAPNG inspection,
+display filters, reports, and Windows-native
 Ping, Traceroute, SMB, SSH, and Remote Desktop launchers. Linux `AF_PACKET` live
 capture, Network Security Monitor live capture, and monitor-mode Passive Wi-Fi are
 shown as Debian 13-only because the Windows build does not bundle a third-party
@@ -71,7 +73,7 @@ then run:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.5.1_all.deb
+sudo apt install ./advanced-ip-analyser_2.6.0_all.deb
 ```
 
 Launch it from the desktop application menu or run:
@@ -105,8 +107,8 @@ the complete GUI with `sudo`.
 
 ## Scanning and service discovery
 
-1. Select an interface subnet, enter one address/range/CIDR, or use the `/24`
-   shortcut.
+1. Select an interface subnet, enter one address/range/CIDR, use the `/24`
+   shortcut, or press **IPv6 LAN** to discover local IPv6 neighbours.
 2. Optionally enter excluded addresses/ranges/CIDRs and choose an in-app repeat
    interval for scheduled inventory refreshes.
 3. Choose Fast, Balanced, or Accurate, or set timeout/workers manually.
@@ -124,6 +126,12 @@ log in to a service.
 Supported targets are single IPv4/IPv6 addresses, CIDRs, and inclusive ranges.
 Each invocation is limited to 65,536 addresses. Full TCP-port scans should be
 restricted to a small number of authorized targets.
+
+Normal IPv6 LANs use `/64` prefixes and cannot be exhaustively enumerated. The
+**IPv6 LAN** action sends a bounded all-nodes multicast probe on active interfaces,
+reads the operating system's NDP neighbour table, adds the machine's own usable
+IPv6 addresses, and scans only that discovered set. Link-local addresses retain
+their interface scope.
 
 ## Favorites, inventories, and device actions
 
@@ -318,6 +326,7 @@ Use **Help → Check for updates** for a manual check.
 # Scan and export
 advanced-ip-analyser scan 192.168.1.0/24 --output inventory.csv
 advanced-ip-analyser scan 192.168.1.10-192.168.1.30
+advanced-ip-analyser scan-local-ipv6 --interface eth0 --output ipv6-inventory.csv
 
 # Wake-on-LAN
 advanced-ip-analyser wake AA:BB:CC:DD:EE:FF
