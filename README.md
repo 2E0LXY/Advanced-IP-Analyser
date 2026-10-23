@@ -42,7 +42,7 @@ live progress, expandable service results, inventory exchange, and remote action
 | Display filters | IP/CIDR, TCP/UDP ports, DNS, HTTP, TLS, ICMP, ARP, TCP flags, lengths, comparisons, text/regex matching, boolean expressions, 20 quick filters, saved named filters |
 | Network Security Monitor | Up to 24-hour sessions across all observed ports and both directions, minute timeline, conversations, devices, DNS, TCP diagnostics, behavioural baselines, colour-coded findings, alerts, bookmarks, reports, retention, history |
 | Windows Wi-Fi Analyzer | Nearby SSIDs, signal quality, approximate dBm, security, active connection, adapter status, saved-profile inventory, selected-profile password reveal with confirmation, credential-free CSV export |
-| Passive Wi-Fi | Monitor-mode virtual interface, AP/client discovery, SSID/BSSID, channel, signal, security advertisement, beacons/data, probes, passive EAPOL observation, PCAP/JSON save |
+| Passive Wi-Fi | Monitor-mode AP/client discovery, BSSID manufacturer, channel/signal/security/WPS review, beacons/data/probes, passive EAPOL observation, bounded history and comparison, PCAP/JSON/CSV/HTML reports |
 | Web Security Audit | Same-host bounded crawler, path exclusions, extra allowed hosts, custom headers, page/form/technology inventory, TLS fingerprint, security-header, cookie, cleartext, mixed-content, directory-listing, CORS, and password-form observations, HTML/JSON reports |
 | AI intelligence | Separate OpenAI, Gemini, and OpenRouter keys in Debian Secret Service or Windows Credential Manager; supplier-native live model lists; exact outbound preview; redaction; explicit consent; evidence-backed advisory analysis |
 | Updates | Automatic GitHub release check, flashing button, platform-specific asset selection, trusted release URL, SHA-256 verification, package/installer checks, close/install/restart workflow |
@@ -74,7 +74,7 @@ then run:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.7.0_all.deb
+sudo apt install ./advanced-ip-analyser_2.8.0_all.deb
 ```
 
 Launch it from the desktop application menu or run:
@@ -310,8 +310,11 @@ left in place where the driver supports concurrent interfaces.
 
 Passive Wi-Fi Watch can display SSID, BSSID, channel, driver-provided signal,
 Open/WEP/WPA/WPA2/WPA3 advertisement, beacon/data counts, client MAC addresses,
-probe-request names, and passive EAPOL presence. Captures can be retained as
-radiotap PCAP and observations exported as JSON.
+probe-request names, passive EAPOL presence, offline manufacturer names, and
+cautious findings for Open, WEP, legacy WPA, and advertised WPS. Captures can be
+retained as radiotap PCAP and observations exported as JSON, CSV, or escaped HTML.
+Completed observations are stored in a bounded local history so the two latest
+snapshots can be compared for new, missing, or changed security advertisements.
 
 It intentionally does **not** deauthenticate clients, inject frames, create rogue
 access points, capture credentials, crack passwords/keys, or perform denial of

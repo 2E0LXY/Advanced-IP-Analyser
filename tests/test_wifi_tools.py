@@ -6,8 +6,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 from ip_analyser.wifi_tools import (AccessPoint, WifiClient, _pkexec_command,
-                                    analyze_wifi_capture, rogue_wifi_indicators,
-                                    save_wifi_report)
+                                    analyze_wifi_capture, append_wifi_history,
+                                    compare_wifi_history, enrich_wifi_vendors, rogue_wifi_indicators,
+                                    save_wifi_report, wifi_security_assessment)
 
 
 AP = bytes.fromhex("001122334455")
@@ -35,7 +36,8 @@ class WifiToolTests(unittest.TestCase):
     def test_passive_beacon_probe_client_and_eapol_analysis(self):
         fixed = b"\x00" * 8 + struct.pack("<HH", 100, 0x10)
         rsn = b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x08"
-        tags = b"\x00\x07TestNet\x03\x01\x06" + bytes((48, len(rsn))) + rsn
+        tags = (b"\x00\x07TestNet\x03\x01\x06" + bytes((48, len(rsn))) + rsn +
+                b"\xdd\x04\x00\x50\xf2\x04")
         beacon = wifi_header(0x0080, BROADCAST, AP, AP) + fixed + tags
         probe = wifi_header(0x0040, BROADCAST, CLIENT, BROADCAST) + b"\x00\x04Cafe"
         eapol = (wifi_header(0x0108, AP, CLIENT, BROADCAST) +
@@ -50,6 +52,8 @@ class WifiToolTests(unittest.TestCase):
         self.assertEqual(aps[0].channel, 6)
         self.assertEqual(aps[0].security, "WPA3")
         self.assertEqual(aps[0].signal_dbm, -42)
+        self.assertTrue(aps[0].wps_advertised)
+        self.assertEqual(aps[0].risk_level, "Medium")
         self.assertTrue(aps[0].handshake_seen)
         self.assertEqual(unlinked, [])
         self.assertEqual(aps[0].clients["66:77:88:99:AA:BB"].probes, {"Cafe"})
@@ -79,6 +83,50 @@ class WifiToolTests(unittest.TestCase):
                AccessPoint("00:11:22:33:44:66", name="Office", security="Open")]
         self.assertEqual(rogue_wifi_indicators(aps), 2)
         self.assertIn("verify", aps[0].indicators[0].casefold())
+
+    def test_security_assessment_flags_legacy_and_wps_without_overclaiming(self):
+        self.assertEqual(wifi_security_assessment("Open")[0], "High")
+        self.assertEqual(wifi_security_assessment("WEP")[0], "High")
+        level, reasons = wifi_security_assessment("WPA2/RSN", True)
+        self.assertEqual(level, "Medium")
+        self.assertIn("WPS", reasons[0])
+        self.assertEqual(wifi_security_assessment("WPA3"), ("No obvious issue", []))
+
+    def test_wifi_history_reports_new_missing_and_security_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "history.jsonl"
+            append_wifi_history(path, [AccessPoint("00:11:22:33:44:55", name="Office", security="WPA2/RSN"),
+                                       AccessPoint("00:11:22:33:44:66", name="Old", security="WPA2/RSN")], 1)
+            append_wifi_history(path, [AccessPoint("00:11:22:33:44:55", name="Office", security="Open"),
+                                       AccessPoint("00:11:22:33:44:77", name="New", security="WPA3")], 2)
+            changes = compare_wifi_history(path)
+        self.assertEqual({change["change"] for change in changes},
+                         {"New", "Not observed", "Security changed"})
+        changed = next(change for change in changes if change["change"] == "Security changed")
+        self.assertIn("WPA2/RSN", changed["detail"])
+        self.assertIn("Open", changed["detail"])
+        self.assertIn("weaker", changed["detail"])
+
+    def test_wifi_html_and_csv_reports_escape_untrusted_names(self):
+        ap = AccessPoint("00:11:22:33:44:55", name="=SUM(1,2)<script>", security="Open",
+                         risk_level="High", risk_reasons=["Review <now>"])
+        with tempfile.TemporaryDirectory() as directory:
+            html_path = Path(directory) / "report.html"
+            csv_path = Path(directory) / "report.csv"
+            save_wifi_report(html_path, [ap], [])
+            save_wifi_report(csv_path, [ap], [])
+            html_report = html_path.read_text(encoding="utf-8")
+            csv_report = csv_path.read_text(encoding="utf-8")
+        self.assertNotIn("<script>", html_report)
+        self.assertIn("&lt;script&gt;", html_report)
+        self.assertIn("'=SUM", csv_report)
+
+    @patch("ip_analyser.wifi_tools._WIFI_VENDORS.lookup", return_value="Example Vendor")
+    def test_wifi_vendor_enrichment_uses_bssid(self, lookup):
+        ap = AccessPoint("00:11:22:33:44:55")
+        enrich_wifi_vendors([ap])
+        lookup.assert_called_once_with(ap.bssid)
+        self.assertEqual(ap.manufacturer, "Example Vendor")
 
     @patch("ip_analyser.wifi_tools.shutil.which", return_value="/usr/bin/pkexec")
     @patch("ip_analyser.wifi_tools.os.name", "posix")

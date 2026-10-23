@@ -1,18 +1,26 @@
 from __future__ import annotations
 
 import json
+import csv
+import html
 import os
 import re
 import shutil
 import stat
 import struct
 import subprocess
+import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+
+from .vendors import MacVendorLookup
 
 
 MAX_WIFI_CAPTURE_BYTES = 512 * 1024 * 1024
 MAX_WIFI_PACKETS = 100_000
+MAX_WIFI_HISTORY_BYTES = 5 * 1024 * 1024
+MAX_WIFI_HISTORY_ENTRIES = 365
+MAX_WIFI_HISTORY_APS = 4_096
 _INTERFACE = re.compile(r"[A-Za-z0-9_.:@-]{1,15}")
 _MONITOR = re.compile(r"aia[0-9]{1,6}mon")
 
@@ -40,6 +48,10 @@ class AccessPoint:
     first_seen: float = 0
     last_seen: float = 0
     handshake_seen: bool = False
+    wps_advertised: bool = False
+    manufacturer: str = ""
+    risk_level: str = "No obvious issue"
+    risk_reasons: list[str] = field(default_factory=list)
     indicators: list[str] = field(default_factory=list)
     clients: dict[str, WifiClient] = field(default_factory=dict)
 
@@ -164,6 +176,27 @@ def _security(capabilities: int, tags: dict[int, list[bytes]]) -> str:
     return "WEP" if capabilities & 0x10 else "Open"
 
 
+def wifi_security_assessment(security: str, wps_advertised: bool = False) -> tuple[str, list[str]]:
+    """Return cautious configuration findings from advertised security only."""
+    value = security.strip().upper()
+    reasons = []
+    level = "No obvious issue"
+    if value.startswith("OPEN") or value == "OPEN OR UNKNOWN":
+        level = "High"
+        reasons.append("No wireless encryption was advertised; verify this is an intentional guest network.")
+    elif value.startswith("WEP"):
+        level = "High"
+        reasons.append("WEP is obsolete and should be replaced with WPA2-AES or WPA3.")
+    elif value == "WPA" or value.startswith("WPA ·") or value.startswith("WPA PERSONAL"):
+        level = "Medium"
+        reasons.append("Legacy WPA/TKIP was advertised; migrate to WPA2-AES or WPA3.")
+    if wps_advertised:
+        if level == "No obvious issue":
+            level = "Medium"
+        reasons.append("WPS was advertised; disable it unless it is specifically required and controlled.")
+    return level, reasons
+
+
 def _pcap_records(path: Path):
     if path.stat().st_size > MAX_WIFI_CAPTURE_BYTES:
         raise ValueError("wireless recording exceeds the 512 MiB limit")
@@ -215,6 +248,10 @@ def analyze_wifi_capture(path: Path) -> tuple[list[AccessPoint], list[WifiClient
             ap.channel = channel[0] if channel else ap.channel
             ap.signal_dbm = signal if signal is not None else ap.signal_dbm
             ap.security = _security(capabilities, tags)
+            ap.wps_advertised = any(value.startswith(b"\x00\x50\xf2\x04")
+                                    for value in tags.get(221, []))
+            ap.risk_level, ap.risk_reasons = wifi_security_assessment(
+                ap.security, ap.wps_advertised)
             ap.beacons += int(subtype == 8)
             ap.last_seen = timestamp
         elif frame_type == 0 and subtype == 4:
@@ -277,17 +314,160 @@ def rogue_wifi_indicators(access_points) -> int:
     return count
 
 
-def save_wifi_report(path: Path, aps: list[AccessPoint], unlinked: list[WifiClient]) -> None:
-    def client_value(client: WifiClient) -> dict:
-        value = asdict(client)
-        value["probes"] = sorted(client.probes)
-        return value
+_WIFI_VENDORS = MacVendorLookup()
 
-    values = []
-    for ap in aps:
-        value = {key: item for key, item in asdict(ap).items() if key != "clients"}
-        value["clients"] = [client_value(client) for client in ap.clients.values()]
-        values.append(value)
-    path.write_text(json.dumps({"format": 1, "access_points": values,
-                                "unlinked_clients": [client_value(item) for item in unlinked]},
-                               indent=2) + "\n", encoding="utf-8")
+
+def enrich_wifi_vendors(access_points: list[AccessPoint]) -> None:
+    """Add locally cached IEEE manufacturer names; device BSSIDs are never sent."""
+    for access_point in access_points:
+        access_point.manufacturer = _WIFI_VENDORS.lookup(access_point.bssid)
+
+
+def _client_value(client: WifiClient) -> dict:
+    value = asdict(client)
+    value["probes"] = sorted(client.probes)
+    return value
+
+
+def _ap_value(ap: AccessPoint, include_clients: bool = True) -> dict:
+    value = {key: item for key, item in asdict(ap).items() if key != "clients"}
+    if include_clients:
+        value["clients"] = [_client_value(client) for client in ap.clients.values()]
+    else:
+        value["client_count"] = len(ap.clients)
+    return value
+
+
+def spreadsheet_safe_cell(value) -> str:
+    text = str(value if value is not None else "")
+    return "'" + text if text.startswith(("=", "+", "-", "@")) else text
+
+
+def save_wifi_report(path: Path, aps: list[AccessPoint], unlinked: list[WifiClient]) -> None:
+    suffix = path.suffix.casefold()
+    if suffix == ".json":
+        path.write_text(json.dumps({"format": 2,
+                                    "access_points": [_ap_value(ap) for ap in aps],
+                                    "unlinked_clients": [_client_value(item) for item in unlinked]},
+                                   indent=2) + "\n", encoding="utf-8")
+        return
+    rows = [_ap_value(ap, include_clients=False) for ap in aps]
+    columns = ("name", "bssid", "manufacturer", "channel", "signal_dbm", "security",
+               "wps_advertised", "risk_level", "risk_reasons", "beacons", "data_packets",
+               "client_count", "handshake_seen", "indicators")
+    if suffix == ".csv":
+        with path.open("w", encoding="utf-8", newline="") as stream:
+            writer = csv.writer(stream)
+            writer.writerow(columns)
+            for row in rows:
+                writer.writerow([spreadsheet_safe_cell(
+                    "; ".join(row[column]) if isinstance(row.get(column), list) else row.get(column, ""))
+                                 for column in columns])
+        return
+    if suffix in {".html", ".htm"}:
+        headings = "".join(f"<th>{html.escape(column.replace('_', ' ').title())}</th>"
+                           for column in columns)
+        body = []
+        for row in rows:
+            cells = []
+            for column in columns:
+                value = row.get(column, "")
+                if isinstance(value, list):
+                    value = "; ".join(value)
+                cells.append(f"<td>{html.escape(str(value))}</td>")
+            body.append("<tr>" + "".join(cells) + "</tr>")
+        document = ("<!doctype html><html><head><meta charset='utf-8'>"
+                    "<title>Wi-Fi audit report</title><style>body{font-family:system-ui;margin:2rem;"
+                    "color:#17324d}table{border-collapse:collapse;width:100%}th,td{border:1px solid #aac;"
+                    "padding:.45rem;text-align:left}th{background:#102f49;color:white}tr:nth-child(even)"
+                    "{background:#eef6fb}</style></head><body><h1>Wi-Fi audit report</h1><table><thead><tr>"
+                    + headings + "</tr></thead><tbody>" + "".join(body) + "</tbody></table></body></html>")
+        path.write_text(document, encoding="utf-8")
+        return
+    raise ValueError("Wi-Fi report must use .json, .csv, or .html")
+
+
+def append_wifi_history(path: Path, aps: list[AccessPoint], timestamp: float | None = None) -> None:
+    """Append one bounded summary snapshot for later configuration comparison."""
+    path = path.expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    existing: list[str] = []
+    try:
+        size = path.stat().st_size
+        with path.open("rb") as stream:
+            if size > MAX_WIFI_HISTORY_BYTES:
+                stream.seek(-MAX_WIFI_HISTORY_BYTES, os.SEEK_END)
+                stream.readline()  # discard a possibly partial first record
+            existing = stream.read(MAX_WIFI_HISTORY_BYTES).decode(
+                "utf-8", errors="replace").splitlines()
+    except FileNotFoundError:
+        pass
+    record = {"format": 1, "timestamp": timestamp if timestamp is not None else time.time(),
+              "access_points": [_ap_value(ap, include_clients=False)
+                                for ap in aps[:MAX_WIFI_HISTORY_APS]]}
+    lines = (existing + [json.dumps(record, separators=(",", ":"), ensure_ascii=False)])[-MAX_WIFI_HISTORY_ENTRIES:]
+    while len(lines) > 1 and len(("\n".join(lines) + "\n").encode("utf-8")) > MAX_WIFI_HISTORY_BYTES:
+        lines.pop(0)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    temporary.replace(path)
+
+
+def _security_strength(value: str) -> int | None:
+    normalized = value.strip().upper()
+    if normalized.startswith("OPEN"):
+        return 0
+    if normalized.startswith("WEP"):
+        return 1
+    if normalized == "WPA" or normalized.startswith("WPA ·"):
+        return 2
+    if normalized.startswith("WPA2"):
+        return 3
+    if normalized.startswith("WPA3"):
+        return 4
+    return None
+
+
+def compare_wifi_history(path: Path) -> list[dict[str, str]]:
+    """Compare the newest two valid snapshots without treating changes as proof of compromise."""
+    try:
+        if path.stat().st_size > MAX_WIFI_HISTORY_BYTES:
+            raise ValueError("Wi-Fi history exceeds the 5 MiB safety limit")
+        records = []
+        for line in path.read_text(encoding="utf-8").splitlines():
+            try:
+                value = json.loads(line)
+                if isinstance(value, dict) and isinstance(value.get("access_points"), list):
+                    records.append(value)
+            except json.JSONDecodeError:
+                continue
+    except FileNotFoundError:
+        return []
+    if len(records) < 2:
+        return []
+    before = {str(ap.get("bssid", "")).upper(): ap for ap in records[-2]["access_points"]
+              if isinstance(ap, dict) and ap.get("bssid")}
+    after = {str(ap.get("bssid", "")).upper(): ap for ap in records[-1]["access_points"]
+             if isinstance(ap, dict) and ap.get("bssid")}
+    changes: list[dict[str, str]] = []
+    for bssid in sorted(after.keys() - before.keys()):
+        changes.append({"change": "New", "network": str(after[bssid].get("name", "<hidden>")),
+                        "bssid": bssid, "detail": "Newly observed access point; verify against inventory."})
+    for bssid in sorted(before.keys() - after.keys()):
+        changes.append({"change": "Not observed", "network": str(before[bssid].get("name", "<hidden>")),
+                        "bssid": bssid, "detail": "Not present in the latest observation; range and timing may differ."})
+    for bssid in sorted(before.keys() & after.keys()):
+        old_security = str(before[bssid].get("security", ""))
+        new_security = str(after[bssid].get("security", ""))
+        old_wps = bool(before[bssid].get("wps_advertised"))
+        new_wps = bool(after[bssid].get("wps_advertised"))
+        if old_security != new_security or old_wps != new_wps:
+            detail = f"Security advertisement changed from {old_security or 'unknown'} to {new_security or 'unknown'}"
+            old_strength, new_strength = _security_strength(old_security), _security_strength(new_security)
+            if old_strength is not None and new_strength is not None and old_strength != new_strength:
+                detail += " (weaker)" if new_strength < old_strength else " (stronger)"
+            if old_wps != new_wps:
+                detail += f"; WPS {'appeared' if new_wps else 'was no longer observed'}"
+            changes.append({"change": "Security changed", "network": str(after[bssid].get("name", "<hidden>")),
+                            "bssid": bssid, "detail": detail + "; confirm on the authorized access point."})
+    return changes

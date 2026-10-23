@@ -1,3 +1,11 @@
+advanced-ip-analyser (2.8.0) stable; urgency=medium
+
+  * Add Wi-Fi security review for Open, WEP, legacy WPA, and WPS advertisements.
+  * Add offline BSSID manufacturer lookup and bounded scan history comparison.
+  * Add spreadsheet-safe CSV and escaped HTML Wi-Fi audit reports.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Fri, 23 Oct 2026 22:00:00 +0100
+
 advanced-ip-analyser (2.7.0) stable; urgency=medium
 
   * Add native Windows Wi-Fi scanning and adapter status.

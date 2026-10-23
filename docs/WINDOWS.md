@@ -32,7 +32,9 @@ analysed on Windows.
 
 Open **Wi-Fi** in the sidebar. Nearby-network scanning and adapter status are
 read-only and use the Windows WLAN service. CSV exports contain SSID, signal,
-security, connection, saved-profile, and adapter fields; they exclude passwords.
+security, cautious configuration review, connection, saved-profile, and adapter
+fields; they exclude passwords. Open and legacy security advertisements are
+highlighted for verification.
 
 The Saved profiles tab masks every key by default. Revealing a selected profile
 requires confirmation and asks Windows for that one locally stored key. Revealed

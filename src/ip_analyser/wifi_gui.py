@@ -11,8 +11,9 @@ from tkinter import filedialog, messagebox, ttk
 from .packet_tools import CaptureSession, start_monitor_capture
 from .monitoring import enforce_capture_retention
 from .wifi_tools import (AccessPoint, WifiClient, analyze_wifi_capture,
+                         append_wifi_history, compare_wifi_history,
                          create_monitor_interface, list_wireless_interfaces,
-                         remove_monitor_interface, save_wifi_report,
+                         enrich_wifi_vendors, remove_monitor_interface, save_wifi_report,
                          start_channel_hopper)
 
 
@@ -36,6 +37,8 @@ class WifiWatch(tk.Toplevel):
         self.events: queue.Queue = queue.Queue()
         self.worker_active = False
         self.data_dir = Path.home() / ".local" / "share" / "advanced-ip-analyser" / "wifi-captures"
+        self.history_path = self.data_dir / "wifi-scan-history.jsonl"
+        self.history_logged = False
         self._build()
         self._load_interfaces()
         self.after(200, self._drain_events)
@@ -67,7 +70,8 @@ class WifiWatch(tk.Toplevel):
         self.channels.insert(0, DEFAULT_CHANNELS)
         self.channels.pack(side="left", fill="x", expand=True, padx=8)
         ttk.Button(options, text="Save capture…", command=self.save_capture).pack(side="left")
-        ttk.Button(options, text="Save JSON report…", command=self.save_report).pack(side="left", padx=(8, 0))
+        ttk.Button(options, text="Save report…", command=self.save_report).pack(side="left", padx=(8, 0))
+        ttk.Button(options, text="Compare recent scans…", command=self.compare_scans).pack(side="left", padx=(8, 0))
 
         note = ttk.Label(self, padding=(12, 0, 12, 8),
                          text="Passive discovery only: this feature does not disconnect clients, inject packets, or attempt passwords.")
@@ -80,10 +84,10 @@ class WifiWatch(tk.Toplevel):
         panes.add(ap_frame, weight=4)
         panes.add(client_frame, weight=2)
 
-        ap_columns = ("name", "bssid", "channel", "signal", "security",
-                      "beacons", "data", "clients", "handshake", "indicators")
+        ap_columns = ("name", "bssid", "manufacturer", "channel", "signal", "security",
+                      "wps", "risk", "beacons", "data", "clients", "eapol", "findings")
         self.ap_table = ttk.Treeview(ap_frame, columns=ap_columns, show="headings", selectmode="browse")
-        ap_widths = (150, 140, 55, 55, 90, 60, 60, 55, 75, 280)
+        ap_widths = (150, 140, 170, 55, 55, 90, 50, 80, 60, 60, 55, 70, 320)
         for column, width in zip(ap_columns, ap_widths):
             self.ap_table.heading(column, text=column.title())
             self.ap_table.column(column, width=width, anchor="w", stretch=column == "name")
@@ -172,6 +176,7 @@ class WifiWatch(tk.Toplevel):
         self.start_button.configure(state="disabled")
         self.stop_button.configure(state="normal")
         self.progress.start(10)
+        self.history_logged = False
         self.status.configure(text=f"Passively watching on {self.monitor_interface}…")
         self._schedule_refresh()
 
@@ -187,6 +192,7 @@ class WifiWatch(tk.Toplevel):
     def _worker(self, path: Path) -> None:
         try:
             aps, clients = analyze_wifi_capture(path)
+            enrich_wifi_vendors(aps)
             self.events.put(("analysis", aps, clients))
         except (OSError, ValueError) as error:
             self.events.put(("error", str(error)))
@@ -199,6 +205,13 @@ class WifiWatch(tk.Toplevel):
                 if event[0] == "analysis":
                     self.access_points, self.unlinked_clients = event[1], event[2]
                     self._refresh_tables()
+                    if (self.capture and not self.capture.running and self.access_points
+                            and not self.history_logged):
+                        try:
+                            append_wifi_history(self.history_path, self.access_points)
+                            self.history_logged = True
+                        except OSError as error:
+                            self.status.configure(text=f"Wi-Fi history could not be saved: {error}")
                 else:
                     self.status.configure(text=f"Wireless analysis waiting: {event[1]}")
         except queue.Empty:
@@ -215,9 +228,10 @@ class WifiWatch(tk.Toplevel):
         selected_item = ""
         for ap in self.access_points:
             item = self.ap_table.insert("", "end", values=(
-                ap.name or "<hidden>", ap.bssid, ap.channel or "", ap.signal_dbm or "",
-                ap.security, ap.beacons, ap.data_packets, len(ap.clients),
-                "Observed" if ap.handshake_seen else "", "; ".join(ap.indicators)))
+                ap.name or "<hidden>", ap.bssid, ap.manufacturer, ap.channel or "", ap.signal_dbm or "",
+                ap.security, "Yes" if ap.wps_advertised else "", ap.risk_level,
+                ap.beacons, ap.data_packets, len(ap.clients),
+                "Observed" if ap.handshake_seen else "", "; ".join(ap.risk_reasons + ap.indicators)))
             self.ap_by_item[item] = ap
             if ap.bssid == selected_bssid:
                 selected_item = item
@@ -286,13 +300,40 @@ class WifiWatch(tk.Toplevel):
         if not self.access_points and not self.unlinked_clients:
             messagebox.showinfo("No results", "No wireless observations are available yet.", parent=self)
             return
-        name = filedialog.asksaveasfilename(parent=self, defaultextension=".json",
-                                            filetypes=[("JSON report", "*.json")])
+        name = filedialog.asksaveasfilename(
+            parent=self, defaultextension=".html",
+            filetypes=[("HTML report", "*.html"), ("CSV report", "*.csv"),
+                       ("JSON report", "*.json")])
         if name:
             try:
                 save_wifi_report(Path(name), self.access_points, self.unlinked_clients)
-            except OSError as error:
+            except (OSError, ValueError) as error:
                 messagebox.showerror("Report failed", str(error), parent=self)
+
+    def compare_scans(self) -> None:
+        try:
+            changes = compare_wifi_history(self.history_path)
+        except (OSError, ValueError) as error:
+            messagebox.showerror("Scan comparison failed", str(error), parent=self)
+            return
+        if not changes:
+            messagebox.showinfo("Scan comparison", "Two saved Wi-Fi scan snapshots are required, or no differences were found.", parent=self)
+            return
+        window = tk.Toplevel(self)
+        window.title("Recent Wi-Fi scan comparison")
+        window.geometry("960x460")
+        ttk.Label(window, text="Changes between the two most recent completed observations",
+                  font=("TkDefaultFont", 13, "bold"), padding=12).pack(anchor="w")
+        ttk.Label(window, text="Changes are observations to verify; range, channel timing, and adapter position can affect visibility.",
+                  padding=(12, 0, 12, 8)).pack(anchor="w")
+        columns = ("change", "network", "bssid", "detail")
+        table = ttk.Treeview(window, columns=columns, show="headings")
+        for column, width in zip(columns, (120, 180, 150, 470)):
+            table.heading(column, text=column.title())
+            table.column(column, width=width, anchor="w", stretch=column == "detail")
+        for change in changes:
+            table.insert("", "end", values=tuple(change[column] for column in columns))
+        table.pack(fill="both", expand=True, padx=12, pady=(0, 12))
 
     def close(self) -> None:
         if self.capture and self.capture.running:

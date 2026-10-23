@@ -11,6 +11,7 @@ from tkinter import filedialog, messagebox, ttk
 from .windows_wifi import (NearbyWifiNetwork, SavedWifiProfile,
                            list_nearby_wifi_networks, list_saved_wifi_profiles,
                            list_wifi_interfaces, reveal_saved_wifi_password)
+from .wifi_tools import spreadsheet_safe_cell
 
 
 class WindowsWifiAnalyzer(tk.Toplevel):
@@ -53,10 +54,10 @@ class WindowsWifiAnalyzer(tk.Toplevel):
         tabs.add(profiles_page, text="Saved profiles")
         tabs.add(adapter_page, text="Adapters")
 
-        columns = ("ssid", "signal", "dbm", "security", "saved", "state", "adapter")
+        columns = ("ssid", "signal", "dbm", "security", "risk", "saved", "state", "adapter", "finding")
         self.nearby_table = ttk.Treeview(nearby_page, columns=columns, show="headings")
-        widths = (220, 85, 75, 210, 90, 95, 220)
-        labels = ("Network name", "Signal", "Approx. dBm", "Security", "Saved", "State", "Adapter")
+        widths = (200, 75, 75, 190, 100, 70, 90, 200, 340)
+        labels = ("Network name", "Signal", "Approx. dBm", "Security", "Review", "Saved", "State", "Adapter", "Finding")
         for column, width, label in zip(columns, widths, labels):
             self.nearby_table.heading(column, text=label)
             self.nearby_table.column(column, width=width, anchor="w", stretch=column in {"ssid", "security", "adapter"})
@@ -154,8 +155,9 @@ class WindowsWifiAnalyzer(tk.Toplevel):
         for network in networks:
             self.nearby_table.insert("", "end", values=(
                 network.ssid, f"{network.signal_percent}%", network.signal_dbm,
-                network.security, "Yes" if network.profile_name else "No",
-                "Connected" if network.connected else "Available", network.interface))
+                network.security, network.risk_level, "Yes" if network.profile_name else "No",
+                "Connected" if network.connected else "Available", network.interface,
+                network.risk_reason))
         self.profile_table.delete(*self.profile_table.get_children())
         self.profile_by_item.clear()
         for profile in profiles:
@@ -260,12 +262,13 @@ class WindowsWifiAnalyzer(tk.Toplevel):
         try:
             with Path(name).open("w", encoding="utf-8", newline="") as stream:
                 writer = csv.writer(stream)
-                writer.writerow(("ssid", "signal_percent", "approx_dbm", "security",
-                                 "saved_profile", "connected", "adapter"))
+                writer.writerow(("ssid", "signal_percent", "approx_dbm", "security", "risk_level",
+                                 "risk_reason", "saved_profile", "connected", "adapter"))
                 for network in self.nearby:
-                    writer.writerow((network.ssid, network.signal_percent, network.signal_dbm,
-                                     network.security, bool(network.profile_name), network.connected,
-                                     network.interface))
+                    writer.writerow(tuple(spreadsheet_safe_cell(value) for value in (
+                        network.ssid, network.signal_percent, network.signal_dbm,
+                        network.security, network.risk_level, network.risk_reason,
+                        bool(network.profile_name), network.connected, network.interface)))
             self.status.configure(text=f"Nearby network scan saved to {os.path.basename(name)}; passwords were excluded.")
         except OSError as error:
             messagebox.showerror("Export failed", str(error), parent=self)

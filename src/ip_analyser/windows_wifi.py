@@ -8,6 +8,8 @@ from ctypes import wintypes
 
 from defusedxml import ElementTree
 
+from .wifi_tools import wifi_security_assessment
+
 
 WLAN_MAX_NAME_LENGTH = 256
 DOT11_SSID_MAX_LENGTH = 32
@@ -32,6 +34,8 @@ class NearbyWifiNetwork:
     profile_name: str
     interface: str
     connected: bool
+    risk_level: str = "No obvious issue"
+    risk_reason: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,15 +230,18 @@ def list_nearby_wifi_networks() -> list[NearbyWifiNetwork]:
                 for record in records:
                     ssid = record.dot11Ssid.text() or "<hidden>"
                     quality = max(0, min(100, int(record.wlanSignalQuality)))
+                    security = _security(int(record.dot11DefaultAuthAlgorithm),
+                                         int(record.dot11DefaultCipherAlgorithm),
+                                         bool(record.bSecurityEnabled))
+                    risk_level, risk_reasons = wifi_security_assessment(security)
                     network = NearbyWifiNetwork(
                         ssid=ssid, signal_percent=quality,
                         signal_dbm=-100 if quality == 0 else -50 if quality == 100 else -100 + quality // 2,
-                        security=_security(int(record.dot11DefaultAuthAlgorithm),
-                                           int(record.dot11DefaultCipherAlgorithm),
-                                           bool(record.bSecurityEnabled)),
+                        security=security,
                         profile_name=record.strProfileName,
                         interface=interface.name,
-                        connected=bool(int(record.dwFlags) & WLAN_AVAILABLE_NETWORK_CONNECTED))
+                        connected=bool(int(record.dwFlags) & WLAN_AVAILABLE_NETWORK_CONNECTED),
+                        risk_level=risk_level, risk_reason="; ".join(risk_reasons))
                     key = (ssid.casefold(), interface.guid)
                     previous = networks.get(key)
                     if previous is None or network.signal_percent > previous.signal_percent:

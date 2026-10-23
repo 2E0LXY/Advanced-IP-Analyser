@@ -1155,7 +1155,7 @@ class Application(tk.Tk):
                 "Recordings and analysis remain local. Old unbookmarked watch captures are limited by age and storage; bookmarked recordings are retained. Findings are indicators rather than proof of compromise, traffic is not blocked, and encrypted content is never decrypted.")
         add_tab("Passive Wi-Fi Watch",
                 "Packets → Passive Wi-Fi Watch discovers nearby access points and observed clients using a compatible Linux wireless adapter. "
-                "It shows network name, BSSID, channel, approximate signal, security type, beacon/data counts, client addresses, probe names, and whether WPA authentication traffic was observed.\n\n"
+                "It shows network name, BSSID, offline manufacturer, channel, approximate signal, security type, WPS advertisement, cautious risk findings, beacon/data counts, client addresses, probe names, and whether WPA authentication traffic was observed. JSON, CSV, and escaped HTML reports are available, and bounded history compares new, missing, and changed security advertisements.\n\n"
                 "The adapter must support monitor mode. A temporary virtual monitor interface is created through PolicyKit and removed when the watch stops, leaving the normal interface unchanged where the driver supports concurrent interfaces. "
                 "The feature is passive: it does not send deauthentication frames, inject traffic, disconnect clients, or attempt password recovery.")
         add_tab("Windows Wi-Fi Analyzer",
