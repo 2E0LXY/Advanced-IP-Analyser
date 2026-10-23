@@ -1,4 +1,4 @@
-# Advanced IP Analyser 2.6.0 Instruction Book
+# Advanced IP Analyser 2.7.0 Instruction Book
 
 Windows 10/11 and Debian 13 edition
 
@@ -64,21 +64,22 @@ service, disconnect Wi-Fi clients, inject frames, or recover passwords.
 
 ### Install on Windows
 
-Download `Advanced-IP-Analyser-Setup-2.6.0.exe` from the project release page
+Download `Advanced-IP-Analyser-Setup-2.7.0.exe` from the project release page
 and run it. The per-user installer normally needs no administrator rights and
 offers Start-menu and desktop shortcuts. Windows supports network scanning,
-inventory, web auditing, AI analysis, and saved capture-file inspection. Linux
+inventory, Wi-Fi adapter/nearby-network scanning, selected saved-profile key
+inspection, web auditing, AI analysis, and saved capture-file inspection. Linux
 live capture, the Network Security Monitor, and passive monitor-mode Wi-Fi are
 visibly disabled because the project does not bundle a Windows capture driver.
 
 ### Install on Debian 13
 
-Download `advanced-ip-analyser_2.6.0_all.deb` from the project release page.
+Download `advanced-ip-analyser_2.7.0_all.deb` from the project release page.
 In a terminal:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.6.0_all.deb
+sudo apt install ./advanced-ip-analyser_2.7.0_all.deb
 ```
 
 Use `apt install ./file.deb`, not `dpkg -i`, because APT resolves dependencies.
@@ -477,7 +478,21 @@ Findings are cautious indicators, not proof of compromise. Visibility depends on
 interface selection and network topology, sessions stop at 100,000 packets, and
 encrypted application content remains encrypted.
 
-## 13. Passive Wi-Fi Watch
+## 13. Windows Wi-Fi Analyzer
+
+On Windows 10 or 11, select **Wi-Fi** in the sidebar. The Nearby networks tab
+shows SSID, signal percentage, approximate dBm, security, saved-profile status,
+connection state, and adapter. The Adapters tab reports Windows WLAN interface
+state. Refresh is read-only, and CSV export excludes credentials.
+
+The Saved profiles tab lists profiles already stored by Windows with every key
+masked. Select one profile and confirm **Reveal selected password** to request
+that key from Windows. The result remains in application memory until hidden or
+the window closes. Copy clears the same clipboard value after 30 seconds.
+Windows can refuse clear-text retrieval when the signed-in account lacks the
+required permission.
+
+## 14. Passive Wi-Fi Watch
 
 ![Passive Wi-Fi Watch](images/passive-wifi-watch.png)
 
@@ -506,7 +521,7 @@ JSON report if needed. Wi-Fi ordinary recordings use the same bounded retention.
 Passive Wi-Fi Watch deliberately has no deauthentication, injection, rogue AP,
 credential interception, key/password cracking, or denial-of-service capability.
 
-## 14. Web Security Audit
+## 15. Web Security Audit
 
 ![Web Security Audit](images/web-security-audit.png)
 
@@ -541,7 +556,7 @@ module is not a clone of Acunetix/Invicti. It deliberately excludes active SQL
 injection/XSS testing, credential attacks, forced browsing, file upload, malware
 execution, destructive validation, and out-of-band exploit callbacks.
 
-## 15. Automatic updates
+## 16. Automatic updates
 
 The app checks the latest project GitHub release after startup. A newer valid tag
 turns the top toolbar's Scan Network button into a yellow Install button. Click
@@ -565,7 +580,7 @@ and `apt-signing` environments should have required reviewers, and tag creation
 should be limited by a repository tag rule. These repository settings are part
 of the release security boundary and must remain enabled.
 
-## 16. Command-line reference
+## 17. Command-line reference
 
 ### Scan
 
@@ -620,7 +635,7 @@ advanced-ip-analyser web-audit https://server.example \
   --max-pages 25 --max-depth 2 --exclude /logout --report web-audit.html
 ```
 
-## 17. Files, data, and privacy
+## 18. Files, data, and privacy
 
 | Path | Contents |
 | --- | --- |
@@ -640,7 +655,7 @@ through explicit export/copy, tools the user launches, or an AI payload the user
 has inspected and approved. Update checks contact this project's GitHub Releases
 API. AI keys remain in the desktop keyring.
 
-## 18. Troubleshooting
+## 19. Troubleshooting
 
 ### Scan finds nothing
 
@@ -689,7 +704,7 @@ An authentication redirect to another hostname requires that hostname to be
 explicitly allowed. Interpret certificate trust separately from the TLS
 protocol/cipher inventory; validation failures are shown as High findings.
 
-## 19. Keyboard and mouse reference
+## 20. Keyboard and mouse reference
 
 | Input | Action |
 | --- | --- |
@@ -704,7 +719,7 @@ protocol/cipher inventory; validation failures are shown as High findings.
 | Right-click result | Open, copy, expand/collapse |
 | Right-click TCP ports | Port presets |
 
-## 20. Security and interpretation notes
+## 21. Security and interpretation notes
 
 - Scan/fingerprint work is bounded and unauthenticated.
 - Network-derived strings are not passed through a shell.
@@ -728,7 +743,7 @@ Network Security Monitor findings and Passive Wi-Fi security labels are observat
 can be affected by partial visibility and should be confirmed with configuration,
 logs, and authorized specialist tools before action.
 
-## 21. Getting help and contributing
+## 22. Getting help and contributing
 
 Use the in-app Help centre for offline guidance. For bugs, include Debian version,
 application version, steps, expected/actual result, and sanitized logs/captures:

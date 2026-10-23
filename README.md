@@ -41,6 +41,7 @@ live progress, expandable service results, inventory exchange, and remote action
 | Packet engine | Native Linux `AF_PACKET` capture, selected-host/service scope, interface discovery, Ethernet PCAP/PCAPNG/gzip reading, endpoint/port/protocol summaries, byte preview |
 | Display filters | IP/CIDR, TCP/UDP ports, DNS, HTTP, TLS, ICMP, ARP, TCP flags, lengths, comparisons, text/regex matching, boolean expressions, 20 quick filters, saved named filters |
 | Network Security Monitor | Up to 24-hour sessions across all observed ports and both directions, minute timeline, conversations, devices, DNS, TCP diagnostics, behavioural baselines, colour-coded findings, alerts, bookmarks, reports, retention, history |
+| Windows Wi-Fi Analyzer | Nearby SSIDs, signal quality, approximate dBm, security, active connection, adapter status, saved-profile inventory, selected-profile password reveal with confirmation, credential-free CSV export |
 | Passive Wi-Fi | Monitor-mode virtual interface, AP/client discovery, SSID/BSSID, channel, signal, security advertisement, beacons/data, probes, passive EAPOL observation, PCAP/JSON save |
 | Web Security Audit | Same-host bounded crawler, path exclusions, extra allowed hosts, custom headers, page/form/technology inventory, TLS fingerprint, security-header, cookie, cleartext, mixed-content, directory-listing, CORS, and password-form observations, HTML/JSON reports |
 | AI intelligence | Separate OpenAI, Gemini, and OpenRouter keys in Debian Secret Service or Windows Credential Manager; supplier-native live model lists; exact outbound preview; redaction; explicit consent; evidence-backed advisory analysis |
@@ -73,7 +74,7 @@ then run:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.6.0_all.deb
+sudo apt install ./advanced-ip-analyser_2.7.0_all.deb
 ```
 
 Launch it from the desktop application menu or run:
@@ -284,6 +285,19 @@ This is a visibility and alerting tool, not an IDS/IPS: it does not block traffi
 Sessions remain bounded to 100,000 packets, and encrypted payloads remain encrypted.
 
 See [Network Security Monitor documentation](docs/NETWORK_WATCH.md).
+
+## Windows Wi-Fi Analyzer
+
+Open **Wi-Fi** in the sidebar on Windows 10 or 11. The analyzer uses Windows'
+native WLAN service to list wireless adapters, nearby network names, signal
+quality, approximate dBm, advertised security, the active connection, and saved
+profiles. Nearby results can be exported to CSV; credentials are never included.
+
+Saved passwords remain masked. To inspect one key already stored on the current
+computer, select its profile and confirm **Reveal selected password**. The app
+requests only that profile, retains the result only in memory, provides an
+immediate Hide action, and clears a matching copied clipboard value after 30
+seconds. Windows controls access and may require an administrator account.
 
 ## Passive Wi-Fi Watch
 

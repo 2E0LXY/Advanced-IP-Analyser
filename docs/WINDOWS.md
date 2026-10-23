@@ -12,6 +12,8 @@ shortcut and offers an optional desktop shortcut.
 - TCP service discovery, safe banners, device profiles, inventory, and favourites;
 - Wake-on-LAN, web audit, reports, imports, and exports;
 - Windows Ping, Traceroute, SMB, OpenSSH, and Remote Desktop launchers;
+- native Wi-Fi adapter and nearby-network scanning with signal and security details;
+- saved Wi-Fi profile inventory and confirmation-gated reveal of one locally stored key;
 - OpenAI, Gemini, and OpenRouter model discovery and consent-gated analysis;
 - API keys stored through Windows Credential Manager;
 - bounded PCAP, PCAPNG, and compressed capture-file analysis and display filters;
@@ -25,6 +27,19 @@ interfaces. Their menu entries are visibly disabled on Windows. The application
 does not bundle Npcap, WinPcap, Wireshark, a kernel driver, or any software with a
 separate capture-driver licence. Existing capture files can still be opened and
 analysed on Windows.
+
+## Wi-Fi Analyzer
+
+Open **Wi-Fi** in the sidebar. Nearby-network scanning and adapter status are
+read-only and use the Windows WLAN service. CSV exports contain SSID, signal,
+security, connection, saved-profile, and adapter fields; they exclude passwords.
+
+The Saved profiles tab masks every key by default. Revealing a selected profile
+requires confirmation and asks Windows for that one locally stored key. Revealed
+values remain in application memory until hidden or the window closes. A copied
+key is cleared after 30 seconds when the clipboard still contains the same value.
+Windows can deny clear-text retrieval unless the signed-in account has the
+required permission.
 
 ## Release integrity
 

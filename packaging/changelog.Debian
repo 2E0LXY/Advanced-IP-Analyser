@@ -1,3 +1,11 @@
+advanced-ip-analyser (2.7.0) stable; urgency=medium
+
+  * Add native Windows Wi-Fi scanning and adapter status.
+  * Add confirmation-gated inspection of one locally saved Wi-Fi profile key.
+  * Add credential-free nearby-network CSV export.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Fri, 23 Oct 2026 12:00:00 +0100
+
 advanced-ip-analyser (2.6.0) stable; urgency=medium
 
   * Add TP-Link Kasa and Tapo smart-home discovery and controls.

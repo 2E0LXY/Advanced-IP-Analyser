@@ -74,6 +74,7 @@ from .updater import Update, check_for_update, download_update, launch_installer
 from .watch_gui import NetworkWatch
 from .web_gui import WebSecurityAudit
 from .wifi_gui import WifiWatch
+from .windows_wifi_gui import WindowsWifiAnalyzer
 
 OPENABLE_SERVICES = {"http", "https", "ftp", "smb", "ssh", "rdp", "telnet"}
 COMMON_PORTS = ",".join(str(port) for port in DEFAULT_PORTS)
@@ -387,6 +388,7 @@ class Application(tk.Tk):
         for label, action in (("⌁  Ping", lambda: self._run_diagnostic("ping")),
                               ("↗  Traceroute", lambda: self._run_diagnostic("trace")),
                               ("▦  Port Scan", self._open_port_scan),
+                              ("⌁  Wi-Fi", self.open_wifi_tools),
                               ("◫  Packets", self.open_packet_capture),
                               ("⬡  Security", self.open_web_audit)):
             tk.Button(sidebar, text=label, anchor="w", relief="flat", bd=0, bg="#132334",
@@ -1156,6 +1158,9 @@ class Application(tk.Tk):
                 "It shows network name, BSSID, channel, approximate signal, security type, beacon/data counts, client addresses, probe names, and whether WPA authentication traffic was observed.\n\n"
                 "The adapter must support monitor mode. A temporary virtual monitor interface is created through PolicyKit and removed when the watch stops, leaving the normal interface unchanged where the driver supports concurrent interfaces. "
                 "The feature is passive: it does not send deauthentication frames, inject traffic, disconnect clients, or attempt password recovery.")
+        add_tab("Windows Wi-Fi Analyzer",
+                "Wi-Fi in the sidebar opens a read-only Windows analyzer showing adapters, the current connection, nearby network names, signal quality, approximate dBm, security, and saved-profile status. Nearby results can be exported to CSV without credentials.\n\n"
+                "The Saved profiles tab lists profiles already stored by Windows. Passwords remain masked until one profile is selected and its Reveal action is confirmed. A revealed password stays only in application memory, is excluded from exports, and can be hidden immediately. Copy clears the matching clipboard value after 30 seconds. Windows controls whether the signed-in account may retrieve a clear-text key and may require administrator permission.")
         add_tab("AI settings",
                 "AI Settings supports OpenAI, Gemini, and OpenRouter with a separate key for each provider. "
                 "Refresh models securely retrieves the live text-generation choices available to that key from the supplier's own API. "
@@ -1685,6 +1690,14 @@ class Application(tk.Tk):
 
     def open_wifi_watch(self) -> None:
         WifiWatch(self)
+
+    def open_wifi_tools(self) -> None:
+        if sys.platform == "win32":
+            WindowsWifiAnalyzer(self)
+        elif sys.platform.startswith("linux"):
+            WifiWatch(self)
+        else:
+            messagebox.showinfo("Wi-Fi tools", "Wi-Fi tools are available on Windows 10/11 and Debian 13.")
 
     def open_web_audit(self) -> None:
         initial = ""
