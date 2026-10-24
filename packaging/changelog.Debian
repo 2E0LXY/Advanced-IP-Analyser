@@ -1,3 +1,11 @@
+advanced-ip-analyser (2.8.1) stable; urgency=medium
+
+  * Discover LAN devices that block ping and selected TCP ports using neighbour-table evidence.
+  * Deduplicate overlapping and concurrent scan results by IP address.
+  * Reject ambiguous reverse-DNS names that map to multiple devices.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Sat, 24 Oct 2026 18:00:00 +0100
+
 advanced-ip-analyser (2.8.0) stable; urgency=medium
 
   * Add Wi-Fi security review for Open, WEP, legacy WPA, and WPS advertisements.

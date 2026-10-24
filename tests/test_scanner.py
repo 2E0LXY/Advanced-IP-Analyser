@@ -7,6 +7,23 @@ from ip_analyser.scanner import CREATE_NO_WINDOW, Scanner
 
 
 class ScannerPortDetailTests(unittest.TestCase):
+    @patch.object(Scanner, "inspect")
+    def test_scan_deduplicates_overlapping_targets(self, inspect):
+        inspect.side_effect = lambda address: Host(address, reachable=True)
+        results = Scanner(workers=1).scan(
+            ["192.0.2.1", "192.0.2.1", "192.0.2.2"], discover_services=False)
+        self.assertEqual([host.address for host in results], ["192.0.2.1", "192.0.2.2"])
+        self.assertEqual(inspect.call_count, 2)
+
+    @patch.object(Scanner, "_neighbour_mac", return_value="AA:BB:CC:DD:EE:FF")
+    @patch.object(Scanner, "_ping", return_value=None)
+    @patch.object(Scanner, "_port_open", return_value=False)
+    def test_local_arp_neighbour_is_reachable_without_ping_or_open_port(self, _port, _ping, _mac):
+        host = Scanner(ports={80: "http"}).inspect("192.0.2.20")
+        self.assertTrue(host.reachable)
+        self.assertEqual(host.mac, "AA:BB:CC:DD:EE:FF")
+        self.assertIsNone(host.latency_ms)
+
     @patch.object(Scanner, "_neighbour_mac", return_value="")
     @patch.object(Scanner, "_port_open")
     def test_port_checks_are_parallel_and_latency_is_a_probe_not_scan_duration(self, port_open, _mac):
@@ -113,6 +130,23 @@ class ScannerPortDetailTests(unittest.TestCase):
         self.assertEqual(scanner._resolve_hostname("192.168.1.45"), "Tapo_SmartPlug.lan")
         self.assertEqual(scanner._local_gateway("192.168.2.45"), "")
         self.assertEqual(scanner._local_gateway("8.8.8.8"), "")
+
+    @patch("ip_analyser.scanner.subprocess.run")
+    def test_ambiguous_forward_name_is_rejected(self, run):
+        run.return_value = Mock(stdout=(
+            "Server: router\nAddress: 192.168.1.1\n\n"
+            "Name: Tapo_SmartPlug.example.ts.net\n"
+            "Addresses: 192.168.1.10\n          192.168.1.34\n"))
+        self.assertFalse(Scanner._hostname_is_unique(
+            "Tapo_SmartPlug.example.ts.net", "192.168.1.34", "192.168.1.1"))
+
+    @patch("ip_analyser.scanner.subprocess.run")
+    def test_unique_forward_name_is_accepted(self, run):
+        run.return_value = Mock(stdout=(
+            "Server: router\nAddress: 192.168.1.1\n\n"
+            "Name: printer.lan\nAddress: 192.168.1.50\n"))
+        self.assertTrue(Scanner._hostname_is_unique(
+            "printer.lan", "192.168.1.50", "192.168.1.1"))
 
     @patch("ip_analyser.scanner.time.monotonic", side_effect=[10.0, 10.012])
     @patch.object(Scanner, "_port_open", return_value=True)

@@ -48,7 +48,9 @@ class Scanner:
     def scan(self, targets: Iterable[str], progress: Callable[[int, int, Host], None] | None = None,
              cancel: threading.Event | None = None, discover_services: bool = True,
              discovery_progress: Callable[[int, int, Host], None] | None = None) -> list[Host]:
-        addresses = list(targets)
+        # A repeated target must never create repeated result rows. This also
+        # protects callers that combine overlapping ranges.
+        addresses = list(dict.fromkeys(targets))
         results: list[Host] = []
         # Keep the combined host/port fan-out bounded. A host now probes several
         # ports concurrently, so 64 hosts each with 64 sockets would overwhelm a LAN.
@@ -100,11 +102,14 @@ class Scanner:
         ping_started = time.monotonic()
         ping_latency = self._ping(address) if not open_ports else None
         pinged = bool(ping_latency)
-        reachable = bool(open_ports) or pinged
+        mac = self._neighbour_mac(address)
+        # On a directly connected LAN, a valid neighbour-table entry is strong
+        # reachability evidence even when the device blocks ICMP and every
+        # selected TCP port. ARP-only discovery is how many appliances surface.
+        reachable = bool(open_ports) or pinged or bool(mac)
         latency = (round(min(connection_times), 1) if connection_times else
                    round(float(ping_latency), 1) if pinged and not isinstance(ping_latency, bool) else
                    round((time.monotonic() - ping_started) * 1000, 1) if pinged else None)
-        mac = self._neighbour_mac(address)
         host = Host(address=address, reachable=reachable, latency_ms=latency, mac=mac,
                     services=services, ports=[port for port, _name in open_ports])
         profile = infer_asset_profile(host)
@@ -117,8 +122,9 @@ class Scanner:
 
     def discover(self, host: Host) -> Host:
         """Enrich one completed host result without delaying its initial display."""
+        mac = host.mac or (self._neighbour_mac(host.address) if host.reachable else "")
         hostname = host.hostname or (self._resolve_hostname(host.address) if host.reachable else "")
-        manufacturer = self.vendors.lookup(host.mac) if host.mac else ""
+        manufacturer = self.vendors.lookup(mac) if mac else ""
         service_info: dict[str, dict[str, str]] = {}
         services = list(zip(host.ports, host.services))
         if services:
@@ -129,7 +135,7 @@ class Scanner:
                 for future in concurrent.futures.as_completed(probes):
                     if details := future.result():
                         service_info[str(probes[future])] = details
-        enriched = replace(host, hostname=hostname, manufacturer=manufacturer,
+        enriched = replace(host, hostname=hostname, mac=mac, manufacturer=manufacturer,
                            service_info=service_info)
         profile = infer_asset_profile(enriched)
         return replace(enriched, device_type=profile.device_type,
@@ -141,10 +147,10 @@ class Scanner:
         gateway = self._local_gateway(address)
         if gateway:
             name = self._reverse_lookup(address, gateway)
-            if name:
+            if name and self._hostname_is_unique(name, address, gateway):
                 return name
         name = self._reverse_lookup(address)
-        if name:
+        if name and self._hostname_is_unique(name, address):
             return name
         if os.name == "nt":
             try:
@@ -158,6 +164,41 @@ class Scanner:
             except (FileNotFoundError, subprocess.TimeoutExpired):
                 pass
         return ""
+
+    @staticmethod
+    def _hostname_is_unique(name: str, address: str, server: str = "") -> bool:
+        """Accept a PTR name only when it maps uniquely back to this address.
+
+        Some router/Tailscale DNS configurations publish the same descriptive
+        PTR name for a group of devices. Displaying that as a host identity is
+        misleading, so ambiguous or stale names are left unresolved.
+        """
+        try:
+            target = ipaddress.ip_address(address.split("%", 1)[0])
+            if target.version == 6:
+                found = {str(ipaddress.ip_address(item[4][0].split("%", 1)[0]))
+                         for item in socket.getaddrinfo(name, None, socket.AF_INET6)}
+                return found == {str(target)}
+            command = ["nslookup", "-timeout=1", "-retry=1", name]
+            if server:
+                command.append(server)
+            output = subprocess.run(
+                command, capture_output=True, text=True, errors="replace",
+                timeout=2, check=False,
+                creationflags=(CREATE_NO_WINDOW if os.name == "nt" else 0)).stdout
+            sections = re.split(r"^Name:\s*", output, maxsplit=1,
+                                flags=re.MULTILINE | re.IGNORECASE)
+            if len(sections) != 2:
+                return False
+            found = set()
+            for candidate in re.findall(r"(?<![\d.])\d{1,3}(?:\.\d{1,3}){3}(?![\d.])", sections[1]):
+                try:
+                    found.add(str(ipaddress.ip_address(candidate)))
+                except ValueError:
+                    continue
+            return found == {str(target)}
+        except (FileNotFoundError, OSError, subprocess.TimeoutExpired, ValueError):
+            return False
 
     @staticmethod
     def _reverse_lookup(address: str, server: str = "") -> str:

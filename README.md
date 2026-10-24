@@ -2,9 +2,9 @@
 
 ![Advanced IP Analyser icon](src/ip_analyser/assets/advanced-ip-analyser.png)
 
-Advanced IP Analyser is an original Windows 10/11 and Debian 13 desktop
-network inventory, bounded web security auditing, and packet-file analysis
-application. Debian additionally provides native live packet capture, long-term
+Advanced IP Analyser is an original Windows 10/11, Debian 13, and Android
+network diagnostics application. The desktop editions provide network inventory,
+bounded web security auditing, and packet-file analysis. Debian additionally provides native live packet capture, long-term
 Network Security Monitor sessions, and passive Wi-Fi observation. It is designed for home labs, support teams, system
 administrators, and authorized network troubleshooting without requiring
 Wireshark.
@@ -48,6 +48,7 @@ live progress, expandable service results, inventory exchange, and remote action
 | Updates | Automatic GitHub release check, flashing button, platform-specific asset selection, trusted release URL, SHA-256 verification, package/installer checks, close/install/restart workflow |
 | Debian packaging | Reproducible `.deb`, Lintian/AppStream/desktop validation, install/GUI/remove smoke test, release checksum, optional signed GitHub Pages APT feed |
 | Windows packaging | Self-contained x64 application, per-user Inno Setup installer, native launcher adaptations, smoke test, checksum, and GitHub build-provenance attestation |
+| Android companion | Native Kotlin/Compose dashboard, bounded LAN discovery, common-service checks, nearby Wi-Fi security review, ping/reachability, DNS, port and HTTP diagnostics |
 
 Scan rows appear as each host finishes its bounded port checks. Hostnames, vendor names, and service fingerprints are added as discovery completes. The first vendor lookup downloads public IEEE MA-L/MA-M/MA-S assignment lists into the local cache; no device MAC address is sent to IEEE. A blank hostname or OS means the network did not provide enough evidence to identify it reliably.
 
@@ -66,6 +67,20 @@ capture, Network Security Monitor live capture, and monitor-mode Passive Wi-Fi a
 shown as Debian 13-only because the Windows build does not bundle a third-party
 packet-capture driver. See [Windows edition details](docs/WINDOWS.md).
 
+## Android installation
+
+Download `Advanced-IP-Analyser-Android-VERSION.apk` from the matching Android
+release and open it on a phone or tablet running Android 8.0 or later. Android
+may ask you to allow installation from the browser or file manager used to open
+the APK.
+
+The Android companion includes a mobile dashboard, bounded LAN discovery,
+common TCP service checks, nearby Wi-Fi security review, and ping/reachability,
+DNS, port, and HTTP diagnostics. Android protects other devices' MAC addresses,
+saved Wi-Fi passwords, raw packet capture, and unrestricted background Wi-Fi
+scanning, so those desktop features are not presented as available on Android.
+See the [Android build guide](android/README.md).
+
 ## Debian 13 installation
 
 Download the newest `advanced-ip-analyser_VERSION_all.deb` from the
@@ -74,7 +89,7 @@ then run:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.8.0_all.deb
+sudo apt install ./advanced-ip-analyser_2.8.1_all.deb
 ```
 
 Launch it from the desktop application menu or run:

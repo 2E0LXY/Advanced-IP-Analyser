@@ -284,6 +284,7 @@ class Application(tk.Tk):
         self.repeat_scan_callback = self.start_scan
         self.active_scan_target = ""
         self.scan_scanned_count = 0
+        self.scan_active = False
         self.ssh_username = getpass.getuser()
         self.cancel_scan = threading.Event()
         self.network_presets = []
@@ -1263,6 +1264,9 @@ class Application(tk.Tk):
     def start_scan(self, targets_override: list[str] | None = None,
                    target_label: str | None = None) -> None:
         self._navigate(self.scan_page)
+        if self.scan_active:
+            self.status.configure(text="A network scan is already running. Press Stop before starting another.")
+            return
         if self.scheduled_scan_id is not None:
             try:
                 self.after_cancel(self.scheduled_scan_id)
@@ -1299,6 +1303,7 @@ class Application(tk.Tk):
         self.ipv6_scan_button.configure(state="disabled")
         self.cancel_button.configure(state="normal")
         self.cancel_scan = threading.Event()
+        self.scan_active = True
         self.active_scan_target = target_label or self.target.get().strip()
         self.repeat_scan_callback = self.start_ipv6_scan if targets_override is not None else self.start_scan
         self.scan_scanned_count = 0
@@ -1380,15 +1385,21 @@ class Application(tk.Tk):
                     _, done, total, host = event
                     self.scan_scanned_count = done
                     if host.reachable:
-                        self.results.append(host)
-                        if self._matches_filter(host):
-                            self._insert_host(host)
+                        existing = next((index for index, item in enumerate(self.results)
+                                         if item.address.casefold() == host.address.casefold()), None)
+                        if existing is None:
+                            self.results.append(host)
+                            if self._matches_filter(host):
+                                self._insert_host(host)
+                        else:
+                            self.results[existing] = host
+                            self._update_host_row(host)
                     self.progress.configure(value=done)
                     self.status.configure(text=f"Scanned {done} of {total}")
                 elif event[0] == "scan_complete":
                     scanned, total, cancelled, candidates = event[1], event[2], event[3], event[4]
                     self.scan_scanned_count = len(scanned)
-                    self.results = [host for host in scanned if host.reachable]
+                    self.results = self._unique_reachable(scanned)
                     self._refresh_table()
                     self._refresh_dashboard()
                     self.dashboard.record_activity(
@@ -1403,7 +1414,9 @@ class Application(tk.Tk):
                         self._start_discovery_indicator(candidates)
                 elif event[0] == "discovery":
                     _, done, total, host = event
-                    self.results = [host if existing.identity == host.identity else existing for existing in self.results]
+                    self.results = [host if (existing.identity == host.identity or
+                                              existing.address.casefold() == host.address.casefold())
+                                    else existing for existing in self.results]
                     self._update_host_row(host)
                     self._refresh_dashboard()
                     self.progress.configure(maximum=total, value=done)
@@ -1411,13 +1424,14 @@ class Application(tk.Tk):
                     self.status.configure(text=f"Scan complete · discovering service details {done} of {total}")
                 elif event[0] == "discovery_done":
                     scanned, total, cancelled, candidates = event[1], event[2], event[3], event[4]
-                    self.results = [host for host in scanned if host.reachable]
+                    self.results = self._unique_reachable(scanned)
                     self._refresh_table()
                     self._refresh_dashboard()
                     self._stop_discovery_indicator()
                     self.scan_button.configure(state="normal")
                     self.ipv6_scan_button.configure(state="normal")
                     self.cancel_button.configure(state="disabled")
+                    self.scan_active = False
                     prefix = "Cancelled" if cancelled else "Finished"
                     suffix = " · discovery cancelled" if cancelled and candidates else (" · discovery complete" if candidates else "")
                     self.status.configure(text=f"{prefix}: {len(self.results)} reachable; {len(scanned)} of {total} checked{suffix}")
@@ -1449,6 +1463,7 @@ class Application(tk.Tk):
                     self.scan_button.configure(state="normal")
                     self.ipv6_scan_button.configure(state="normal")
                     self.cancel_button.configure(state="disabled")
+                    self.scan_active = False
                     messagebox.showerror("Scan failed", str(event[1]))
                     return
         except queue.Empty:
@@ -1461,6 +1476,14 @@ class Application(tk.Tk):
         except (OSError, ValueError):
             # Optional history must never turn a successful network scan into a failure.
             return
+
+    @staticmethod
+    def _unique_reachable(hosts: list[Host]) -> list[Host]:
+        by_address: dict[str, Host] = {}
+        for host in hosts:
+            if host.reachable:
+                by_address[host.address.casefold()] = host
+        return list(by_address.values())
 
     def _schedule_next_scan(self) -> None:
         repeat = self.repeat_scan.get()
@@ -1528,7 +1551,8 @@ class Application(tk.Tk):
     def _update_host_row(self, host: Host) -> None:
         """Show each enriched host as soon as discovery completes."""
         for item, original in tuple(self.hosts_by_item.items()):
-            if original.identity != host.identity:
+            if (original.identity != host.identity and
+                    original.address.casefold() != host.address.casefold()):
                 continue
             index = self.table.index(item)
             for child in self.table.get_children(item):
@@ -1772,6 +1796,9 @@ class Application(tk.Tk):
             self.status.configure(text=f"Scan finished; favorites refresh failed: {error}")
 
     def refresh_favorites(self) -> None:
+        if self.scan_active:
+            self.status.configure(text="A network scan is already running. Press Stop before refreshing favorites.")
+            return
         try:
             favorites = load_favorites(self.favorites_path)
         except (OSError, ValueError) as error:
@@ -1791,6 +1818,7 @@ class Application(tk.Tk):
         self.scan_button.configure(state="disabled")
         self.cancel_button.configure(state="normal")
         self.cancel_scan = threading.Event()
+        self.scan_active = True
         self.progress.configure(maximum=len(targets), value=0)
         self.status.configure(text=f"Refreshing {len(targets)} saved device(s)…")
         adaptive = self.profile.get() == "Adaptive"

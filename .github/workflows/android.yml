@@ -1,0 +1,110 @@
+name: Android APK
+
+on:
+  push:
+    branches: ['**']
+    tags: ['android-v*']
+    paths:
+      - 'android/**'
+      - '.github/workflows/android.yml'
+  pull_request:
+    paths:
+      - 'android/**'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: microsoft
+          java-version: '17'
+          cache: gradle
+
+      - uses: gradle/actions/setup-gradle@4c125117fe7c5aed11272ec4213f602f012f89f2 # v5
+
+      - name: Test, lint, and build installable debug APK
+        working-directory: android
+        run: ./gradlew --no-daemon test lintDebug assembleDebug
+
+      - name: Name APK and calculate checksum
+        run: |
+          mkdir -p dist/android
+          cp android/app/build/outputs/apk/debug/app-debug.apk \
+            dist/android/Advanced-IP-Analyser-Android-1.0.0-debug.apk
+          (cd dist/android && sha256sum *.apk > SHA256SUMS-ANDROID.txt)
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: advanced-ip-analyser-android-debug
+          path: dist/android/*
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/android-v')
+    needs: quality
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Require the tag to come from the default branch
+        run: |
+          git fetch --no-tags origin \
+            "+refs/heads/${{ github.event.repository.default_branch }}:refs/remotes/origin/trusted-release"
+          git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/trusted-release
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: microsoft
+          java-version: '17'
+          cache: gradle
+
+      - uses: gradle/actions/setup-gradle@4c125117fe7c5aed11272ec4213f602f012f89f2 # v5
+
+      - name: Validate version and restore signing key
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          version="${GITHUB_REF_NAME#android-v}"
+          grep -Fq "versionName = \"$version\"" android/app/build.gradle.kts
+          test -n "$ANDROID_KEYSTORE_B64"
+          printf '%s' "$ANDROID_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/android-release.jks"
+
+      - name: Build signed release APK
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/android-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon test lintRelease assembleRelease
+
+      - name: Verify signature and prepare release files
+        run: |
+          version="${GITHUB_REF_NAME#android-v}"
+          mkdir -p dist/android
+          cp android/app/build/outputs/apk/release/app-release.apk \
+            "dist/android/Advanced-IP-Analyser-Android-$version.apk"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose \
+            "dist/android/Advanced-IP-Analyser-Android-$version.apk"
+          (cd dist/android && sha256sum *.apk > SHA256SUMS-ANDROID.txt)
+
+      - name: Publish Android release
+        uses: softprops/action-gh-release@5113cdc90fd4d541c801c55356214017bf5ae34b # v3
+        with:
+          name: Advanced IP Analyser Android ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            dist/android/*.apk
+            dist/android/SHA256SUMS-ANDROID.txt
