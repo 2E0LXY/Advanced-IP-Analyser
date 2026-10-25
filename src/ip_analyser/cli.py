@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 from pathlib import Path
 
 from .actions import wake
+from .ai_network_monitor import local_report, monitor_loop, monitor_once, save_local_report
 from .monitoring import (
     MonitorAnalyzer,
     MonitorStore,
@@ -72,11 +74,39 @@ def build_parser() -> argparse.ArgumentParser:
     web.add_argument("--exclude", action="append", default=[], help="excluded URL path prefix")
     web.add_argument("--allow-host", action="append", default=[], help="additional allowed hostname")
     web.add_argument("--report", type=Path, required=True, help=".json or .html output")
+    local = commands.add_parser("local-monitor", help="opt-in LAN health checks; no cloud or listening port")
+    local.add_argument("target", help="private LAN subnet, range or IP (at most 1024 hosts)")
+    local.add_argument("--interval", type=int, default=300, help="seconds between checks (minimum 60)")
+    local.add_argument("--count", type=int, default=1, help="checks to run; use 0 for until Ctrl+C")
+    local.add_argument("--history", type=Path, help="optional local SQLite history path")
+    local.add_argument("--report", type=Path, help="optional JSON report output, written after checks")
+    local.add_argument("--include-identifiers", action="store_true",
+                       help="include IP/MAC/hostnames in the local report")
+    report = commands.add_parser("local-monitor-report", help="write a read-only local history report")
+    report.add_argument("--history", type=Path)
+    report.add_argument("--output", type=Path, required=True)
+    report.add_argument("--include-identifiers", action="store_true")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command == "local-monitor-report":
+        path = save_local_report(args.output, local_report(args.history, include_identifiers=args.include_identifiers))
+        print(f"Saved local-only monitor report: {path}")
+        return 0
+    if args.command == "local-monitor":
+        try:
+            monitor_loop(args.target, interval=args.interval, count=args.count or None,
+                         history_path=args.history,
+                         on_result=lambda result: print(json.dumps(result), flush=True))
+        except KeyboardInterrupt:
+            print("Local monitoring stopped")
+        if args.report:
+            save_local_report(args.report, local_report(args.history,
+                                                       include_identifiers=args.include_identifiers))
+            print(f"Saved local-only monitor report: {args.report}")
+        return 0
     if args.command == "wake":
         wake(args.mac, args.broadcast)
         print("Wake-on-LAN packet sent")

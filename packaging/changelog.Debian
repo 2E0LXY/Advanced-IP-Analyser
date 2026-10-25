@@ -1,3 +1,11 @@
+advanced-ip-analyser (2.8.2) stable; urgency=medium
+
+  * Add optional local-only, read-only AI Network Monitor with historical change tracking.
+  * Add bounded periodic LAN checks, local SQLite history, and explicit JSON report export.
+  * Keep monitoring disabled by default with no cloud telemetry or inbound listener.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Sun, 25 Oct 2026 16:00:00 +0000
+
 advanced-ip-analyser (2.8.1) stable; urgency=medium
 
   * Discover LAN devices that block ping and selected TCP ports using neighbour-table evidence.
