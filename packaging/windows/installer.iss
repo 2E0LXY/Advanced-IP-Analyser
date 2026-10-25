@@ -38,9 +38,11 @@ Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs 
 [Icons]
 Name: "{autoprograms}\Advanced IP Analyser"; Filename: "{app}\Advanced-IP-Analyser.exe"
 Name: "{autodesktop}\Advanced IP Analyser"; Filename: "{app}\Advanced-IP-Analyser.exe"; Tasks: desktopicon
+Name: "{userstartup}\Advanced IP Analyser Background Monitor"; Filename: "{app}\Advanced-IP-Analyser.exe"; Parameters: "--background-monitor"; Tasks: backgroundmonitor
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"
+Name: "backgroundmonitor"; Description: "Start local network monitoring automatically when I sign in"; GroupDescription: "Monitoring:"; Flags: checkedonce
 
 [Run]
 Filename: "{app}\Advanced-IP-Analyser.exe"; Description: "Launch Advanced IP Analyser"; Flags: nowait postinstall skipifsilent

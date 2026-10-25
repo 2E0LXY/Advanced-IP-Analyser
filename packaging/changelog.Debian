@@ -1,3 +1,11 @@
+advanced-ip-analyser (2.8.4) stable; urgency=medium
+
+  * Add local ChatGPT Desktop MCP stdio connector without a separate OpenAI API key.
+  * Add opt-in persistent Windows login monitoring with no cloud telemetry.
+  * Maintain explicit local approval for router control and redacted MCP reports.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Sun, 25 Oct 2026 18:30:00 +0000
+
 advanced-ip-analyser (2.8.3) stable; urgency=medium
 
   * Add opt-in loopback dashboard with token-authenticated scan and monitor controls.
