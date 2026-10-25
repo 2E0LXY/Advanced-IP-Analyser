@@ -86,11 +86,20 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--history", type=Path)
     report.add_argument("--output", type=Path, required=True)
     report.add_argument("--include-identifiers", action="store_true")
+    control = commands.add_parser("local-control", help="opt-in localhost dashboard and separately approved router actions")
+    control.add_argument("--router", default="192.168.1.1", help="private LAN router address")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command == "local-control":
+        from .local_control import serve_control
+        try:
+            serve_control(router=args.router)
+        except KeyboardInterrupt:
+            print("Local control revoked")
+        return 0
     if args.command == "local-monitor-report":
         path = save_local_report(args.output, local_report(args.history, include_identifiers=args.include_identifiers))
         print(f"Saved local-only monitor report: {path}")

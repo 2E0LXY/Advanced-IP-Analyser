@@ -1,3 +1,11 @@
+advanced-ip-analyser (2.8.3) stable; urgency=medium
+
+  * Add opt-in loopback dashboard with token-authenticated scan and monitor controls.
+  * Require explicit local approval for router reboot and Wi-Fi reload.
+  * Keep network data local without VPN, tunnel, or automatic cloud telemetry.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Sun, 25 Oct 2026 18:00:00 +0000
+
 advanced-ip-analyser (2.8.2) stable; urgency=medium
 
   * Add optional local-only, read-only AI Network Monitor with historical change tracking.
