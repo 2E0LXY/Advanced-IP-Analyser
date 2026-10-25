@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import getpass
 import ipaddress
+import webbrowser
 import queue
 import shutil
 import sys
@@ -291,6 +292,7 @@ class Application(tk.Tk):
         self.cancel_scan = threading.Event()
         self.network_presets = []
         self.favorites_path = Path.home() / ".config" / "advanced-ip-analyser" / "favorites.json"
+        self.local_control_server = None
         try:
             self.app_icon = tk.PhotoImage(file=Path(__file__).with_name("assets") / "advanced-ip-analyser.png")
             self.iconphoto(True, self.app_icon)
@@ -393,7 +395,8 @@ class Application(tk.Tk):
                               ("▦  Port Scan", self._open_port_scan),
                               ("⌁  Wi-Fi", self.open_wifi_tools),
                               ("◫  Packets", self.open_packet_capture),
-                              ("⬡  Security", self.open_web_audit)):
+                              ("⬡  Security", self.open_web_audit),
+                              ("◎  Local AI Control", self.show_local_ai_control)):
             tk.Button(sidebar, text=label, anchor="w", relief="flat", bd=0, bg="#132334",
                       fg="#a9bfd4", activebackground="#254b71", activeforeground="#ffffff",
                       font=("Segoe UI", 9), padx=15, pady=10,
@@ -757,6 +760,62 @@ class Application(tk.Tk):
         self.diagnostic_output.configure(state="normal")
         self.diagnostic_output.insert("end", output)
         self.diagnostic_output.configure(state="disabled")
+
+    def show_local_ai_control(self) -> None:
+        """Create a user-authorised loopback session from the packaged Windows GUI."""
+        from http.server import ThreadingHTTPServer
+
+        from .local_control import PORT, ControlState, make_handler
+
+        if self.local_control_server is None:
+            if not messagebox.askyesno(
+                "Enable local AI Control?",
+                "Allow this computer's browser to read LAN reports and run scanner operations "
+                "using a private session token?\n\nRouter changes will still need separate approval. "
+                "No cloud service or VPN will be started.", parent=self,
+            ):
+                return
+            state = ControlState()
+            try:
+                server = ThreadingHTTPServer(("127.0.0.1", PORT), make_handler(state))
+            except OSError as exc:
+                messagebox.showerror("Local AI Control", f"Cannot start local control: {exc}", parent=self)
+                return
+            self.local_control_state = state
+            self.local_control_server = server
+            threading.Thread(target=server.serve_forever, kwargs={"poll_interval": .2}, daemon=True).start()
+
+        panel = tk.Toplevel(self)
+        panel.title("Local AI Control - authorised session")
+        panel.geometry("620x230")
+        panel.transient(self)
+        frame = ttk.Frame(panel, padding=16)
+        frame.pack(fill="both", expand=True)
+        ttk.Label(frame, text="Private session token (do not share)").pack(anchor="w")
+        token_box = ttk.Entry(frame, width=76)
+        token_box.insert(0, self.local_control_state.token)
+        token_box.configure(state="readonly")
+        token_box.pack(fill="x", pady=8)
+        ttk.Label(frame, text=f"Dashboard: http://127.0.0.1:{PORT}/").pack(anchor="w")
+        buttons = ttk.Frame(frame)
+        buttons.pack(anchor="w", pady=10)
+
+        def copy_token():
+            self.clipboard_clear()
+            self.clipboard_append(self.local_control_state.token)
+
+        def stop_control():
+            self.local_control_state.stop()
+            self.local_control_server.shutdown()
+            self.local_control_server.server_close()
+            self.local_control_server = None
+            panel.destroy()
+
+        ttk.Button(buttons, text="Copy token", command=copy_token).pack(side="left")
+        ttk.Button(buttons, text="Open local dashboard", command=lambda: webbrowser.open(
+            f"http://127.0.0.1:{PORT}/")).pack(side="left", padx=8)
+        ttk.Button(buttons, text="Revoke access", command=stop_control).pack(side="left")
+        ttk.Label(frame, text="Closing this panel does not revoke access. Use Revoke access or close the app.").pack(anchor="w")
 
     def show_local_ai_monitor(self) -> None:
         """Optional foreground-session monitor; all observations remain local."""

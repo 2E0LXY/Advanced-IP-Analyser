@@ -7,7 +7,9 @@ integration must be able to open and operate the local dashboard.
 
 ## Start
 
-From PowerShell, after installing the Windows package:
+**Windows installer:** open Advanced IP Analyser, choose **Local AI Control** in the left sidebar, approve the initial session, then select **Open local dashboard**. Copy the session token into the dashboard. **Revoke access** stops the service. The packaged Windows installer uses this graphical entry point rather than the Python CLI.
+
+From a Python CLI installation:
 
 ```powershell
 advanced-ip-analyser local-control --router 192.168.1.1
