@@ -45,6 +45,17 @@ if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 $compiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
 if (-not (Test-Path -LiteralPath $compiler)) { throw "Inno Setup 6 is not installed" }
 $sourceDir = (Resolve-Path "dist\windows\Advanced-IP-Analyser").Path
+
+# A separate console executable is launched by the ChatGPT desktop MCP client.
+# It communicates over stdio and never opens a TCP listener or cloud session.
+& $Python -m PyInstaller --noconfirm --clean --onefile --console `
+    --name "Advanced-IP-Analyser-MCP" `
+    --distpath "build\windows\mcpdist" --workpath "build\windows\mcpwork" `
+    --specpath "build\windows" --paths $sourcePath `
+    "packaging\windows\mcp_entry.py"
+if ($LASTEXITCODE -ne 0) { throw "MCP executable build failed" }
+Copy-Item -LiteralPath "build\windows\mcpdist\Advanced-IP-Analyser-MCP.exe" -Destination $sourceDir
+
 $outputDir = Join-Path $repoRoot "dist\windows-installer"
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 & $compiler "/DAppVersion=$version" "/DSourceDir=$sourceDir" "/DOutputDir=$outputDir" `
