@@ -3,13 +3,12 @@ Description: Load GUI images from Debian's architecture-independent data path
  Python module directory.
 Author: Daren Loxley <24845841+2E0LXY@users.noreply.github.com>
 Forwarded: not-needed
-Last-Update: 2026-09-02
+Last-Update: 2026-10-27
 ---
 --- a/src/ip_analyser/gui.py
 +++ b/src/ip_analyser/gui.py
-@@ -234,7 +234,8 @@ class Application(tk.Tk):
-         self.network_presets = []
-         self.favorites_path = Path.home() / ".config" / "advanced-ip-analyser" / "favorites.json"
+@@ -294,7 +294,8 @@ class Application(tk.Tk):
+         self.local_control_server = None
          try:
 -            self.app_icon = tk.PhotoImage(file=Path(__file__).with_name("assets") / "advanced-ip-analyser.png")
 +            self.app_icon = tk.PhotoImage(
@@ -17,7 +16,7 @@ Last-Update: 2026-09-02
              self.iconphoto(True, self.app_icon)
          except tk.TclError:
              self.app_icon = None
-@@ -481,7 +482,7 @@ class Application(tk.Tk):
+@@ -1258,7 +1259,7 @@ class Application(tk.Tk):
  
          notebook = ttk.Notebook(window)
          notebook.pack(fill="both", expand=True, padx=18, pady=(0, 12))
