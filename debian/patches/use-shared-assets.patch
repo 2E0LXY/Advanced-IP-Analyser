@@ -7,7 +7,7 @@ Last-Update: 2026-10-27
 ---
 --- a/src/ip_analyser/gui.py
 +++ b/src/ip_analyser/gui.py
-@@ -294,7 +294,8 @@ class Application(tk.Tk):
+@@ -295,6 +295,7 @@ class Application(tk.Tk):
          self.local_control_server = None
          try:
 -            self.app_icon = tk.PhotoImage(file=Path(__file__).with_name("assets") / "advanced-ip-analyser.png")
@@ -16,7 +16,7 @@ Last-Update: 2026-10-27
              self.iconphoto(True, self.app_icon)
          except tk.TclError:
              self.app_icon = None
-@@ -1258,7 +1259,7 @@ class Application(tk.Tk):
+@@ -1257,7 +1258,7 @@ class Application(tk.Tk):
  
          notebook = ttk.Notebook(window)
          notebook.pack(fill="both", expand=True, padx=18, pady=(0, 12))
