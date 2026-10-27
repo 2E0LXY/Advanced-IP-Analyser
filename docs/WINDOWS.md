@@ -5,6 +5,10 @@ release and run it. The x64 installer is per-user, installs beneath Local AppDat
 and does not require a separate Python installation. It creates a Start-menu
 shortcut and offers an optional desktop shortcut.
 
+During upgrades and removal, the installer stops every running GUI, background
+monitor, and ChatGPT Desktop MCP process before replacing application files.
+This also covers processes that remain active after the visible window closes.
+
 ## Available on Windows
 
 - IPv4 and IPv6 target, range, and CIDR scanning;

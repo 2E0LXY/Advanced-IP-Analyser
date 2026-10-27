@@ -46,7 +46,7 @@ jobs:
         shell: pwsh
         run: ./packaging/windows/build.ps1
 
-      - name: Smoke test installer, application, and uninstaller
+      - name: Smoke test installer, running-process upgrade, and uninstaller
         shell: pwsh
         run: |
           $installer = (Resolve-Path "dist/windows-installer/Advanced-IP-Analyser-Setup-*.exe").Path
@@ -56,16 +56,44 @@ jobs:
           ) -Wait -PassThru -WindowStyle Hidden
           if ($setup.ExitCode -ne 0) { throw "Installer failed with exit code $($setup.ExitCode)" }
           $installedExe = Join-Path $installDir "Advanced-IP-Analyser.exe"
+          $installedMcp = Join-Path $installDir "Advanced-IP-Analyser-MCP.exe"
           if (-not (Test-Path -LiteralPath $installedExe)) { throw "Installed application is missing" }
-          $process = Start-Process -FilePath $installedExe -PassThru
-          Start-Sleep -Seconds 8
-          if ($process.HasExited) { throw "Installed application exited during smoke test" }
-          Stop-Process -Id $process.Id
+          if (-not (Test-Path -LiteralPath $installedMcp)) { throw "Installed MCP executable is missing" }
+
+          function Start-LockedProcesses {
+            $script:guiProcess = Start-Process -FilePath $installedExe -PassThru
+            $mcpStart = [System.Diagnostics.ProcessStartInfo]::new()
+            $mcpStart.FileName = $installedMcp
+            $mcpStart.UseShellExecute = $false
+            $mcpStart.RedirectStandardInput = $true
+            $mcpStart.RedirectStandardOutput = $true
+            $mcpStart.RedirectStandardError = $true
+            $mcpStart.CreateNoWindow = $true
+            $script:mcpProcess = [System.Diagnostics.Process]::new()
+            $script:mcpProcess.StartInfo = $mcpStart
+            if (-not $script:mcpProcess.Start()) { throw "Could not start the MCP process" }
+            Start-Sleep -Seconds 8
+            if ($script:guiProcess.HasExited) { throw "Installed application exited during smoke test" }
+            if ($script:mcpProcess.HasExited) { throw "Installed MCP process exited during smoke test" }
+          }
+
+          Start-LockedProcesses
+          $upgrade = Start-Process -FilePath $installer -ArgumentList @(
+            "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$installDir"
+          ) -Wait -PassThru -WindowStyle Hidden
+          if ($upgrade.ExitCode -ne 0) { throw "Upgrade failed with exit code $($upgrade.ExitCode)" }
+          if (-not $guiProcess.WaitForExit(5000)) { throw "Upgrade did not stop the GUI process" }
+          if (-not $mcpProcess.WaitForExit(5000)) { throw "Upgrade did not stop the MCP process" }
+          if (-not (Test-Path -LiteralPath $installedExe)) { throw "Upgrade removed the application" }
+
+          Start-LockedProcesses
           $uninstaller = Join-Path $installDir "unins000.exe"
           $remove = Start-Process -FilePath $uninstaller -ArgumentList @(
             "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"
           ) -Wait -PassThru -WindowStyle Hidden
           if ($remove.ExitCode -ne 0) { throw "Uninstaller failed with exit code $($remove.ExitCode)" }
+          if (-not $guiProcess.WaitForExit(5000)) { throw "Uninstaller did not stop the GUI process" }
+          if (-not $mcpProcess.WaitForExit(5000)) { throw "Uninstaller did not stop the MCP process" }
           if (Test-Path -LiteralPath $installedExe) { throw "Uninstaller left the application executable behind" }
 
       - name: Attest Windows installer provenance

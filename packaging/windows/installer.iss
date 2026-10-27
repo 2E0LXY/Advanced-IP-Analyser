@@ -49,6 +49,50 @@ Filename: "{app}\Advanced-IP-Analyser.exe"; Description: "Launch Advanced IP Ana
 Filename: "{app}\Advanced-IP-Analyser.exe"; Flags: nowait; Check: SilentRelaunchRequested
 
 [Code]
+procedure StopProcessImage(const ImageName: String);
+var
+  ResultCode: Integer;
+begin
+  { Restart Manager cannot reliably close console-only MCP and background-monitor
+    processes. Kill every process with our exact executable names before setup
+    replaces files. /T also closes any child processes they started. }
+  Exec(ExpandConstant('{sys}\taskkill.exe'),
+    '/F /T /IM "' + ImageName + '"', '', SW_HIDE,
+    ewWaitUntilTerminated, ResultCode);
+end;
+
+procedure StopRunningApplicationProcesses;
+var
+  Attempt: Integer;
+begin
+  { Repeat to cover an MCP client attempting an immediate restart while setup is
+    beginning. A missing process is expected and taskkill's exit code is ignored. }
+  for Attempt := 1 to 3 do
+  begin
+    StopProcessImage('Advanced-IP-Analyser-MCP.exe');
+    StopProcessImage('Advanced-IP-Analyser.exe');
+    Sleep(250);
+  end;
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  StopRunningApplicationProcesses;
+  Result := '';
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssInstall then
+    StopRunningApplicationProcesses;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usUninstall then
+    StopRunningApplicationProcesses;
+end;
+
 function SilentRelaunchRequested: Boolean;
 begin
   Result := WizardSilent and (ExpandConstant('{param:RELAUNCH|0}') = '1');

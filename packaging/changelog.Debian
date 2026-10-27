@@ -1,3 +1,10 @@
+advanced-ip-analyser (2.8.6) stable; urgency=medium
+
+  * Stop all GUI, background-monitor, and MCP processes before a Windows upgrade.
+  * Exercise running-process upgrades and uninstalls in the Windows release test.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Tue, 27 Oct 2026 20:00:00 +0000
+
 advanced-ip-analyser (2.8.5) stable; urgency=medium
 
   * Save optional TP-Link smart-home credentials in the desktop credential manager.
