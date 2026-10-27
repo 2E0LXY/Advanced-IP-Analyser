@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,25 +16,39 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Analytics
+import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.Devices
+import androidx.compose.material.icons.outlined.Dns
+import androidx.compose.material.icons.outlined.Hub
+import androidx.compose.material.icons.outlined.NetworkCheck
+import androidx.compose.material.icons.outlined.Router
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material.icons.outlined.SettingsEthernet
+import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -44,8 +59,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -54,13 +71,16 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import uk.co.twoe0lxy.ipanalyser.data.HostResult
 import uk.co.twoe0lxy.ipanalyser.data.WifiNetwork
 import uk.co.twoe0lxy.ipanalyser.theme.Green400
+import uk.co.twoe0lxy.ipanalyser.theme.Navy700
 import uk.co.twoe0lxy.ipanalyser.theme.Orange400
 
-private enum class AppPage(val label: String, val mark: String) {
-  Dashboard("Dashboard", "⌂"), Lan("LAN scan", "⌕"), Wifi("Wi-Fi", "◉"), Tools("Tools", "⚙")
+private enum class AppPage(val label: String, val icon: ImageVector) {
+  Dashboard("Dashboard", Icons.Outlined.Dashboard),
+  Lan("LAN scan", Icons.Outlined.Search),
+  Wifi("Wi-Fi", Icons.Outlined.Wifi),
+  Tools("Tools", Icons.Outlined.Analytics),
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
   modifier: Modifier = Modifier,
@@ -72,32 +92,37 @@ fun MainScreen(
 
   Scaffold(
     modifier = modifier.fillMaxSize(),
-    topBar = {
-      TopAppBar(
-        title = {
-          Column {
-            Text("Advanced IP Analyser", fontWeight = FontWeight.Bold)
-            Text("Network diagnostics for Android", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-          }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
-      )
-    },
+    containerColor = MaterialTheme.colorScheme.background,
+    topBar = { AppHeader(state) },
     bottomBar = {
       Column {
-        Text(
-          state.status,
+        Row(
           modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-          fontSize = 12.sp,
-        )
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Text("●", color = Green400, fontSize = 10.sp)
+          Text(
+            state.status,
+            modifier = Modifier.padding(start = 7.dp).weight(1f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 11.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
         NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
           pages.forEachIndexed { index, page ->
             NavigationBarItem(
               selected = selectedPage == index,
               onClick = { selectedPage = index },
-              icon = { Text(page.mark, fontSize = 20.sp) },
-              label = { Text(page.label) },
+              icon = { Icon(page.icon, contentDescription = null) },
+              label = { Text(page.label, fontSize = 10.sp) },
+              colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = MaterialTheme.colorScheme.primary,
+                selectedTextColor = MaterialTheme.colorScheme.primary,
+                indicatorColor = Navy700,
+              ),
             )
           }
         }
@@ -106,12 +131,44 @@ fun MainScreen(
   ) { padding ->
     Box(Modifier.padding(padding).fillMaxSize()) {
       when (pages[selectedPage]) {
-        AppPage.Dashboard -> DashboardPage(state, onPage = { selectedPage = it.ordinal }, onScan = viewModel::scanLan)
-        AppPage.Lan -> LanPage(state, onScan = viewModel::scanLan, onRefresh = viewModel::refreshNetwork)
-        AppPage.Wifi -> WifiPage(state, onScan = viewModel::scanWifi)
-        AppPage.Tools -> ToolsPage(state, onRun = viewModel::runDiagnostic)
+        AppPage.Dashboard -> DashboardPage(state, { selectedPage = it.ordinal }, viewModel::scanLan)
+        AppPage.Lan -> LanPage(state, viewModel::scanLan, viewModel::refreshNetwork)
+        AppPage.Wifi -> WifiPage(state, viewModel::scanWifi)
+        AppPage.Tools -> ToolsPage(state, viewModel::runDiagnostic)
       }
     }
+  }
+}
+
+@Composable
+private fun AppHeader(state: MainScreenUiState) {
+  Column {
+    Row(
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Card(
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = Navy700),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+      ) {
+        Icon(
+          Icons.Outlined.Hub,
+          contentDescription = null,
+          tint = MaterialTheme.colorScheme.primary,
+          modifier = Modifier.padding(9.dp).size(25.dp),
+        )
+      }
+      Column(Modifier.padding(start = 11.dp).weight(1f)) {
+        Text("Advanced IP Analyser", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Text("Network diagnostics & toolkit", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+      }
+      Column(horizontalAlignment = Alignment.End) {
+        Text("LOCAL IP", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(compactAddress(state.network.localIp), color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
+      }
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
   }
 }
 
@@ -122,40 +179,55 @@ private fun DashboardPage(state: MainScreenUiState, onPage: (AppPage) -> Unit, o
     verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
     item {
-      Text("Network Dashboard", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-      Text("Your current connection and quick diagnostic tools.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-    item {
-      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        MetricCard("Devices", state.hosts.size.toString(), "found in last scan", Modifier.weight(1f))
-        MetricCard("Open ports", state.hosts.sumOf { it.openPorts.size }.toString(), "common services", Modifier.weight(1f), Orange400)
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+          Text("Network Dashboard", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+          Text("Overview and quick actions", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+        }
+        Button(onClick = onScan) {
+          Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+          Text(if (state.scanningLan) " Stop" else " Scan")
+        }
       }
     }
     item {
       Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        MetricCard("Local IP", state.network.localIp, state.network.interfaceName, Modifier.weight(1f))
-        MetricCard("Gateway", state.network.gateway, state.network.wifiName.ifBlank { "active route" }, Modifier.weight(1f), Green400)
+        MetricCard("Hosts", state.hosts.size.toString(), "discovered", Icons.Outlined.Devices, Modifier.weight(1f))
+        MetricCard("Open ports", state.hosts.sumOf { it.openPorts.size }.toString(), "common services", Icons.Outlined.SettingsEthernet, Modifier.weight(1f), Orange400)
       }
     }
     item {
-      SectionCard("Quick actions") {
+      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        MetricCard("Avg response", averageLatency(state.hosts), "LAN scan", Icons.Outlined.Speed, Modifier.weight(1f), Green400)
+        MetricCard("Gateway", compactAddress(state.network.gateway), "active route", Icons.Outlined.Router, Modifier.weight(1f))
+      }
+    }
+    item {
+      SectionCard("Quick actions", Icons.Outlined.NetworkCheck) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          Button(onClick = onScan, modifier = Modifier.weight(1f)) { Text(if (state.scanningLan) "Stop scan" else "Scan network") }
-          OutlinedButton(onClick = { onPage(AppPage.Wifi) }, modifier = Modifier.weight(1f)) { Text("Wi-Fi") }
+          QuickAction("Scan network", Icons.Outlined.Search, Modifier.weight(1f), onScan)
+          QuickAction("Wi-Fi scan", Icons.Outlined.Wifi, Modifier.weight(1f)) { onPage(AppPage.Wifi) }
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          OutlinedButton(onClick = { onPage(AppPage.Tools) }, modifier = Modifier.weight(1f)) { Text("Ping & DNS") }
-          OutlinedButton(onClick = { onPage(AppPage.Lan) }, modifier = Modifier.weight(1f)) { Text("View devices") }
+          QuickAction("Ping & DNS", Icons.Outlined.Dns, Modifier.weight(1f)) { onPage(AppPage.Tools) }
+          QuickAction("View devices", Icons.Outlined.Devices, Modifier.weight(1f)) { onPage(AppPage.Lan) }
         }
       }
     }
     item {
-      SectionCard("Network information") {
+      SectionCard("Recent activity", Icons.Outlined.Analytics) {
+        InfoLine("Current status", state.status)
+        InfoLine("Scan progress", if (state.total > 0) "${state.completed} / ${state.total}" else "Not started")
+        InfoLine("Nearby Wi-Fi", "${state.wifiNetworks.size} networks")
+      }
+    }
+    item {
+      SectionCard("System information", Icons.Outlined.Devices) {
+        InfoLine("Local IP", state.network.localIp)
         InfoLine("Network range", state.network.range)
         InfoLine("Interface", state.network.interfaceName)
-        InfoLine("Wi-Fi", state.network.wifiName.ifBlank { "Unavailable or permission required" })
-        InfoLine("Platform limits", "Android protects device MACs and saved Wi-Fi passwords")
+        InfoLine("Wi-Fi", state.network.wifiName.ifBlank { "Permission required" })
       }
     }
   }
@@ -164,12 +236,11 @@ private fun DashboardPage(state: MainScreenUiState, onPage: (AppPage) -> Unit, o
 @Composable
 private fun LanPage(state: MainScreenUiState, onScan: () -> Unit, onRefresh: () -> Unit) {
   Column(Modifier.fillMaxSize().padding(16.dp)) {
-    Text("LAN discovery", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-    Text("Bounded to the phone's local /24 for responsive scanning.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    PageHeading("LAN discovery", "Find active devices and common services", Icons.Outlined.Search)
     Spacer(Modifier.height(12.dp))
-    SectionCard("${state.network.range} · ${state.network.interfaceName}") {
+    SectionCard(state.network.range, Icons.Outlined.Hub) {
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = onScan, modifier = Modifier.weight(1f)) { Text(if (state.scanningLan) "Stop" else "Scan") }
+        Button(onClick = onScan, modifier = Modifier.weight(1f)) { Text(if (state.scanningLan) "Stop scan" else "Scan network") }
         OutlinedButton(onClick = onRefresh) { Text("Refresh") }
       }
       if (state.scanningLan && state.total > 0) {
@@ -178,14 +249,14 @@ private fun LanPage(state: MainScreenUiState, onScan: () -> Unit, onRefresh: () 
           progress = { state.completed.toFloat() / state.total.toFloat() },
           modifier = Modifier.fillMaxWidth(),
         )
-        Text("${state.completed} of ${state.total} addresses", fontSize = 12.sp)
+        Text("${state.completed} of ${state.total} addresses", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
       }
     }
     Spacer(Modifier.height(12.dp))
     if (state.hosts.isEmpty()) {
-      EmptyPanel(if (state.scanningLan) "Looking for devices…" else "Press Scan to discover devices and common services.")
+      EmptyPanel(if (state.scanningLan) "Looking for devices…" else "Press Scan network to discover devices on this LAN.")
     } else {
-      LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+      LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         items(state.hosts, key = HostResult::address) { HostRow(it) }
       }
     }
@@ -194,14 +265,22 @@ private fun LanPage(state: MainScreenUiState, onScan: () -> Unit, onRefresh: () 
 
 @Composable
 private fun HostRow(host: HostResult) {
-  Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-    Column(Modifier.fillMaxWidth().padding(14.dp)) {
-      Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(host.address, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-        Text("${host.latencyMs} ms", color = Green400)
+  Card(
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    border = panelBorder(),
+    shape = RoundedCornerShape(9.dp),
+  ) {
+    Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
+      Icon(Icons.Outlined.Devices, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+      Column(Modifier.padding(start = 11.dp).weight(1f)) {
+        Text(host.address, fontWeight = FontWeight.Bold)
+        Text(
+          if (host.openPorts.isEmpty()) "Online · no common ports responded" else host.services,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          fontSize = 12.sp,
+        )
       }
-      Text(if (host.openPorts.isEmpty()) "Online · no common TCP ports responded" else host.services,
-        color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+      Text("${host.latencyMs} ms", color = Green400, fontSize = 12.sp)
     }
   }
 }
@@ -216,27 +295,29 @@ private fun WifiPage(state: MainScreenUiState, onScan: () -> Unit) {
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.NEARBY_WIFI_DEVICES)
     }.toTypedArray()
   }
-  val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-    onScan()
-  }
+  val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { onScan() }
   fun requestOrScan() {
     val missing = permissions.any { ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED }
     if (missing) permissionLauncher.launch(permissions) else onScan()
   }
 
   Column(Modifier.fillMaxSize().padding(16.dp)) {
-    Text("Wi-Fi analyzer", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-    Text("Nearby network names, channels, signal and advertised security.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-    Spacer(Modifier.height(10.dp))
-    Button(onClick = ::requestOrScan, enabled = !state.scanningWifi) {
-      Text(if (state.scanningWifi) "Scanning…" else "Scan nearby Wi-Fi")
+    PageHeading("Wi-Fi analyzer", "Nearby channels, signal and security", Icons.Outlined.Wifi)
+    Spacer(Modifier.height(12.dp))
+    Button(onClick = ::requestOrScan, enabled = !state.scanningWifi, modifier = Modifier.fillMaxWidth()) {
+      Icon(Icons.Outlined.Wifi, null, modifier = Modifier.size(18.dp))
+      Text(if (state.scanningWifi) "  Scanning…" else "  Scan nearby Wi-Fi")
     }
-    Text("Android requires nearby-device and precise-location permission for Wi-Fi scan results.",
-      fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
+    Text(
+      "Nearby-device and precise-location permission are required by Android.",
+      fontSize = 11.sp,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      modifier = Modifier.padding(vertical = 9.dp),
+    )
     if (state.wifiNetworks.isEmpty()) {
       EmptyPanel("No nearby Wi-Fi results yet.")
     } else {
-      LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+      LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         items(state.wifiNetworks, key = WifiNetwork::bssid) { WifiRow(it) }
       }
     }
@@ -247,15 +328,19 @@ private fun WifiPage(state: MainScreenUiState, onScan: () -> Unit) {
 private fun WifiRow(network: WifiNetwork) {
   val reviewColor = if (network.review.startsWith("High")) Color(0xFFFF6767)
   else if (network.review.startsWith("Medium")) Orange400 else Green400
-  Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-    Column(Modifier.fillMaxWidth().padding(14.dp)) {
-      Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(network.name, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-        Text("${network.signalPercent}%", color = MaterialTheme.colorScheme.primary)
+  Card(
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    border = panelBorder(),
+    shape = RoundedCornerShape(9.dp),
+  ) {
+    Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
+      Icon(Icons.Outlined.Wifi, null, tint = MaterialTheme.colorScheme.primary)
+      Column(Modifier.padding(start = 11.dp).weight(1f)) {
+        Text(network.name, fontWeight = FontWeight.Bold)
+        Text("Channel ${network.channel} · ${network.frequencyMhz} MHz · ${network.security}", fontSize = 12.sp)
+        Text(network.review, color = reviewColor, fontSize = 12.sp)
       }
-      Text(network.bssid, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-      Text("Channel ${network.channel} · ${network.frequencyMhz} MHz · ${network.security}", fontSize = 13.sp)
-      Text(network.review, color = reviewColor, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+      Text("${network.signalPercent}%", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
     }
   }
 }
@@ -264,8 +349,7 @@ private fun WifiRow(network: WifiNetwork) {
 private fun ToolsPage(state: MainScreenUiState, onRun: (DiagnosticKind, String) -> Unit) {
   var target by rememberSaveable { mutableStateOf("8.8.8.8") }
   Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-    Text("Diagnostics", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-    Text("Test a host, address or URL from this phone.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    PageHeading("Diagnostics", "Test a host, address or URL", Icons.Outlined.Analytics)
     Spacer(Modifier.height(12.dp))
     OutlinedTextField(
       value = target,
@@ -277,38 +361,79 @@ private fun ToolsPage(state: MainScreenUiState, onRun: (DiagnosticKind, String) 
     Spacer(Modifier.height(10.dp))
     DiagnosticKind.entries.chunked(2).forEach { row ->
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 8.dp)) {
-        row.forEach { kind ->
-          Button(onClick = { onRun(kind, target) }, modifier = Modifier.weight(1f)) { Text(kind.label) }
-        }
-        if (row.size == 1) Spacer(Modifier.weight(1f))
+        row.forEach { kind -> Button(onClick = { onRun(kind, target) }, modifier = Modifier.weight(1f)) { Text(kind.label) } }
       }
     }
-    SectionCard("Result") {
-      Text(state.diagnosticResult)
-    }
+    SectionCard("Result", Icons.Outlined.NetworkCheck) { Text(state.diagnosticResult) }
     Spacer(Modifier.height(12.dp))
-    Text("Ping uses Android's reachability API, so some hosts that block echo requests can still be online.",
-      color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+    SectionCard("Android network access", Icons.Outlined.Security) {
+      Text(
+        "Device MAC addresses and saved Wi-Fi passwords are protected by Android.",
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        fontSize = 12.sp,
+      )
+    }
   }
 }
 
 @Composable
-private fun MetricCard(title: String, value: String, detail: String, modifier: Modifier = Modifier, accent: Color = MaterialTheme.colorScheme.primary) {
-  Card(modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+private fun PageHeading(title: String, subtitle: String, icon: ImageVector) {
+  Row(verticalAlignment = Alignment.CenterVertically) {
+    Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
+    Column(Modifier.padding(start = 10.dp)) {
+      Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+      Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+    }
+  }
+}
+
+@Composable
+private fun MetricCard(
+  title: String,
+  value: String,
+  detail: String,
+  icon: ImageVector,
+  modifier: Modifier = Modifier,
+  accent: Color = MaterialTheme.colorScheme.primary,
+) {
+  Card(
+    modifier,
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    border = panelBorder(),
+    shape = RoundedCornerShape(10.dp),
+  ) {
     Column(Modifier.padding(14.dp)) {
-      Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-      Text(value, color = accent, fontWeight = FontWeight.Bold, fontSize = if (value.length > 10) 16.sp else 28.sp, maxLines = 1)
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = accent, modifier = Modifier.size(21.dp))
+        Text(title, modifier = Modifier.padding(start = 7.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+      }
+      Text(value, color = accent, fontWeight = FontWeight.Bold, fontSize = if (value.length > 10) 15.sp else 26.sp, maxLines = 1)
       Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, maxLines = 1)
     }
   }
 }
 
 @Composable
-private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
-  Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+private fun QuickAction(label: String, icon: ImageVector, modifier: Modifier = Modifier, onClick: () -> Unit) {
+  OutlinedButton(onClick = onClick, modifier = modifier.height(54.dp), shape = RoundedCornerShape(8.dp)) {
+    Icon(icon, null, modifier = Modifier.size(18.dp))
+    Text("  $label", fontSize = 12.sp)
+  }
+}
+
+@Composable
+private fun SectionCard(title: String, icon: ImageVector, content: @Composable ColumnScope.() -> Unit) {
+  Card(
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    border = panelBorder(),
+    shape = RoundedCornerShape(10.dp),
+  ) {
     Column(Modifier.fillMaxWidth().padding(14.dp)) {
-      Text(title, fontWeight = FontWeight.Bold)
-      Spacer(Modifier.height(10.dp))
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+        Text(title, modifier = Modifier.padding(start = 8.dp), fontWeight = FontWeight.Bold)
+      }
+      HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = MaterialTheme.colorScheme.surfaceVariant)
       content()
     }
   }
@@ -317,15 +442,26 @@ private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Un
 @Composable
 private fun InfoLine(label: String, value: String) {
   Row(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
-    Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(0.42f))
-    Text(value, modifier = Modifier.weight(0.58f))
+    Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(0.4f), fontSize = 12.sp)
+    Text(value, modifier = Modifier.weight(0.6f), fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
   }
-  HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 }
 
 @Composable
 private fun EmptyPanel(message: String) {
-  Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+  Card(
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    border = panelBorder(),
+    shape = RoundedCornerShape(10.dp),
+  ) {
     Text(message, modifier = Modifier.fillMaxWidth().padding(24.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
   }
 }
+
+@Composable
+private fun panelBorder() = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+
+private fun averageLatency(hosts: List<HostResult>): String =
+  if (hosts.isEmpty()) "—" else "${hosts.map { it.latencyMs }.average().toInt()} ms"
+
+private fun compactAddress(value: String): String = if (value.length > 15) value.take(15) else value

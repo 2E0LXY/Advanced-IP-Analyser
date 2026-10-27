@@ -1,3 +1,10 @@
+advanced-ip-analyser (2.8.2) stable; urgency=medium
+
+  * Save optional TP-Link smart-home credentials in the desktop credential manager.
+  * Add explicit Save securely and Forget saved controls to Smart Home.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Tue, 27 Oct 2026 18:00:00 +0000
+
 advanced-ip-analyser (2.8.1) stable; urgency=medium
 
   * Discover LAN devices that block ping and selected TCP ports using neighbour-table evidence.

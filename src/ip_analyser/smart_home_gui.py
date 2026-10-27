@@ -29,6 +29,12 @@ from .smart_home import (
     set_brightness,
     set_power,
 )
+from .smart_home_credentials import (
+    SmartHomeCredentialError,
+    clear_smart_home_credentials,
+    load_smart_home_credentials,
+    save_smart_home_credentials,
+)
 
 
 class SmartHomeView(ttk.Frame):
@@ -48,14 +54,20 @@ class SmartHomeView(ttk.Frame):
             text="Discover and control supported Kasa and Tapo plugs, bulbs, switches and strips.",
             foreground="#90abc4", font=("Segoe UI", 10)).pack(anchor="w", pady=(3, 12))
 
-        credentials = ttk.LabelFrame(self, text="Device authentication (kept in memory only)", padding=10)
+        credentials = ttk.LabelFrame(self, text="TP-Link account · stored in your desktop credential manager", padding=10)
         credentials.pack(fill="x")
         ttk.Label(credentials, text="TP-Link email").grid(row=0, column=0, sticky="w")
         self.username = ttk.Entry(credentials, width=34)
         self.username.grid(row=0, column=1, sticky="ew", padx=(8, 18))
         ttk.Label(credentials, text="Password").grid(row=0, column=2, sticky="w")
         self.password = ttk.Entry(credentials, show="●", width=28)
-        self.password.grid(row=0, column=3, sticky="ew", padx=(8, 0))
+        self.password.grid(row=0, column=3, sticky="ew", padx=(8, 12))
+        self.save_credentials_button = ttk.Button(
+            credentials, text="Save securely", command=self.save_credentials)
+        self.save_credentials_button.grid(row=0, column=4, padx=(0, 8))
+        self.clear_credentials_button = ttk.Button(
+            credentials, text="Forget saved", command=self.clear_credentials)
+        self.clear_credentials_button.grid(row=0, column=5)
         credentials.columnconfigure(1, weight=1)
         credentials.columnconfigure(3, weight=1)
 
@@ -159,6 +171,7 @@ class SmartHomeView(ttk.Frame):
             advanced, text="Run selected action", command=self.run_advanced_action)
         self.ha_action_button.pack(side="left")
         self._update_controls()
+        self._load_saved_credentials()
 
         ttk.Label(
             self,
@@ -168,6 +181,39 @@ class SmartHomeView(ttk.Frame):
 
     def _credentials(self) -> tuple[str, str]:
         return self.username.get(), self.password.get()
+
+    def _load_saved_credentials(self) -> None:
+        try:
+            saved = load_smart_home_credentials()
+        except SmartHomeCredentialError as error:
+            self.status.configure(text=str(error))
+            return
+        if saved is None:
+            return
+        username, password = saved
+        self.username.delete(0, "end")
+        self.username.insert(0, username)
+        self.password.delete(0, "end")
+        self.password.insert(0, password)
+        self.status.configure(text="Saved TP-Link account loaded securely.")
+
+    def save_credentials(self) -> None:
+        try:
+            save_smart_home_credentials(*self._credentials())
+        except (ValueError, SmartHomeCredentialError) as error:
+            messagebox.showerror("Could not save account", str(error), parent=self)
+            return
+        self.status.configure(text="TP-Link account saved securely in the desktop credential manager.")
+
+    def clear_credentials(self) -> None:
+        try:
+            clear_smart_home_credentials()
+        except SmartHomeCredentialError as error:
+            messagebox.showerror("Could not forget account", str(error), parent=self)
+            return
+        self.username.delete(0, "end")
+        self.password.delete(0, "end")
+        self.status.configure(text="Saved TP-Link account removed.")
 
     def _run(self, label: str, operation: Callable[[], Awaitable]) -> None:
         if self.busy:

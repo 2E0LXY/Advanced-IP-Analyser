@@ -37,7 +37,7 @@ live progress, expandable service results, inventory exchange, and remote action
 | Favorites | Persistent saved devices, MAC-first identity, refreshed IP observations, editable notes, rescan, removal, import, selected export |
 | Inventory | CSV/JSON/XML/escaped-HTML export, bounded JSON/XML import, spreadsheet-formula protection, atomic favorites updates |
 | Device access | HTTP, HTTPS, FTP, SMB, SSH, RDP and Telnet launchers; Ping, Tracepath, Wake-on-LAN; confirmed delayed SSH shutdown/reboot and abort |
-| Smart home | Direct local control for TP-Link Kasa/Tapo, Smart Life/Tuya, Shelly Gen1/Gen2+, Tasmota, WLED, and Philips Hue; local Home Assistant connection for lights, switches, fans, locks, covers, climate, media, vacuums, scenes and other controllable entities; generic local action runner; secure VPN-routed remote use |
+| Smart home | Direct local control for TP-Link Kasa/Tapo with secure desktop credential storage, Smart Life/Tuya, Shelly Gen1/Gen2+, Tasmota, WLED, and Philips Hue; local Home Assistant connection for lights, switches, fans, locks, covers, climate, media, vacuums, scenes and other controllable entities; generic local action runner; secure VPN-routed remote use |
 | Packet engine | Native Linux `AF_PACKET` capture, selected-host/service scope, interface discovery, Ethernet PCAP/PCAPNG/gzip reading, endpoint/port/protocol summaries, byte preview |
 | Display filters | IP/CIDR, TCP/UDP ports, DNS, HTTP, TLS, ICMP, ARP, TCP flags, lengths, comparisons, text/regex matching, boolean expressions, 20 quick filters, saved named filters |
 | Network Security Monitor | Up to 24-hour sessions across all observed ports and both directions, minute timeline, conversations, devices, DNS, TCP diagnostics, behavioural baselines, colour-coded findings, alerts, bookmarks, reports, retention, history |
@@ -74,7 +74,7 @@ release and open it on a phone or tablet running Android 8.0 or later. Android
 may ask you to allow installation from the browser or file manager used to open
 the APK.
 
-The Android companion includes a mobile dashboard, bounded LAN discovery,
+The Android companion includes a mobile version of the dark network dashboard, bounded LAN discovery,
 common TCP service checks, nearby Wi-Fi security review, and ping/reachability,
 DNS, port, and HTTP diagnostics. Android protects other devices' MAC addresses,
 saved Wi-Fi passwords, raw packet capture, and unrestricted background Wi-Fi
@@ -89,7 +89,7 @@ then run:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.8.1_all.deb
+sudo apt install ./advanced-ip-analyser_2.8.2_all.deb
 ```
 
 Launch it from the desktop application menu or run:
