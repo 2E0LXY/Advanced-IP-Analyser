@@ -1,4 +1,4 @@
-# Advanced IP Analyser 2.8.2 Instruction Book
+# Advanced IP Analyser 2.8.5 Instruction Book
 
 Windows 10/11 and Debian 13 edition
 
@@ -64,7 +64,7 @@ service, disconnect Wi-Fi clients, inject frames, or recover passwords.
 
 ### Install on Windows
 
-Download `Advanced-IP-Analyser-Setup-2.8.2.exe` from the project release page
+Download `Advanced-IP-Analyser-Setup-2.8.5.exe` from the project release page
 and run it. The per-user installer normally needs no administrator rights and
 offers Start-menu and desktop shortcuts. Windows supports network scanning,
 inventory, Wi-Fi adapter/nearby-network scanning, selected saved-profile key
@@ -74,12 +74,12 @@ visibly disabled because the project does not bundle a Windows capture driver.
 
 ### Install on Debian 13
 
-Download `advanced-ip-analyser_2.8.2_all.deb` from the project release page.
+Download `advanced-ip-analyser_2.8.5_all.deb` from the project release page.
 In a terminal:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.8.2_all.deb
+sudo apt install ./advanced-ip-analyser_2.8.5_all.deb
 ```
 
 Use `apt install ./file.deb`, not `dpkg -i`, because APT resolves dependencies.

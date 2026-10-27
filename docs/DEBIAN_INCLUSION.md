@@ -8,7 +8,7 @@ the package.
 ## Current package state
 
 - Source format: `3.0 (quilt)`
-- Proposed Debian version: `2.8.2-1`
+- Proposed Debian version: `2.8.5-1`
 - Distribution: `UNRELEASED` until an ITP number and sponsor review exist
 - Section and priority: `net`, `optional`
 - Architecture: `all`
@@ -58,10 +58,10 @@ repository.
 ## Building the review package locally
 
 Run this from a Debian unstable machine or clean container after fetching the
-repository and the `v2.8.2` tag:
+repository and the `v2.8.5` tag:
 
 ```sh
-version=2.8.2
+version=2.8.5
 mkdir -p build-area
 git archive --format=tar --prefix="advanced-ip-analyser-$version/" "v$version" \
   | gzip -n > "build-area/advanced-ip-analyser_${version}.orig.tar.gz"

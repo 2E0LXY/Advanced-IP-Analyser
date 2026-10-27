@@ -1,9 +1,33 @@
-advanced-ip-analyser (2.8.2) stable; urgency=medium
+advanced-ip-analyser (2.8.5) stable; urgency=medium
 
   * Save optional TP-Link smart-home credentials in the desktop credential manager.
   * Add explicit Save securely and Forget saved controls to Smart Home.
 
  -- Daren Loxley <2e0lxy@users.noreply.github.com>  Tue, 27 Oct 2026 18:00:00 +0000
+
+advanced-ip-analyser (2.8.4) stable; urgency=medium
+
+  * Add local ChatGPT Desktop MCP stdio connector without a separate OpenAI API key.
+  * Add opt-in persistent Windows login monitoring with no cloud telemetry.
+  * Maintain explicit local approval for router control and redacted MCP reports.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Sun, 25 Oct 2026 18:30:00 +0000
+
+advanced-ip-analyser (2.8.3) stable; urgency=medium
+
+  * Add opt-in loopback dashboard with token-authenticated scan and monitor controls.
+  * Require explicit local approval for router reboot and Wi-Fi reload.
+  * Keep network data local without VPN, tunnel, or automatic cloud telemetry.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Sun, 25 Oct 2026 18:00:00 +0000
+
+advanced-ip-analyser (2.8.2) stable; urgency=medium
+
+  * Add optional local-only, read-only AI Network Monitor with historical change tracking.
+  * Add bounded periodic LAN checks, local SQLite history, and explicit JSON report export.
+  * Keep monitoring disabled by default with no cloud telemetry or inbound listener.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Sun, 25 Oct 2026 16:00:00 +0000
 
 advanced-ip-analyser (2.8.1) stable; urgency=medium
 

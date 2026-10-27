@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import getpass
 import ipaddress
+import webbrowser
 import queue
 import shutil
 import sys
@@ -20,6 +21,8 @@ from .actions import (
     service_url,
     wake,
 )
+from .ai_network_monitor import (local_report, monitor_loop, save_local_report,
+                                 validate_monitor_target)
 from .ai_analysis import ANALYSIS_MODES, SYSTEM_INSTRUCTION, build_analysis_preview
 from .ai_providers import AIProviderError, generate_text, list_models
 from .ai_settings import (
@@ -289,6 +292,7 @@ class Application(tk.Tk):
         self.cancel_scan = threading.Event()
         self.network_presets = []
         self.favorites_path = Path.home() / ".config" / "advanced-ip-analyser" / "favorites.json"
+        self.local_control_server = None
         try:
             self.app_icon = tk.PhotoImage(file=Path(__file__).with_name("assets") / "advanced-ip-analyser.png")
             self.iconphoto(True, self.app_icon)
@@ -391,7 +395,8 @@ class Application(tk.Tk):
                               ("▦  Port Scan", self._open_port_scan),
                               ("⌁  Wi-Fi", self.open_wifi_tools),
                               ("◫  Packets", self.open_packet_capture),
-                              ("⬡  Security", self.open_web_audit)):
+                              ("⬡  Security", self.open_web_audit),
+                              ("◎  Local AI Control", self.show_local_ai_control)):
             tk.Button(sidebar, text=label, anchor="w", relief="flat", bd=0, bg="#132334",
                       fg="#a9bfd4", activebackground="#254b71", activeforeground="#ffffff",
                       font=("Segoe UI", 9), padx=15, pady=10,
@@ -487,6 +492,8 @@ class Application(tk.Tk):
         ttk.Button(actions, text="Trace", command=lambda: self.run_selected_tool("trace")).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Web audit…", command=self.open_web_audit).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="AI analysis…", command=self.show_ai_analysis).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Local AI monitor…", command=self.show_local_ai_monitor).pack(
+            side="left", padx=(8, 0))
         packet_button = ttk.Menubutton(actions, text="Packets ▾")
         packet_button.pack(side="left", padx=(8, 0))
         packet_menu = tk.Menu(packet_button, tearoff=False)
@@ -753,6 +760,164 @@ class Application(tk.Tk):
         self.diagnostic_output.configure(state="normal")
         self.diagnostic_output.insert("end", output)
         self.diagnostic_output.configure(state="disabled")
+
+    def show_local_ai_control(self) -> None:
+        """Create a user-authorised loopback session from the packaged Windows GUI."""
+        from http.server import ThreadingHTTPServer
+
+        from .local_control import PORT, ControlState, make_handler
+
+        if self.local_control_server is None:
+            if not messagebox.askyesno(
+                "Enable local AI Control?",
+                "Allow this computer's browser to read LAN reports and run scanner operations "
+                "using a private session token?\n\nRouter changes will still need separate approval. "
+                "No cloud service or VPN will be started.", parent=self,
+            ):
+                return
+            state = ControlState()
+            try:
+                server = ThreadingHTTPServer(("127.0.0.1", PORT), make_handler(state))
+            except OSError as exc:
+                messagebox.showerror("Local AI Control", f"Cannot start local control: {exc}", parent=self)
+                return
+            self.local_control_state = state
+            self.local_control_server = server
+            threading.Thread(target=server.serve_forever, kwargs={"poll_interval": .2}, daemon=True).start()
+
+        panel = tk.Toplevel(self)
+        panel.title("Local AI Control - authorised session")
+        panel.geometry("620x230")
+        panel.transient(self)
+        frame = ttk.Frame(panel, padding=16)
+        frame.pack(fill="both", expand=True)
+        ttk.Label(frame, text="Private session token (do not share)").pack(anchor="w")
+        token_box = ttk.Entry(frame, width=76)
+        token_box.insert(0, self.local_control_state.token)
+        token_box.configure(state="readonly")
+        token_box.pack(fill="x", pady=8)
+        ttk.Label(frame, text=f"Dashboard: http://127.0.0.1:{PORT}/").pack(anchor="w")
+        buttons = ttk.Frame(frame)
+        buttons.pack(anchor="w", pady=10)
+
+        def copy_token():
+            self.clipboard_clear()
+            self.clipboard_append(self.local_control_state.token)
+
+        def stop_control():
+            self.local_control_state.stop()
+            self.local_control_server.shutdown()
+            self.local_control_server.server_close()
+            self.local_control_server = None
+            panel.destroy()
+
+        ttk.Button(buttons, text="Copy token", command=copy_token).pack(side="left")
+        ttk.Button(buttons, text="Open local dashboard", command=lambda: webbrowser.open(
+            f"http://127.0.0.1:{PORT}/")).pack(side="left", padx=8)
+        ttk.Button(buttons, text="Revoke access", command=stop_control).pack(side="left")
+        ttk.Label(frame, text="Closing this panel does not revoke access. Use Revoke access or close the app.").pack(anchor="w")
+
+    def show_local_ai_monitor(self) -> None:
+        """Optional foreground-session monitor; all observations remain local."""
+        window = tk.Toplevel(self)
+        window.title("Local AI Network Monitor")
+        window.geometry("610x370")
+        window.transient(self)
+        frame = ttk.Frame(window, padding=16)
+        frame.pack(fill="both", expand=True)
+        ttk.Label(frame, text="Local AI Network Monitor",
+                  font=("TkDefaultFont", 14, "bold")).pack(anchor="w")
+        ttk.Label(frame, text="Read-only LAN checks. No cloud upload, listener, VPN or tunnel.").pack(
+            anchor="w", pady=(6, 12))
+        target = tk.StringVar(value=self.target.get().strip() or "192.168.1.0/24")
+        ttk.Label(frame, text="Private LAN target (maximum 1,024 addresses)").pack(anchor="w")
+        ttk.Entry(frame, textvariable=target).pack(fill="x", pady=(2, 10))
+        interval = tk.StringVar(value="300")
+        ttk.Label(frame, text="Interval in seconds (60–86400)").pack(anchor="w")
+        ttk.Entry(frame, textvariable=interval, width=12).pack(anchor="w", pady=(2, 10))
+        identifiers = tk.BooleanVar(value=False)
+        ttk.Checkbutton(frame, text="Include IP/MAC/hostnames in manually exported report",
+                        variable=identifiers).pack(anchor="w")
+        status = tk.StringVar(value="Stopped. No monitoring runs until Start is pressed.")
+        ttk.Label(frame, textvariable=status, wraplength=550).pack(anchor="w", pady=12)
+        controls = ttk.Frame(frame)
+        controls.pack(anchor="w")
+        stop = threading.Event()
+        events: queue.Queue = queue.Queue()
+        active = {"value": False}
+
+        def start_monitor() -> None:
+            if active["value"]:
+                return
+            try:
+                validate_monitor_target(target.get())
+                seconds = int(interval.get())
+                if not 60 <= seconds <= 86400:
+                    raise ValueError("Interval must be 60–86400 seconds")
+            except ValueError as error:
+                messagebox.showerror("Invalid monitor settings", str(error), parent=window)
+                return
+            stop.clear()
+            active["value"] = True
+            start_button.configure(state="disabled")
+            status.set("Monitoring locally…")
+
+            def worker() -> None:
+                try:
+                    monitor_loop(target.get(), interval=seconds, count=None, stop=stop,
+                                 on_result=lambda result: events.put(("result", result)))
+                except (OSError, RuntimeError, ValueError) as error:
+                    events.put(("error", str(error)))
+                finally:
+                    events.put(("stopped", None))
+
+            threading.Thread(target=worker, daemon=True, name="local-ai-monitor").start()
+
+        def stop_monitor() -> None:
+            stop.set()
+            status.set("Stopping after the current scan…")
+
+        def export_monitor() -> None:
+            path = filedialog.asksaveasfilename(parent=window, defaultextension=".json",
+                                                filetypes=[("JSON report", "*.json")])
+            if path:
+                try:
+                    save_local_report(Path(path), local_report(include_identifiers=identifiers.get()))
+                except (OSError, ValueError) as error:
+                    messagebox.showerror("Export failed", str(error), parent=window)
+                else:
+                    messagebox.showinfo("Local report saved", "Report saved locally. Nothing was uploaded.",
+                                        parent=window)
+
+        start_button = ttk.Button(controls, text="Start", command=start_monitor)
+        start_button.pack(side="left")
+        ttk.Button(controls, text="Stop", command=stop_monitor).pack(side="left", padx=8)
+        ttk.Button(controls, text="Export report…", command=export_monitor).pack(side="left")
+
+        def drain() -> None:
+            if not window.winfo_exists():
+                return
+            try:
+                while True:
+                    kind, value = events.get_nowait()
+                    if kind == "result":
+                        status.set(f"Last check: {value['reachable']} reachable / {value['scanned']} scanned; "
+                                   f"snapshot {value['snapshot_id']}")
+                    elif kind == "error":
+                        status.set(f"Monitoring stopped: {value}")
+                    else:
+                        active["value"] = False
+                        start_button.configure(state="normal")
+            except queue.Empty:
+                pass
+            window.after(250, drain)
+
+        def close() -> None:
+            stop.set()
+            window.destroy()
+
+        window.protocol("WM_DELETE_WINDOW", close)
+        window.after(250, drain)
 
     def show_ai_analysis(self) -> None:
         try:

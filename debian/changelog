@@ -1,4 +1,4 @@
-advanced-ip-analyser (2.8.2-1) UNRELEASED; urgency=medium
+advanced-ip-analyser (2.8.5-1) UNRELEASED; urgency=medium
 
   * Save optional TP-Link smart-home credentials in the desktop credential manager.
   * Add explicit Save securely and Forget saved controls to Smart Home.
