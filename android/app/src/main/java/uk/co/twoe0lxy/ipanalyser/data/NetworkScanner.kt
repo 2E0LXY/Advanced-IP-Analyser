@@ -2,9 +2,17 @@ package uk.co.twoe0lxy.ipanalyser.data
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.net.ConnectivityManager
+import android.net.MacAddress
+import android.net.Network
+import android.net.NetworkRequest
+import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
+import android.net.wifi.WifiNetworkSpecifier
+import android.os.Build
 import android.os.SystemClock
+import android.provider.Settings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -14,12 +22,15 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
+import java.net.DatagramPacket
+import java.net.DatagramSocket
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.URL
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.TimeUnit
 
 data class NetworkInfo(
   val localIp: String = "Unavailable",
@@ -65,8 +76,9 @@ object ScannerUtils {
     val octets = localIp.split('.').mapNotNull(String::toIntOrNull)
     if (octets.size != 4 || octets.any { it !in 0..255 } || prefixLength !in 1..32) return emptyList()
     val address = octets.fold(0) { value, octet -> (value shl 8) or octet }
-    // Keep phone scans bounded: a network wider than /24 is scanned as the phone's local /24.
-    val effectivePrefix = maxOf(prefixLength, 24)
+    // Honour normal LAN subnet sizes while keeping very large enterprise ranges bounded.
+    // A /22 is 1,022 usable addresses and is the maximum suitable for an on-device scan.
+    val effectivePrefix = maxOf(prefixLength, 22)
     val mask = if (effectivePrefix == 32) -1 else -1 shl (32 - effectivePrefix)
     val network = address and mask
     val count = (1L shl (32 - effectivePrefix)).toInt()
@@ -93,6 +105,46 @@ object ScannerUtils {
     else -> 0
   }
 
+  fun arpAddresses(table: String): Set<String> = table.lineSequence().drop(1).mapNotNull { line ->
+    val fields = line.trim().split(Regex("\\s+"))
+    val address = fields.getOrNull(0) ?: return@mapNotNull null
+    val flags = fields.getOrNull(2) ?: return@mapNotNull null
+    val mac = fields.getOrNull(3) ?: return@mapNotNull null
+    address.takeIf {
+      flags != "0x0" && mac != "00:00:00:00:00:00" &&
+        it.split('.').size == 4 && it.split('.').all { part -> part.toIntOrNull() in 0..255 }
+    }
+  }.toSet()
+
+  fun ipNeighbourAddresses(table: String): Set<String> = table.lineSequence().mapNotNull { line ->
+    val fields = line.trim().split(Regex("\\s+"))
+    val address = fields.firstOrNull() ?: return@mapNotNull null
+    val state = fields.lastOrNull()?.uppercase().orEmpty()
+    address.takeIf {
+      state !in setOf("FAILED", "INCOMPLETE") && isIpv4Address(it)
+    }
+  }.toSet()
+
+  fun preferredServiceUrl(address: String, ports: List<Int>): String? {
+    val port = listOf(443, 80, 8443, 8080, 8000, 8888, 9000, 5000, 21, 22, 23, 554)
+      .firstOrNull(ports::contains) ?: return null
+    return when (port) {
+      443 -> "https://$address"
+      80 -> "http://$address"
+      8443 -> "https://$address:8443"
+      8080, 8000, 8888, 9000, 5000 -> "http://$address:$port"
+      21 -> "ftp://$address"
+      22 -> "ssh://$address"
+      23 -> "telnet://$address"
+      554 -> "rtsp://$address"
+      else -> null
+    }
+  }
+
+  private fun isIpv4Address(value: String): Boolean = value.split('.').let { parts ->
+    parts.size == 4 && parts.all { it.toIntOrNull() in 0..255 }
+  }
+
   private fun intToIp(value: Int): String = listOf(
     value ushr 24 and 255, value ushr 16 and 255, value ushr 8 and 255, value and 255,
   ).joinToString(".")
@@ -102,7 +154,10 @@ class NetworkScanner(context: Context) {
   private val appContext = context.applicationContext
   private val connectivity = appContext.getSystemService(ConnectivityManager::class.java)
   private val wifi = appContext.getSystemService(WifiManager::class.java)
-  private val commonPorts = listOf(22, 53, 80, 443, 445, 554, 8080, 8443, 9000)
+  private val commonPorts = listOf(
+    21, 22, 23, 53, 80, 139, 443, 445, 554, 1883, 5000, 8000, 8080, 8443, 8883, 9000, 9100,
+  )
+  private var wifiRequestCallback: ConnectivityManager.NetworkCallback? = null
 
   @SuppressLint("MissingPermission")
   fun networkInfo(): NetworkInfo {
@@ -126,13 +181,17 @@ class NetworkScanner(context: Context) {
 
   suspend fun scanLan(info: NetworkInfo, progress: (Int, Int) -> Unit): List<HostResult> = coroutineScope {
     val targets = ScannerUtils.scanTargets(info.localIp, info.prefixLength)
-    val semaphore = Semaphore(48)
+    stimulateNeighbours(targets)
+    delay(350)
+    val neighbours = neighbourAddresses()
+    val alwaysInclude = neighbours + setOf(info.gateway, info.localIp)
+    val semaphore = Semaphore(64)
     val finished = AtomicInteger(0)
     progress(0, targets.size)
     targets.map { address ->
       async(Dispatchers.IO) {
         semaphore.withPermit {
-          val result = inspectHost(address)
+          val result = inspectHost(address, address in alwaysInclude)
           progress(finished.incrementAndGet(), targets.size)
           result
         }
@@ -140,7 +199,47 @@ class NetworkScanner(context: Context) {
     }.awaitAll().filterNotNull().sortedBy { ipSortKey(it.address) }
   }
 
-  private fun inspectHost(address: String): HostResult? {
+  private suspend fun stimulateNeighbours(targets: List<String>) = coroutineScope {
+    val semaphore = Semaphore(64)
+    targets.map { address ->
+      async(Dispatchers.IO) {
+        semaphore.withPermit {
+          try {
+            DatagramSocket().use { socket ->
+              val packet = DatagramPacket(byteArrayOf(0), 1, InetAddress.getByName(address), 9)
+              socket.send(packet)
+            }
+          } catch (_: Exception) {
+            // A failed UDP send does not prevent the normal host probes below.
+          }
+        }
+      }
+    }.awaitAll()
+  }
+
+  private fun neighbourAddresses(): Set<String> {
+    val arp = try {
+      ScannerUtils.arpAddresses(java.io.File("/proc/net/arp").readText())
+    } catch (_: Exception) {
+      emptySet()
+    }
+    val ipNeighbours = try {
+      val process = ProcessBuilder("/system/bin/ip", "neigh", "show")
+        .redirectErrorStream(true)
+        .start()
+      if (!process.waitFor(2, TimeUnit.SECONDS)) {
+        process.destroyForcibly()
+        emptySet()
+      } else {
+        ScannerUtils.ipNeighbourAddresses(process.inputStream.bufferedReader().use { it.readText() })
+      }
+    } catch (_: Exception) {
+      emptySet()
+    }
+    return arp + ipNeighbours
+  }
+
+  private fun inspectHost(address: String, knownNeighbour: Boolean = false): HostResult? {
     var reachable = false
     var latency = Long.MAX_VALUE
     try {
@@ -154,14 +253,14 @@ class NetworkScanner(context: Context) {
     commonPorts.forEach { port ->
       val started = SystemClock.elapsedRealtime()
       try {
-        Socket().use { socket -> socket.connect(InetSocketAddress(address, port), 110) }
+        Socket().use { socket -> socket.connect(InetSocketAddress(address, port), 140) }
         open += port
         latency = minOf(latency, SystemClock.elapsedRealtime() - started)
       } catch (_: Exception) {
         // Closed or filtered is expected during discovery.
       }
     }
-    if (!reachable && open.isEmpty()) return null
+    if (!knownNeighbour && !reachable && open.isEmpty()) return null
     return HostResult(address, if (latency == Long.MAX_VALUE) 0 else latency, open)
   }
 
@@ -185,6 +284,70 @@ class NetworkScanner(context: Context) {
     } catch (error: SecurityException) {
       throw IllegalStateException("Wi-Fi permission is required to list nearby networks.", error)
     }
+  }
+
+  @SuppressLint("MissingPermission")
+  fun connectWifi(network: WifiNetwork, password: String, status: (String) -> Unit) {
+    if (network.name == "Hidden network") {
+      openWifiSettings()
+      status("Choose the hidden network in Android Wi-Fi settings.")
+      return
+    }
+    if (network.security == "WEP") {
+      openWifiSettings()
+      status("Choose ${network.name} in Android Wi-Fi settings; apps cannot join WEP directly.")
+      return
+    }
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+      openWifiSettings()
+      status("Choose ${network.name} in Android Wi-Fi settings.")
+      return
+    }
+    if (network.security != "Open" && password.length < 8) {
+      status("Enter the Wi-Fi password (at least 8 characters).")
+      return
+    }
+    try {
+      wifiRequestCallback?.let { runCatching { connectivity.unregisterNetworkCallback(it) } }
+      val specifier = WifiNetworkSpecifier.Builder().setSsid(network.name).apply {
+        if (network.bssid != "Unavailable") {
+          runCatching { setBssid(MacAddress.fromString(network.bssid)) }
+        }
+        when (network.security) {
+          "WPA3" -> setWpa3Passphrase(password)
+          "WPA2", "WPA" -> setWpa2Passphrase(password)
+        }
+      }.build()
+      val request = NetworkRequest.Builder()
+        .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+        .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        .setNetworkSpecifier(specifier)
+        .build()
+      val callback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(available: Network) {
+          status("Connected to ${network.name}")
+        }
+
+        override fun onUnavailable() {
+          status("Could not connect to ${network.name}. Check the password and try again.")
+        }
+
+        override fun onLost(lost: Network) {
+          status("Disconnected from ${network.name}")
+        }
+      }
+      wifiRequestCallback = callback
+      status("Approve the Android connection request for ${network.name}.")
+      connectivity.requestNetwork(request, callback, 30_000)
+    } catch (error: SecurityException) {
+      status("Wi-Fi permission is required before connecting.")
+    } catch (error: IllegalArgumentException) {
+      status(error.message ?: "This Wi-Fi configuration is not supported.")
+    }
+  }
+
+  private fun openWifiSettings() {
+    appContext.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
   }
 
   suspend fun ping(target: String): String = withContext(Dispatchers.IO) {

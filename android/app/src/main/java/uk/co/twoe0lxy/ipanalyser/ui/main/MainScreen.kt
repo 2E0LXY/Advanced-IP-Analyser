@@ -1,11 +1,16 @@
 package uk.co.twoe0lxy.ipanalyser.ui.main
 
 import android.Manifest
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +34,7 @@ import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.NetworkCheck
+import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Router
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Security
@@ -36,6 +42,7 @@ import androidx.compose.material.icons.outlined.SettingsEthernet
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -49,6 +56,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -62,6 +70,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -69,10 +78,12 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import uk.co.twoe0lxy.ipanalyser.data.HostResult
+import uk.co.twoe0lxy.ipanalyser.data.ScannerUtils
 import uk.co.twoe0lxy.ipanalyser.data.WifiNetwork
 import uk.co.twoe0lxy.ipanalyser.theme.Green400
 import uk.co.twoe0lxy.ipanalyser.theme.Navy700
 import uk.co.twoe0lxy.ipanalyser.theme.Orange400
+import uk.co.twoe0lxy.ipanalyser.theme.Purple400
 
 private enum class AppPage(val label: String, val icon: ImageVector) {
   Dashboard("Dashboard", Icons.Outlined.Dashboard),
@@ -133,7 +144,7 @@ fun MainScreen(
       when (pages[selectedPage]) {
         AppPage.Dashboard -> DashboardPage(state, { selectedPage = it.ordinal }, viewModel::scanLan)
         AppPage.Lan -> LanPage(state, viewModel::scanLan, viewModel::refreshNetwork)
-        AppPage.Wifi -> WifiPage(state, viewModel::scanWifi)
+        AppPage.Wifi -> WifiPage(state, viewModel::scanWifi, viewModel::connectWifi)
         AppPage.Tools -> ToolsPage(state, viewModel::runDiagnostic)
       }
     }
@@ -190,6 +201,7 @@ private fun DashboardPage(state: MainScreenUiState, onPage: (AppPage) -> Unit, o
         }
       }
     }
+    item { VisibilityCard(state) }
     item {
       Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         MetricCard("Hosts", state.hosts.size.toString(), "discovered", Icons.Outlined.Devices, Modifier.weight(1f))
@@ -234,6 +246,51 @@ private fun DashboardPage(state: MainScreenUiState, onPage: (AppPage) -> Unit, o
 }
 
 @Composable
+private fun VisibilityCard(state: MainScreenUiState) {
+  val openPorts = state.hosts.sumOf { it.openPorts.size }
+  Card(
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    border = BorderStroke(1.dp, Purple400),
+    shape = RoundedCornerShape(12.dp),
+  ) {
+    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Card(
+          colors = CardDefaults.cardColors(containerColor = Navy700),
+          shape = RoundedCornerShape(10.dp),
+        ) {
+          Icon(
+            Icons.Outlined.Security,
+            contentDescription = null,
+            tint = Purple400,
+            modifier = Modifier.padding(10.dp).size(26.dp),
+          )
+        }
+        Column(Modifier.padding(start = 12.dp).weight(1f)) {
+          Text("Complete visibility", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+          Text("Your local network in one dashboard", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+        }
+        Text("LIVE", color = Green400, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+      }
+      HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = MaterialTheme.colorScheme.surfaceVariant)
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        VisibilityValue("DEVICES", state.hosts.size.toString(), Modifier.weight(1f), MaterialTheme.colorScheme.primary)
+        VisibilityValue("OPEN PORTS", openPorts.toString(), Modifier.weight(1f), Orange400)
+        VisibilityValue("WI-FI", state.wifiNetworks.size.toString(), Modifier.weight(1f), Purple400)
+      }
+    }
+  }
+}
+
+@Composable
+private fun VisibilityValue(label: String, value: String, modifier: Modifier, accent: Color) {
+  Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+    Text(value, color = accent, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+    Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+  }
+}
+
+@Composable
 private fun LanPage(state: MainScreenUiState, onScan: () -> Unit, onRefresh: () -> Unit) {
   Column(Modifier.fillMaxSize().padding(16.dp)) {
     PageHeading("LAN discovery", "Find active devices and common services", Icons.Outlined.Search)
@@ -265,7 +322,21 @@ private fun LanPage(state: MainScreenUiState, onScan: () -> Unit, onRefresh: () 
 
 @Composable
 private fun HostRow(host: HostResult) {
+  val context = LocalContext.current
+  val serviceUrl = ScannerUtils.preferredServiceUrl(host.address, host.openPorts)
+  var showPorts by remember { mutableStateOf(false) }
   Card(
+    modifier = Modifier.clickable(enabled = host.openPorts.isNotEmpty()) {
+      if (serviceUrl == null) {
+        showPorts = true
+      } else {
+        try {
+          context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(serviceUrl)))
+        } catch (_: ActivityNotFoundException) {
+          Toast.makeText(context, "No app can open $serviceUrl", Toast.LENGTH_LONG).show()
+        }
+      }
+    },
     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     border = panelBorder(),
     shape = RoundedCornerShape(9.dp),
@@ -280,13 +351,41 @@ private fun HostRow(host: HostResult) {
           fontSize = 12.sp,
         )
       }
-      Text("${host.latencyMs} ms", color = Green400, fontSize = 12.sp)
+      Column(horizontalAlignment = Alignment.End) {
+        Text(if (host.latencyMs > 0) "${host.latencyMs} ms" else "Online", color = Green400, fontSize = 12.sp)
+        if (host.openPorts.isNotEmpty()) {
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(if (serviceUrl == null) "View ports" else "Open service", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp)
+            Icon(Icons.Outlined.OpenInNew, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 4.dp).size(14.dp))
+          }
+        }
+      }
     }
+  }
+  if (showPorts) {
+    AlertDialog(
+      onDismissRequest = { showPorts = false },
+      title = { Text(host.address) },
+      text = {
+        Column {
+          Text("Open ports found", fontWeight = FontWeight.Bold)
+          Spacer(Modifier.height(8.dp))
+          host.openPorts.forEach { Text(HostResult.portName(it), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+          Spacer(Modifier.height(10.dp))
+          Text("No installed browser-compatible service is available for these ports.", fontSize = 12.sp)
+        }
+      },
+      confirmButton = { TextButton(onClick = { showPorts = false }) { Text("Close") } },
+    )
   }
 }
 
 @Composable
-private fun WifiPage(state: MainScreenUiState, onScan: () -> Unit) {
+private fun WifiPage(
+  state: MainScreenUiState,
+  onScan: () -> Unit,
+  onConnect: (WifiNetwork, String) -> Unit,
+) {
   val context = LocalContext.current
   val permissions = remember {
     buildList {
@@ -318,14 +417,16 @@ private fun WifiPage(state: MainScreenUiState, onScan: () -> Unit) {
       EmptyPanel("No nearby Wi-Fi results yet.")
     } else {
       LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(state.wifiNetworks, key = WifiNetwork::bssid) { WifiRow(it) }
+        items(state.wifiNetworks, key = WifiNetwork::bssid) { WifiRow(it, onConnect) }
       }
     }
   }
 }
 
 @Composable
-private fun WifiRow(network: WifiNetwork) {
+private fun WifiRow(network: WifiNetwork, onConnect: (WifiNetwork, String) -> Unit) {
+  var showPassword by remember { mutableStateOf(false) }
+  var password by remember { mutableStateOf("") }
   val reviewColor = if (network.review.startsWith("High")) Color(0xFFFF6767)
   else if (network.review.startsWith("Medium")) Orange400 else Green400
   Card(
@@ -340,8 +441,36 @@ private fun WifiRow(network: WifiNetwork) {
         Text("Channel ${network.channel} · ${network.frequencyMhz} MHz · ${network.security}", fontSize = 12.sp)
         Text(network.review, color = reviewColor, fontSize = 12.sp)
       }
-      Text("${network.signalPercent}%", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+      Column(horizontalAlignment = Alignment.End) {
+        Text("${network.signalPercent}%", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        TextButton(onClick = {
+          if (network.security == "Open" || network.security == "WEP") onConnect(network, "")
+          else showPassword = true
+        }) { Text("Connect") }
+      }
     }
+  }
+  if (showPassword) {
+    AlertDialog(
+      onDismissRequest = { showPassword = false },
+      title = { Text("Connect to ${network.name}") },
+      text = {
+        OutlinedTextField(
+          value = password,
+          onValueChange = { password = it },
+          label = { Text("Wi-Fi password") },
+          singleLine = true,
+          visualTransformation = PasswordVisualTransformation(),
+        )
+      },
+      confirmButton = {
+        TextButton(onClick = {
+          onConnect(network, password)
+          showPassword = false
+        }) { Text("Connect") }
+      },
+      dismissButton = { TextButton(onClick = { showPassword = false }) { Text("Cancel") } },
+    )
   }
 }
 

@@ -6,9 +6,12 @@ Native Android companion for Advanced IP Analyser, built with Kotlin and Jetpack
 
 - modern dashboard matching the desktop application's dark network-tool interface;
 - current local IPv4 address, gateway, interface, Wi-Fi name and network prefix;
-- bounded LAN discovery across the phone's local `/24`;
+- bounded LAN discovery across the active subnet, capped at the phone's local `/22`;
 - response-time measurement and common TCP service checks;
+- neighbour-table discovery for devices that do not answer ping or common ports;
+- tap-to-open access to the best web or remote service found on a LAN device;
 - nearby Wi-Fi names, BSSIDs, channels, signal levels and advertised security review;
+- user-approved connection to a selected nearby Wi-Fi network;
 - ping/reachability, DNS, common-port and HTTP response diagnostics; and
 - explicit Android permission prompts for nearby Wi-Fi results.
 

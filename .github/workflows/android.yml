@@ -36,9 +36,11 @@ jobs:
 
       - name: Name APK and calculate checksum
         run: |
+          version="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' android/app/build.gradle.kts | head -n 1)"
+          test -n "$version"
           mkdir -p dist/android
           cp android/app/build/outputs/apk/debug/app-debug.apk \
-            dist/android/Advanced-IP-Analyser-Android-1.1.0-debug.apk
+            "dist/android/Advanced-IP-Analyser-Android-$version-debug.apk"
           (cd dist/android && sha256sum *.apk > SHA256SUMS-ANDROID.txt)
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

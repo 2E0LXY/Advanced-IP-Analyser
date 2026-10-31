@@ -75,6 +75,17 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
     }
   }
 
+  fun connectWifi(network: WifiNetwork, password: String) {
+    scanner.connectWifi(network, password) { message ->
+      mutableState.update {
+        it.copy(
+          status = message,
+          network = if (message.startsWith("Connected to ")) scanner.networkInfo() else it.network,
+        )
+      }
+    }
+  }
+
   fun runDiagnostic(kind: DiagnosticKind, target: String) {
     viewModelScope.launch {
       mutableState.update { it.copy(diagnosticResult = "Running ${kind.label.lowercase()}…") }
