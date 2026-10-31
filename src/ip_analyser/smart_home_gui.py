@@ -39,6 +39,26 @@ from .smart_home_credentials import (
 )
 
 
+def signal_display(signal: int | None) -> str:
+    """Return four ascending bars, quality colour, label, and source value."""
+    if signal is None:
+        return "—"
+    if signal >= 0:  # Some integrations report a percentage instead of dBm.
+        level = 1 if signal < 25 else 2 if signal < 50 else 3 if signal < 75 else 4
+        reading = f"{signal}%"
+    else:
+        level = 1 if signal < -80 else 2 if signal < -70 else 3 if signal < -60 else 4
+        reading = f"{signal} dBm"
+    colour, label = {
+        1: ("🔴", "Too weak"),
+        2: ("🟠", "Weak"),
+        3: ("🟡", "Strong"),
+        4: ("🟢", "Very strong"),
+    }[level]
+    bars = "▂▃▅▇"[:level] + "·" * (4 - level)
+    return f"{colour} {bars} {label} · {reading}"
+
+
 class SmartHomeView(ttk.Frame):
     def __init__(self, parent):
         super().__init__(parent, padding=12)
@@ -133,7 +153,7 @@ class SmartHomeView(ttk.Frame):
         columns = ("name", "provider", "model", "type", "address", "state",
                    "brightness", "signal", "mac")
         self.table = ttk.Treeview(self, columns=columns, show="headings", selectmode="browse")
-        widths = (175, 110, 110, 95, 165, 70, 85, 75, 140)
+        widths = (175, 110, 110, 95, 165, 70, 85, 190, 140)
         for column, width in zip(columns, widths):
             self.table.heading(column, text=column.title())
             self.table.column(column, width=width, anchor="w")
@@ -470,7 +490,7 @@ class SmartHomeView(ttk.Frame):
         self.table.item(item, values=(
             device.alias, device.provider, device.model, device.kind, device.address, state,
             f"{device.brightness}%" if device.brightness is not None else "—",
-            f"{device.signal} dBm" if device.signal is not None else "—", device.mac), tags=(tag,))
+            signal_display(device.signal), device.mac), tags=(tag,))
 
     def _drain_events(self) -> None:
         try:

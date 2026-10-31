@@ -10,7 +10,7 @@ from ip_analyser.smart_home import (
     set_brightness,
     set_power,
 )
-from ip_analyser.smart_home_gui import SmartHomeView
+from ip_analyser.smart_home_gui import SmartHomeView, signal_display
 
 
 class _Type:
@@ -134,6 +134,22 @@ class SmartHomeTests(unittest.IsolatedAsyncioTestCase):
             "file://192.0.2.40")
         self.assertIsNone(
             SmartHomeView._service_target("192.0.2.40", 9999, "kasa"))
+
+    def test_signal_bars_cover_dbm_and_percentage_values(self):
+        self.assertEqual(signal_display(None), "—")
+        self.assertIn("🔴 ▂··· Too weak", signal_display(-85))
+        self.assertIn("🟠 ▂▃·· Weak", signal_display(-75))
+        self.assertIn("🟡 ▂▃▅· Strong", signal_display(-65))
+        self.assertIn("🟢 ▂▃▅▇ Very strong", signal_display(-51))
+        self.assertTrue(signal_display(82).endswith("82%"))
+
+    def test_signal_falls_back_to_sys_info_when_direct_rssi_is_missing(self):
+        device = _Device()
+        device.rssi = None
+        device.sys_info = {"rssi": -67}
+        from ip_analyser.smart_home import _snapshot
+
+        self.assertEqual(_snapshot(device).signal, -67)
 
 
 if __name__ == "__main__":

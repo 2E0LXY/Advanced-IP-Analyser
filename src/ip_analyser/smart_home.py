@@ -76,6 +76,28 @@ def _has_callable(source: Any, name: str) -> bool:
         return False
 
 
+def _signal_value(device: Any, features: Any) -> int | None:
+    """Read RSSI from the variants exposed by Kasa and Tapo device classes."""
+    candidates = [
+        _safe_value(device, "rssi"),
+        _safe_value(device, "wifi_signal_level"),
+    ]
+    if isinstance(features, dict):
+        for name in ("rssi", "signal_level", "wifi_signal"):
+            feature = features.get(name)
+            if feature is not None:
+                candidates.append(_safe_value(feature, "value"))
+    info = _safe_value(device, "sys_info", {})
+    if isinstance(info, dict):
+        candidates.extend((info.get("rssi"), info.get("wifi_rssi")))
+    for value in candidates:
+        if isinstance(value, int | float) and not isinstance(value, bool):
+            rounded = round(value)
+            if -150 <= rounded <= 100:
+                return rounded
+    return None
+
+
 def _snapshot(device: Any) -> SmartHomeDevice:
     features = _safe_value(device, "features", {})
     brightness_feature = features.get("brightness") if isinstance(features, dict) else None
@@ -90,7 +112,7 @@ def _snapshot(device: Any) -> SmartHomeDevice:
         kind=str(kind).replace("_", " ").title(),
         is_on=_safe_value(device, "is_on"),
         brightness=int(brightness) if isinstance(brightness, int | float) else None,
-        signal=_safe_value(device, "rssi"),
+        signal=_signal_value(device, features),
         mac=str(_safe_value(device, "mac", "")),
         can_power=bool(state_feature and _safe_value(state_feature, "attribute_setter")) or
         _has_callable(device, "turn_on"),

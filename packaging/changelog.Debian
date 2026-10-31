@@ -1,3 +1,11 @@
+advanced-ip-analyser (2.8.8) stable; urgency=medium
+
+  * Display colour-coded four-bar signal quality for smart-home devices.
+  * Read TP-Link signal values from direct, feature, and system-info sources.
+  * Support both dBm and percentage signal reports.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Sat, 31 Oct 2026 15:30:00 +0000
+
 advanced-ip-analyser (2.8.7) stable; urgency=medium
 
   * Inspect services and resolve names for discovered TP-Link smart-home devices.
