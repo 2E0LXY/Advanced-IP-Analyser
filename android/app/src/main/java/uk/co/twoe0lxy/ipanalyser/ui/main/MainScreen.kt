@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -22,19 +21,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Analytics
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.NetworkCheck
-import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Router
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Security
@@ -75,6 +75,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import uk.co.twoe0lxy.ipanalyser.data.HostResult
@@ -197,7 +198,8 @@ private fun DashboardPage(state: MainScreenUiState, onPage: (AppPage) -> Unit, o
         }
         Button(onClick = onScan) {
           Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-          Text(if (state.scanningLan) " Stop" else " Scan")
+          Spacer(Modifier.width(6.dp))
+          Text(if (state.scanningLan) "Stop" else "Scan")
         }
       }
     }
@@ -331,7 +333,7 @@ private fun HostRow(host: HostResult) {
         showPorts = true
       } else {
         try {
-          context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(serviceUrl)))
+          context.startActivity(Intent(Intent.ACTION_VIEW, serviceUrl.toUri()))
         } catch (_: ActivityNotFoundException) {
           Toast.makeText(context, "No app can open $serviceUrl", Toast.LENGTH_LONG).show()
         }
@@ -356,7 +358,7 @@ private fun HostRow(host: HostResult) {
         if (host.openPorts.isNotEmpty()) {
           Row(verticalAlignment = Alignment.CenterVertically) {
             Text(if (serviceUrl == null) "View ports" else "Open service", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp)
-            Icon(Icons.Outlined.OpenInNew, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 4.dp).size(14.dp))
+            Icon(Icons.AutoMirrored.Outlined.OpenInNew, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 4.dp).size(14.dp))
           }
         }
       }
@@ -372,7 +374,7 @@ private fun HostRow(host: HostResult) {
           Spacer(Modifier.height(8.dp))
           host.openPorts.forEach { Text(HostResult.portName(it), color = MaterialTheme.colorScheme.onSurfaceVariant) }
           Spacer(Modifier.height(10.dp))
-          Text("No installed browser-compatible service is available for these ports.", fontSize = 12.sp)
+          Text("These services do not open directly in a browser.", fontSize = 12.sp)
         }
       },
       confirmButton = { TextButton(onClick = { showPorts = false }) { Text("Close") } },
@@ -394,7 +396,11 @@ private fun WifiPage(
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.NEARBY_WIFI_DEVICES)
     }.toTypedArray()
   }
-  val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { onScan() }
+  var permissionDenied by rememberSaveable { mutableStateOf(false) }
+  val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
+    permissionDenied = grants.values.any { !it }
+    if (!permissionDenied) onScan()
+  }
   fun requestOrScan() {
     val missing = permissions.any { ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED }
     if (missing) permissionLauncher.launch(permissions) else onScan()
@@ -408,9 +414,10 @@ private fun WifiPage(
       Text(if (state.scanningWifi) "  Scanning…" else "  Scan nearby Wi-Fi")
     }
     Text(
-      "Nearby-device and precise-location permission are required by Android.",
+      if (permissionDenied) "Wi-Fi scan permission was denied. Allow it in Android settings to scan nearby networks."
+      else "Nearby-device and precise-location permission are required by Android.",
       fontSize = 11.sp,
-      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      color = if (permissionDenied) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
       modifier = Modifier.padding(vertical = 9.dp),
     )
     if (state.wifiNetworks.isEmpty()) {
@@ -444,7 +451,7 @@ private fun WifiRow(network: WifiNetwork, onConnect: (WifiNetwork, String) -> Un
       Column(horizontalAlignment = Alignment.End) {
         Text("${network.signalPercent}%", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
         TextButton(onClick = {
-          if (network.security == "Open" || network.security == "WEP") onConnect(network, "")
+          if (network.security !in setOf("WPA", "WPA2", "WPA3")) onConnect(network, "")
           else showPassword = true
         }) { Text("Connect") }
       }
@@ -452,7 +459,10 @@ private fun WifiRow(network: WifiNetwork, onConnect: (WifiNetwork, String) -> Un
   }
   if (showPassword) {
     AlertDialog(
-      onDismissRequest = { showPassword = false },
+      onDismissRequest = {
+        password = ""
+        showPassword = false
+      },
       title = { Text("Connect to ${network.name}") },
       text = {
         OutlinedTextField(
@@ -466,10 +476,16 @@ private fun WifiRow(network: WifiNetwork, onConnect: (WifiNetwork, String) -> Un
       confirmButton = {
         TextButton(onClick = {
           onConnect(network, password)
+          password = ""
           showPassword = false
         }) { Text("Connect") }
       },
-      dismissButton = { TextButton(onClick = { showPassword = false }) { Text("Cancel") } },
+      dismissButton = {
+        TextButton(onClick = {
+          password = ""
+          showPassword = false
+        }) { Text("Cancel") }
+      },
     )
   }
 }
@@ -591,6 +607,8 @@ private fun EmptyPanel(message: String) {
 private fun panelBorder() = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
 
 private fun averageLatency(hosts: List<HostResult>): String =
-  if (hosts.isEmpty()) "—" else "${hosts.map { it.latencyMs }.average().toInt()} ms"
+  hosts.map { it.latencyMs }.filter { it > 0 }.let { samples ->
+    if (samples.isEmpty()) "—" else "${samples.average().toInt()} ms"
+  }
 
 private fun compactAddress(value: String): String = if (value.length > 15) value.take(15) else value

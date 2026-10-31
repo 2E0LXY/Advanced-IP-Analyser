@@ -30,6 +30,8 @@ class ScannerUtilsTest {
   fun wifiSecurityUsesCautiousConfigurationLabels() {
     assertEquals("High · WEP is obsolete", ScannerUtils.wifiSecurity("[WEP]").second)
     assertEquals("WPA3", ScannerUtils.wifiSecurity("[RSN-SAE-CCMP]").first)
+    assertEquals("Enterprise", ScannerUtils.wifiSecurity("[RSN-EAP-CCMP]").first)
+    assertEquals("Enhanced Open", ScannerUtils.wifiSecurity("[RSN-OWE-CCMP]").first)
     assertEquals("No obvious issue", ScannerUtils.wifiSecurity("[WPA2-PSK-CCMP]").second)
     assertTrue(ScannerUtils.wifiSecurity("").second.startsWith("High"))
   }
@@ -58,6 +60,7 @@ class ScannerUtilsTest {
       192.168.1.1 dev wlan0 lladdr aa:bb:cc:dd:ee:ff REACHABLE
       192.168.1.20 dev wlan0 INCOMPLETE
       192.168.1.30 dev wlan0 lladdr 11:22:33:44:55:66 STALE
+      192.168.1.40 dev wlan0 lladdr 22:33:44:55:66:77 NOARP
       fe80::1 dev wlan0 lladdr aa:bb:cc:dd:ee:ff REACHABLE
     """.trimIndent()
     assertEquals(setOf("192.168.1.1", "192.168.1.30"), ScannerUtils.ipNeighbourAddresses(table))

@@ -14,6 +14,6 @@ class MainScreenTest {
   fun dashboardAndPrimaryActionAreVisible() {
     composeTestRule.setContent { MainScreen() }
     composeTestRule.onNodeWithText("Network Dashboard").assertIsDisplayed()
-    composeTestRule.onNodeWithText(" Scan").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Scan").assertIsDisplayed()
   }
 }

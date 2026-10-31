@@ -21,6 +21,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.DatagramPacket
 import java.net.DatagramSocket
@@ -89,6 +90,8 @@ object ScannerUtils {
   fun wifiSecurity(capabilities: String): Pair<String, String> {
     val value = capabilities.uppercase()
     return when {
+      "SUITE_B_192" in value || "EAP" in value -> "Enterprise" to "Managed authentication"
+      "OWE" in value -> "Enhanced Open" to "Encrypted without a password"
       "WEP" in value -> "WEP" to "High · WEP is obsolete"
       "WPA3" in value || "SAE" in value -> "WPA3" to "No obvious issue"
       "WPA2" in value || "RSN" in value -> "WPA2" to "No obvious issue"
@@ -121,7 +124,7 @@ object ScannerUtils {
     val address = fields.firstOrNull() ?: return@mapNotNull null
     val state = fields.lastOrNull()?.uppercase().orEmpty()
     address.takeIf {
-      state !in setOf("FAILED", "INCOMPLETE") && isIpv4Address(it)
+      state !in setOf("FAILED", "INCOMPLETE", "NOARP") && isIpv4Address(it)
     }
   }.toSet()
 
@@ -182,8 +185,14 @@ class NetworkScanner(context: Context) {
   suspend fun scanLan(info: NetworkInfo, progress: (Int, Int) -> Unit): List<HostResult> = coroutineScope {
     val targets = ScannerUtils.scanTargets(info.localIp, info.prefixLength)
     stimulateNeighbours(targets)
-    delay(350)
-    val neighbours = neighbourAddresses()
+    val neighbours = buildSet {
+      // Wi-Fi chipsets can take several hundred milliseconds to publish ARP entries.
+      // Sample repeatedly so slower devices are not omitted from the scan results.
+      repeat(3) {
+        delay(250)
+        addAll(neighbourAddresses())
+      }
+    }
     val alwaysInclude = neighbours + setOf(info.gateway, info.localIp)
     val semaphore = Semaphore(64)
     val finished = AtomicInteger(0)
@@ -223,18 +232,26 @@ class NetworkScanner(context: Context) {
     } catch (_: Exception) {
       emptySet()
     }
-    val ipNeighbours = try {
+    val outputFile = try {
+      File.createTempFile("ip-neigh-", ".txt", appContext.cacheDir)
+    } catch (_: Exception) {
+      null
+    }
+    val ipNeighbours = if (outputFile == null) emptySet() else try {
       val process = ProcessBuilder("/system/bin/ip", "neigh", "show")
         .redirectErrorStream(true)
+        .redirectOutput(outputFile)
         .start()
       if (!process.waitFor(2, TimeUnit.SECONDS)) {
         process.destroyForcibly()
         emptySet()
       } else {
-        ScannerUtils.ipNeighbourAddresses(process.inputStream.bufferedReader().use { it.readText() })
+        ScannerUtils.ipNeighbourAddresses(outputFile.readText().take(1_000_000))
       }
     } catch (_: Exception) {
       emptySet()
+    } finally {
+      outputFile.delete()
     }
     return arp + ipNeighbours
   }
@@ -298,12 +315,17 @@ class NetworkScanner(context: Context) {
       status("Choose ${network.name} in Android Wi-Fi settings; apps cannot join WEP directly.")
       return
     }
+    if (network.security == "Enterprise") {
+      openWifiSettings()
+      status("Choose ${network.name} in Android Wi-Fi settings to enter its enterprise credentials.")
+      return
+    }
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
       openWifiSettings()
       status("Choose ${network.name} in Android Wi-Fi settings.")
       return
     }
-    if (network.security != "Open" && password.length < 8) {
+    if (network.security in setOf("WPA", "WPA2", "WPA3") && password.length < 8) {
       status("Enter the Wi-Fi password (at least 8 characters).")
       return
     }
@@ -316,6 +338,7 @@ class NetworkScanner(context: Context) {
         when (network.security) {
           "WPA3" -> setWpa3Passphrase(password)
           "WPA2", "WPA" -> setWpa2Passphrase(password)
+          "Enhanced Open" -> setIsEnhancedOpen(true)
         }
       }.build()
       val request = NetworkRequest.Builder()
