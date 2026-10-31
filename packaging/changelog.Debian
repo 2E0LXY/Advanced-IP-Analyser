@@ -1,3 +1,12 @@
+advanced-ip-analyser (2.8.7) stable; urgency=medium
+
+  * Inspect services and resolve names for discovered TP-Link smart-home devices.
+  * Add device-specific right-click controls and service launchers.
+  * Keep power controls available when TP-Link feature metadata is incomplete.
+  * Read Windows interfaces directly to reduce startup delays and retry the background monitor.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Sat, 31 Oct 2026 14:30:00 +0000
+
 advanced-ip-analyser (2.8.6) stable; urgency=medium
 
   * Stop all GUI, background-monitor, and MCP processes before a Windows upgrade.

@@ -1,4 +1,5 @@
 import subprocess
+import socket
 import unittest
 from unittest.mock import patch
 
@@ -40,13 +41,39 @@ class NetworkTests(unittest.TestCase):
             current_ipv4_subnet()
 
     @patch("ip_analyser.network.os.name", "nt")
+    @patch("ip_analyser.network.psutil.net_if_addrs", return_value={})
+    @patch("ip_analyser.network.psutil.net_if_stats", return_value={})
     @patch("ip_analyser.network.subprocess.run")
-    def test_windows_networks_are_parsed_from_powershell(self, run):
+    def test_windows_networks_are_parsed_from_powershell(self, run, _stats, _addrs):
         run.return_value.stdout = (
             '{"InterfaceAlias":"Ethernet","IPAddress":"192.168.50.12","PrefixLength":24}')
         self.assertEqual(active_ipv4_networks(), [
             ("Ethernet", "192.168.50.0/24", "192.168.50.255")])
         self.assertEqual(run.call_args.kwargs["creationflags"], CREATE_NO_WINDOW)
+
+    @patch("ip_analyser.network.os.name", "nt")
+    @patch("ip_analyser.network.subprocess.run")
+    @patch("ip_analyser.network.psutil.net_if_stats", return_value={})
+    @patch("ip_analyser.network.psutil.net_if_addrs")
+    def test_windows_networks_use_psutil_without_starting_powershell(
+            self, addrs, _stats, run):
+        addrs.return_value = {
+            "Ethernet": [unittest.mock.Mock(
+                family=socket.AF_INET,
+                address="192.168.50.12",
+                netmask="255.255.255.0")]
+        }
+        self.assertEqual(active_ipv4_networks(), [
+            ("Ethernet", "192.168.50.0/24", "192.168.50.255")])
+        run.assert_not_called()
+
+    @patch("ip_analyser.network.os.name", "nt")
+    @patch("ip_analyser.network.psutil.net_if_addrs", return_value={})
+    @patch("ip_analyser.network.psutil.net_if_stats", return_value={})
+    @patch("ip_analyser.network.subprocess.run", side_effect=subprocess.TimeoutExpired("powershell", 3))
+    def test_windows_network_timeout_has_clear_error(self, _run, _stats, _addrs):
+        with self.assertRaisesRegex(RuntimeError, "could not read Windows network interfaces"):
+            active_ipv4_networks()
 
     def test_ipv4_24_shortcut(self):
         self.assertEqual(ipv4_24_target("192.168.42.17"), "192.168.42.0/24")

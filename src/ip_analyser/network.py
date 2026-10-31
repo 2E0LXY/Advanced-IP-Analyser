@@ -5,7 +5,10 @@ import ipaddress
 import json
 import os
 import re
+import socket
 import subprocess
+
+import psutil
 
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
@@ -41,6 +44,38 @@ def current_ipv4_subnet() -> str:
 
 
 def _windows_ipv4_networks() -> list[tuple[str, str, str]]:
+    """Read Windows IPv4 networks without starting a PowerShell process.
+
+    psutil is a required application dependency and is substantially faster and
+    more reliable during Windows sign-in, when PowerShell networking cmdlets can
+    take several seconds to initialise.  Keep the cmdlet below as a fallback for
+    unusual adapters that psutil cannot report.
+    """
+    networks: list[tuple[str, str, str]] = []
+    try:
+        stats = psutil.net_if_stats()
+        for interface, addresses in psutil.net_if_addrs().items():
+            if interface in stats and not stats[interface].isup:
+                continue
+            for address in addresses:
+                if address.family != socket.AF_INET or not address.netmask:
+                    continue
+                try:
+                    host = ipaddress.IPv4Address(address.address)
+                    network = ipaddress.IPv4Network(
+                        f"{address.address}/{address.netmask}", strict=False)
+                except (ipaddress.AddressValueError, ipaddress.NetmaskValueError):
+                    continue
+                if host.is_loopback or host.is_unspecified:
+                    continue
+                item = (interface, str(network), str(network.broadcast_address))
+                if item not in networks:
+                    networks.append(item)
+    except (OSError, RuntimeError):
+        networks = []
+    if networks:
+        return networks
+
     command = (
         "Get-NetIPAddress -AddressFamily IPv4 | "
         "Where-Object {$_.IPAddress -ne '127.0.0.1' -and $_.AddressState -eq 'Preferred'} | "
@@ -49,7 +84,7 @@ def _windows_ipv4_networks() -> list[tuple[str, str, str]]:
     try:
         output = subprocess.run(
             ["powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command],
-            text=True, capture_output=True, timeout=5, check=True,
+            text=True, capture_output=True, timeout=3, check=True,
             creationflags=CREATE_NO_WINDOW).stdout
     except (FileNotFoundError, subprocess.SubprocessError) as error:
         raise RuntimeError("could not read Windows network interfaces") from error

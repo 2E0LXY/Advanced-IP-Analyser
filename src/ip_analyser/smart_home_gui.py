@@ -6,6 +6,8 @@ import asyncio
 import json
 import queue
 import threading
+import tkinter as tk
+import webbrowser
 from collections.abc import Awaitable, Callable
 from tkinter import messagebox, ttk
 
@@ -137,6 +139,7 @@ class SmartHomeView(ttk.Frame):
             self.table.column(column, width=width, anchor="w")
         self.table.pack(fill="both", expand=True)
         self.table.bind("<<TreeviewSelect>>", self._selection_changed)
+        self.table.bind("<Button-3>", self._show_context_menu)
         self.table.tag_configure("on", foreground="#55d992")
         self.table.tag_configure("off", foreground="#d8e5f3")
         self.table.tag_configure("unknown", foreground="#e7bd65")
@@ -235,13 +238,15 @@ class SmartHomeView(ttk.Frame):
         username, password = self._credentials()
         target = self.broadcast.get()
         self._run("Discovering TP-Link devices on the LAN…",
-                  lambda: discover_devices(username, password, target=target))
+                  lambda: discover_devices(
+                      username, password, target=target, include_services=True))
 
     def connect_direct(self) -> None:
         username, password = self._credentials()
         address = self.direct_host.get()
         self._run(f"Connecting to {address or 'device'}…",
-                  lambda: inspect_device(address, username, password))
+                  lambda: inspect_device(
+                      address, username, password, include_services=True))
 
     def load_home_assistant(self) -> None:
         base_url, token = self.ha_url.get(), self.ha_token.get()
@@ -289,7 +294,70 @@ class SmartHomeView(ttk.Frame):
         else:
             username, password = self._credentials()
             self._run(f"Refreshing {device.alias}…",
-                      lambda: inspect_device(device.address, username, password))
+                      lambda: inspect_device(
+                          device.address, username, password, include_services=True))
+
+    @staticmethod
+    def _service_target(address: str, port: int, service: str) -> str | None:
+        scheme = {
+            "http": "http", "https": "https", "ftp": "ftp", "ssh": "ssh",
+            "telnet": "telnet", "rtsp": "rtsp",
+        }.get(service)
+        if scheme:
+            standard = {"http": 80, "https": 443, "ftp": 21, "ssh": 22,
+                        "telnet": 23, "rtsp": 554}
+            suffix = "" if standard[scheme] == port else f":{port}"
+            return f"{scheme}://{address}{suffix}"
+        if service == "smb":
+            return f"file://{address}"
+        return None
+
+    def _copy_text(self, value: str) -> None:
+        self.clipboard_clear()
+        self.clipboard_append(value)
+        self.status.configure(text=f"Copied {value}")
+
+    def _open_service(self, target: str) -> None:
+        if not webbrowser.open(target):
+            self._copy_text(target)
+            self.status.configure(text=f"No application handled {target}; endpoint copied.")
+
+    def _show_context_menu(self, event) -> None:
+        item = self.table.identify_row(event.y)
+        if not item:
+            return
+        self.table.selection_set(item)
+        self.table.focus(item)
+        self._selection_changed()
+        device = self.devices.get(item)
+        if device is None:
+            return
+        menu = tk.Menu(self, tearoff=False)
+        if device.can_power:
+            menu.add_command(label="Activate", command=lambda: self.power(True))
+        if device.can_deactivate:
+            menu.add_command(label="Deactivate", command=lambda: self.power(False))
+        if device.can_brightness:
+            menu.add_command(label="Apply selected brightness", command=self.apply_brightness)
+        if device.can_power or device.can_deactivate or device.can_brightness:
+            menu.add_separator()
+        for port, service in device.services:
+            target = self._service_target(device.address, port, service)
+            label = f"Open {service.upper()} · port {port}" if target else \
+                f"Copy {service.upper()} endpoint · port {port}"
+            command = (lambda value=target: self._open_service(value)) if target else \
+                (lambda value=f"{device.address}:{port}": self._copy_text(value))
+            menu.add_command(label=label, command=command)
+        if device.services:
+            menu.add_separator()
+        menu.add_command(label="Refresh and rescan services", command=self.refresh_selected)
+        menu.add_command(label="Copy address", command=lambda: self._copy_text(device.address))
+        if device.hostname:
+            menu.add_command(label="Copy hostname", command=lambda: self._copy_text(device.hostname))
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
 
     def power(self, enabled: bool) -> None:
         device = self._selected()
@@ -416,7 +484,9 @@ class SmartHomeView(ttk.Frame):
                     devices = payload if isinstance(payload, list) else [payload]
                     for device in devices:
                         self._store(device)
-                    self.status.configure(text=f"Ready · {len(self.devices)} device(s)")
+                    service_count = sum(len(device.services) for device in self.devices.values())
+                    self.status.configure(
+                        text=f"Ready · {len(self.devices)} device(s) · {service_count} service(s)")
                 self._update_controls()
         except queue.Empty:
             pass

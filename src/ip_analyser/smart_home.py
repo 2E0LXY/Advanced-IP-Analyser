@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import asyncio
+from dataclasses import dataclass, replace
 from typing import Any
 
 
@@ -26,6 +27,17 @@ class SmartHomeDevice:
     entity_id: str = ""
     controller: str = ""
     can_deactivate: bool = True
+    hostname: str = ""
+    services: tuple[tuple[int, str], ...] = ()
+    service_info: tuple[tuple[int, tuple[tuple[str, str], ...]], ...] = ()
+
+
+SMART_HOME_PORTS = {
+    21: "ftp", 22: "ssh", 23: "telnet", 53: "dns", 80: "http",
+    443: "https", 445: "smb", 554: "rtsp", 8080: "http",
+    8443: "https", 8888: "http", 9999: "kasa", 10443: "https",
+    20002: "tapo-discovery",
+}
 
 
 def _kasa_api():
@@ -57,6 +69,13 @@ def _safe_value(source: Any, name: str, default: Any = None) -> Any:
     return default if value is None else value
 
 
+def _has_callable(source: Any, name: str) -> bool:
+    try:
+        return callable(getattr(source, name))
+    except (AttributeError, RuntimeError, TypeError, ValueError):
+        return False
+
+
 def _snapshot(device: Any) -> SmartHomeDevice:
     features = _safe_value(device, "features", {})
     brightness_feature = features.get("brightness") if isinstance(features, dict) else None
@@ -73,10 +92,40 @@ def _snapshot(device: Any) -> SmartHomeDevice:
         brightness=int(brightness) if isinstance(brightness, int | float) else None,
         signal=_safe_value(device, "rssi"),
         mac=str(_safe_value(device, "mac", "")),
-        can_power=bool(state_feature and _safe_value(state_feature, "attribute_setter")),
+        can_power=bool(state_feature and _safe_value(state_feature, "attribute_setter")) or
+        _has_callable(device, "turn_on"),
         can_brightness=bool(
             brightness_feature and _safe_value(brightness_feature, "attribute_setter")),
+        can_deactivate=_has_callable(device, "turn_off") or bool(
+            state_feature and _safe_value(state_feature, "attribute_setter")),
     )
+
+
+def inspect_network_services(device: SmartHomeDevice, *, timeout: float = 0.3) -> SmartHomeDevice:
+    """Resolve a device name and inspect a small, relevant TCP service set."""
+    from .scanner import Scanner
+
+    scanner = Scanner(timeout=timeout, workers=8, ports=SMART_HOME_PORTS)
+    host = scanner.discover(scanner.inspect(device.address))
+    services = tuple(zip(host.ports, host.services))
+    service_info = tuple(
+        (int(port), tuple(sorted(details.items())))
+        for port, details in sorted(host.service_info.items(), key=lambda item: int(item[0]))
+    )
+    alias = device.alias.strip()
+    if not alias or alias.casefold().startswith("unnamed tp-link"):
+        alias = host.hostname or f"{device.model} · {device.address}"
+    return replace(
+        device, alias=alias, hostname=host.hostname, services=services,
+        service_info=service_info)
+
+
+async def _inspect_network_services(devices: list[SmartHomeDevice]) -> list[SmartHomeDevice]:
+    inspected = await asyncio.gather(*(
+        asyncio.to_thread(inspect_network_services, device) for device in devices
+    ), return_exceptions=True)
+    return [result if isinstance(result, SmartHomeDevice) else device
+            for device, result in zip(devices, inspected)]
 
 
 async def _updated_snapshot(device: Any) -> SmartHomeDevice:
@@ -89,7 +138,8 @@ async def _updated_snapshot(device: Any) -> SmartHomeDevice:
 
 async def discover_devices(username: str = "", password: str = "", *,
                            target: str = "255.255.255.255",
-                           timeout: int = 5) -> list[SmartHomeDevice]:
+                           timeout: int = 5,
+                           include_services: bool = False) -> list[SmartHomeDevice]:
     """Discover supported TP-Link devices using bounded local UDP broadcasts."""
     credentials = _credentials(username, password)
     _Credentials, Discover, KasaException = _kasa_api()
@@ -104,13 +154,16 @@ async def discover_devices(username: str = "", password: str = "", *,
             except KasaException:
                 # Discovery metadata remains useful if authentication fails.
                 devices.append(_snapshot(device))
+        if include_services:
+            devices = await _inspect_network_services(devices)
         return sorted(devices, key=lambda item: (item.alias.casefold(), item.address))
     except (OSError, KasaException) as error:
         raise SmartHomeError(str(error)) from error
 
 
 async def inspect_device(address: str, username: str = "", password: str = "",
-                         *, timeout: int = 5) -> SmartHomeDevice:
+                         *, timeout: int = 5,
+                         include_services: bool = False) -> SmartHomeDevice:
     """Connect to one LAN or VPN-routed device and return its current state."""
     host = address.strip()
     if not host or len(host) > 253 or any(character.isspace() for character in host):
@@ -122,7 +175,8 @@ async def inspect_device(address: str, username: str = "", password: str = "",
             host, credentials=credentials, discovery_timeout=timeout, timeout=timeout)
         if device is None:
             raise SmartHomeError(f"No supported TP-Link device responded at {host}.")
-        return await _updated_snapshot(device)
+        snapshot = await _updated_snapshot(device)
+        return (await _inspect_network_services([snapshot]))[0] if include_services else snapshot
     except (OSError, KasaException) as error:
         raise SmartHomeError(str(error)) from error
 

@@ -13,7 +13,14 @@ def run_background_monitor() -> None:
     """Opt-in Windows sign-in monitor: local data only, no listener/cloud."""
     stop = threading.Event()
     while not stop.is_set():
-        for interface, target, _broadcast in active_ipv4_networks():
+        try:
+            networks = active_ipv4_networks()
+        except RuntimeError:
+            # Network services and PowerShell can still be starting during
+            # sign-in. Keep the monitor alive and retry on the next interval.
+            stop.wait(30)
+            continue
+        for interface, target, _broadcast in networks:
             if any(word in interface.lower() for word in ("tailscale", "vpn", "virtual", "loopback")):
                 continue
             try:

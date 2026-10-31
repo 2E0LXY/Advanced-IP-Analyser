@@ -2,12 +2,15 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 from ip_analyser.smart_home import (
+    SmartHomeDevice,
     SmartHomeError,
     discover_devices,
+    inspect_network_services,
     inspect_device,
     set_brightness,
     set_power,
 )
+from ip_analyser.smart_home_gui import SmartHomeView
 
 
 class _Type:
@@ -92,6 +95,45 @@ class SmartHomeTests(unittest.IsolatedAsyncioTestCase):
     async def test_credentials_must_be_complete(self):
         with self.assertRaisesRegex(ValueError, "both"):
             await discover_devices("user@example.com", "")
+
+    def test_method_based_power_capability_is_available_without_feature_metadata(self):
+        device = _Device()
+        device.features = {}
+        from ip_analyser.smart_home import _snapshot
+
+        snapshot = _snapshot(device)
+
+        self.assertTrue(snapshot.can_power)
+        self.assertTrue(snapshot.can_deactivate)
+
+    @patch("ip_analyser.scanner.Scanner")
+    def test_service_inspection_resolves_unnamed_device_and_records_ports(self, scanner_type):
+        host = type("Host", (), {
+            "address": "192.0.2.40", "hostname": "desk-plug.lan",
+            "ports": [80, 9999], "services": ["http", "kasa"],
+            "service_info": {"80": {"Page title": "Desk plug"}},
+        })()
+        scanner_type.return_value.inspect.return_value = host
+        scanner_type.return_value.discover.return_value = host
+        device = SmartHomeDevice(
+            address="192.0.2.40", alias="Unnamed TP-Link device", model="P100",
+            kind="Plug", is_on=False, brightness=None, signal=None, mac="",
+            can_power=True, can_brightness=False)
+
+        result = inspect_network_services(device)
+
+        self.assertEqual(result.alias, "desk-plug.lan")
+        self.assertEqual(result.services, ((80, "http"), (9999, "kasa")))
+
+    def test_service_menu_targets_use_correct_protocol_and_port(self):
+        self.assertEqual(
+            SmartHomeView._service_target("192.0.2.40", 8443, "https"),
+            "https://192.0.2.40:8443")
+        self.assertEqual(
+            SmartHomeView._service_target("192.0.2.40", 445, "smb"),
+            "file://192.0.2.40")
+        self.assertIsNone(
+            SmartHomeView._service_target("192.0.2.40", 9999, "kasa"))
 
 
 if __name__ == "__main__":
