@@ -2,15 +2,15 @@
 
 ## Download the APK
 
-The Android app is a separate release from the Windows and Debian editions.
-GitHub's green **Latest** label points to the desktop release so the Windows
-in-app updater works correctly.
+The main GitHub **Latest** release contains Android, Windows and Debian downloads
+together. Android also retains a separate version tag for its independent build
+and signing history.
 
-**[Download Advanced IP Analyser Android 1.2.1](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.1/Advanced-IP-Analyser-Android-1.2.1.apk)**
+**[Download Advanced IP Analyser Android 1.2.1](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.2/Advanced-IP-Analyser-Android-1.2.1.apk)**
 
 File name: `Advanced-IP-Analyser-Android-1.2.1.apk`
 
-Release page: [Android 1.2.1](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/tag/android-v1.2.1)
+Main download page: [Advanced IP Analyser 2.9.2 — all platforms](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/tag/v2.9.2)
 
 ## Install it
 
@@ -45,7 +45,7 @@ The SHA-256 checksum for Android 1.2.1 is:
 ```
 
 The release also includes the signed
-[`SHA256SUMS-ANDROID.txt`](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.1/SHA256SUMS-ANDROID.txt)
+[`SHA256SUMS-ANDROID.txt`](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.2/SHA256SUMS-ANDROID.txt)
 file.
 
 ## Permissions and privacy

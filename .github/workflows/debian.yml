@@ -100,10 +100,36 @@ jobs:
       - name: Publish tagged release
         uses: softprops/action-gh-release@5113cdc90fd4d541c801c55356214017bf5ae34b # v3
         with:
+          name: Advanced IP Analyser ${{ github.ref_name }} - Windows, Debian and Android
           generate_release_notes: true
+          body: |
+            ## Downloads for every supported platform
+
+            This is the main download page. Its **Assets** section contains the Windows
+            installer, Debian package and the latest signed Android APK. Android retains
+            a separate version number because it has its own build and signing lifecycle.
           files: |
             release/*.deb
             release/SHA256SUMS
+
+      - name: Add the latest signed Android APK to this release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          android_tag=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 \
+            --json tagName,isDraft,isPrerelease,publishedAt \
+            --jq '[.[] | select(.isDraft == false and .isPrerelease == false and (.tagName | startswith("android-v")))] | sort_by(.publishedAt) | reverse | .[0].tagName')
+          if [ -z "$android_tag" ] || [ "$android_tag" = "null" ]; then
+            echo "No signed Android release exists yet; continuing without an APK."
+            exit 0
+          fi
+          mkdir -p android-release
+          gh release download "$android_tag" --repo "$GITHUB_REPOSITORY" \
+            --dir android-release \
+            --pattern 'Advanced-IP-Analyser-Android-*.apk' \
+            --pattern 'SHA256SUMS-ANDROID.txt'
+          gh release upload "$GITHUB_REF_NAME" android-release/* \
+            --repo "$GITHUB_REPOSITORY" --clobber
 
   apt-repository:
     if: startsWith(github.ref, 'refs/tags/')

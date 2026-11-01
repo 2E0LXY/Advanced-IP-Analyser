@@ -14,18 +14,18 @@ Wireshark.
 
 ## Download
 
-[![Download Android APK](https://img.shields.io/badge/ANDROID-DOWNLOAD_APK_1.2.1-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.1/Advanced-IP-Analyser-Android-1.2.1.apk)
+[![Download Android APK](https://img.shields.io/badge/ANDROID-DOWNLOAD_APK_1.2.1-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.2/Advanced-IP-Analyser-Android-1.2.1.apk)
 [![Download Windows](https://img.shields.io/badge/WINDOWS-DOWNLOAD_2.9.2-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.2/Advanced-IP-Analyser-Setup-2.9.2.exe)
 
 | Platform | Current version | Download | Installation help |
 | --- | ---: | --- | --- |
-| **Android phone/tablet** | **1.2.1** | **[Download the signed APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.1/Advanced-IP-Analyser-Android-1.2.1.apk)** | **[Android installation instructions](docs/ANDROID-INSTALL.md)** |
+| **Android phone/tablet** | **1.2.1** | **[Download the signed APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.2/Advanced-IP-Analyser-Android-1.2.1.apk)** | **[Android installation instructions](docs/ANDROID-INSTALL.md)** |
 | Windows 10/11 | 2.9.2 | [Download the Windows installer](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.2/Advanced-IP-Analyser-Setup-2.9.2.exe) | Run the downloaded `.exe`; the installer closes and upgrades running copies |
 | Debian 13 | 2.9.2 | [Download the Debian package](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.2/advanced-ip-analyser_2.9.2_all.deb) | Install with `sudo apt install ./advanced-ip-analyser_2.9.2_all.deb` |
 
-> **Looking for Android?** GitHub labels the desktop release as **Latest** so that
-> the Windows in-app updater works correctly. The Android APK is published as a
-> separate release and is always linked prominently above.
+> **Looking for Android?** The signed Android APK is included on the main
+> **Latest** release page alongside Windows and Debian. Android also retains a
+> separate version tag for its independent build and signing history.
 
 [All releases](https://github.com/2E0LXY/Advanced-IP-Analyser/releases)
 · [Read the instruction book](output/pdf/Advanced-IP-Analyser-Instruction-Book.pdf)
@@ -85,7 +85,7 @@ packet-capture driver. See [Windows edition details](docs/WINDOWS.md).
 
 ## Android installation
 
-**[Download the current signed Android APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.1/Advanced-IP-Analyser-Android-1.2.1.apk)**
+**[Download the current signed Android APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.2/Advanced-IP-Analyser-Android-1.2.1.apk)**
 and open it on a phone or tablet running Android 8.0 or later. Android may ask
 you to allow installation from the browser or file manager used to open the APK.
 See the **[step-by-step Android installation guide](docs/ANDROID-INSTALL.md)** for

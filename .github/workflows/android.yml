@@ -111,3 +111,20 @@ jobs:
           files: |
             dist/android/*.apk
             dist/android/SHA256SUMS-ANDROID.txt
+
+      - name: Add Android downloads to the main desktop release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          desktop_tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          case "$desktop_tag" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "No published desktop release is available" >&2; exit 1 ;;
+          esac
+          while IFS= read -r asset; do
+            [ -z "$asset" ] || gh release delete-asset "$desktop_tag" "$asset" \
+              --repo "$GITHUB_REPOSITORY" --yes
+          done < <(gh release view "$desktop_tag" --repo "$GITHUB_REPOSITORY" \
+            --json assets --jq '.assets[].name | select(startswith("Advanced-IP-Analyser-Android-") or . == "SHA256SUMS-ANDROID.txt")')
+          gh release upload "$desktop_tag" dist/android/*.apk dist/android/SHA256SUMS-ANDROID.txt \
+            --repo "$GITHUB_REPOSITORY" --clobber
