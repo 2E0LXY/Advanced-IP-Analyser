@@ -1,3 +1,13 @@
+advanced-ip-analyser (2.9.3) stable; urgency=medium
+
+  * Replace the endpoint coordinate grid with an interactive OpenStreetMap.
+  * Add map dragging, pointer-centred wheel zoom, controls and fit-to-markers.
+  * Cluster overlapping public destinations and retain direction colours.
+  * Add in-app map help covering use, operation, purpose and privacy.
+  * Update Windows, README and instruction-book map guidance.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Sun, 01 Nov 2026 21:05:00 +0000
+
 advanced-ip-analyser (2.9.2) stable; urgency=medium
 
   * Add a live inbound, outbound and listening connection table.

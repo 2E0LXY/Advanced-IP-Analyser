@@ -14,14 +14,14 @@ Wireshark.
 
 ## Download
 
-[![Download Android APK](https://img.shields.io/badge/ANDROID-DOWNLOAD_APK_1.2.2-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.2/Advanced-IP-Analyser-Android-1.2.2.apk)
-[![Download Windows](https://img.shields.io/badge/WINDOWS-DOWNLOAD_2.9.2-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.2/Advanced-IP-Analyser-Setup-2.9.2.exe)
+[![Download Android APK](https://img.shields.io/badge/ANDROID-DOWNLOAD_APK_1.2.2-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.3/Advanced-IP-Analyser-Android-1.2.2.apk)
+[![Download Windows](https://img.shields.io/badge/WINDOWS-DOWNLOAD_2.9.3-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.3/Advanced-IP-Analyser-Setup-2.9.3.exe)
 
 | Platform | Current version | Download | Installation help |
 | --- | ---: | --- | --- |
-| **Android phone/tablet** | **1.2.2** | **[Download the signed APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.2/Advanced-IP-Analyser-Android-1.2.2.apk)** | **[Android installation instructions](docs/ANDROID-INSTALL.md)** |
-| Windows 10/11 | 2.9.2 | [Download the Windows installer](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.2/Advanced-IP-Analyser-Setup-2.9.2.exe) | Run the downloaded `.exe`; the installer closes and upgrades running copies |
-| Debian 13 | 2.9.2 | [Download the Debian package](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.2/advanced-ip-analyser_2.9.2_all.deb) | Install with `sudo apt install ./advanced-ip-analyser_2.9.2_all.deb` |
+| **Android phone/tablet** | **1.2.2** | **[Download the signed APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.3/Advanced-IP-Analyser-Android-1.2.2.apk)** | **[Android installation instructions](docs/ANDROID-INSTALL.md)** |
+| Windows 10/11 | 2.9.3 | [Download the Windows installer](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.3/Advanced-IP-Analyser-Setup-2.9.3.exe) | Run the downloaded `.exe`; the installer closes and upgrades running copies |
+| Debian 13 | 2.9.3 | [Download the Debian package](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.3/advanced-ip-analyser_2.9.3_all.deb) | Install with `sudo apt install ./advanced-ip-analyser_2.9.3_all.deb` |
 
 > **Looking for Android?** The signed Android APK is included on the main
 > **Latest** release page alongside Windows and Debian. Android also retains a
@@ -56,7 +56,7 @@ live progress, expandable service results, inventory exchange, and remote action
 | Packet engine | Native Linux `AF_PACKET` capture, selected-host/service scope, interface discovery, Ethernet PCAP/PCAPNG/gzip reading, endpoint/port/protocol summaries, byte preview |
 | Display filters | IP/CIDR, TCP/UDP ports, DNS, HTTP, TLS, ICMP, ARP, TCP flags, lengths, comparisons, text/regex matching, boolean expressions, 20 quick filters, saved named filters |
 | Network Security Monitor | Up to 24-hour sessions across all observed ports and both directions, minute timeline, conversations, devices, DNS, TCP diagnostics, behavioural baselines, colour-coded findings, alerts, bookmarks, reports, retention, history |
-| Live connections | Windows/Debian inbound, outbound and listening endpoint table, owning process/PID, protocol and state, approximate public destination organisation/location, embedded map, filtering, CSV/JSON export |
+| Live connections | Windows/Debian inbound, outbound and listening endpoint table, owning process/PID, protocol and state, approximate public destination organisation/location, movable and zoomable OpenStreetMap view with clustered markers, filtering, CSV/JSON export and in-app `?` help |
 | Windows Wi-Fi Analyzer | Nearby SSIDs, signal quality, approximate dBm, security, active connection, adapter status, saved-profile inventory, selected-profile password reveal with confirmation, credential-free CSV export |
 | Passive Wi-Fi | Monitor-mode AP/client discovery, BSSID manufacturer, channel/signal/security/WPS review, beacons/data/probes, passive EAPOL observation, bounded history and comparison, PCAP/JSON/CSV/HTML reports |
 | Web Security Audit | Same-host bounded crawler, path exclusions, extra allowed hosts, custom headers, page/form/technology inventory, TLS fingerprint, security-header, cookie, cleartext, mixed-content, directory-listing, CORS, and password-form observations, HTML/JSON reports |
@@ -85,7 +85,7 @@ packet-capture driver. See [Windows edition details](docs/WINDOWS.md).
 
 ## Android installation
 
-**[Download the current signed Android APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.2/Advanced-IP-Analyser-Android-1.2.2.apk)**
+**[Download the current signed Android APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.3/Advanced-IP-Analyser-Android-1.2.2.apk)**
 and open it on a phone or tablet running Android 8.0 or later. Android may ask
 you to allow installation from the browser or file manager used to open the APK.
 See the **[step-by-step Android installation guide](docs/ANDROID-INSTALL.md)** for
@@ -98,6 +98,24 @@ saved Wi-Fi passwords, raw packet capture, and unrestricted background Wi-Fi
 scanning, so those desktop features are not presented as available on Android.
 See the [Android build guide](android/README.md).
 
+## Live Connections and destination map
+
+Open **Diagnostics → Live Connections** on Windows or Debian to see inbound,
+outbound and listening endpoints with their owning application/PID, protocol,
+state and approximate public destination. The OpenStreetMap view is fully
+interactive: drag to move, use the mouse wheel or `+`/`−` controls to zoom, and
+select **Fit destinations** to bring every current marker into view. Blue
+markers are outbound, orange markers are inbound, and numbered markers combine
+overlapping destinations. The table filter also filters the map.
+
+Select the map's `?` button for built-in help covering what the feature does,
+how to use it, how it works, why it is useful, and its privacy limitations.
+Only public remote IP addresses are sent to `ipwho.is` for approximate location;
+visible tiles are requested from OpenStreetMap. Process names, PIDs, private or
+local addresses and the full connection table are not sent to either service.
+Locations often identify a network provider or data centre and are not evidence
+that a person, device or connection is malicious.
+
 ## Debian 13 installation
 
 Download the newest `advanced-ip-analyser_VERSION_all.deb` from the
@@ -106,7 +124,7 @@ then run:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.8.6_all.deb
+sudo apt install ./advanced-ip-analyser_2.9.3_all.deb
 ```
 
 Launch it from the desktop application menu or run:

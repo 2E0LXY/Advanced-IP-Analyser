@@ -10,6 +10,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from .connections import (ConnectionRecord, GeoLocation, export_connections,
                           is_public_address, locate_address, snapshot_connections)
+from .slippy_map import MapMarker, SlippyMap
 
 
 class ConnectionMonitorView(ttk.Frame):
@@ -70,14 +71,21 @@ class ConnectionMonitorView(ttk.Frame):
         scroll_x.grid(row=1, column=0, sticky="ew")
         table_frame.rowconfigure(0, weight=1); table_frame.columnconfigure(0, weight=1)
 
-        ttk.Label(map_frame, text="Destination map · public remote endpoints only",
-                  font=("Segoe UI", 11, "bold")).pack(anchor="w", pady=(8, 4))
-        self.map = tk.Canvas(map_frame, height=245, bg="#07131f", highlightthickness=1,
-                             highlightbackground="#2c4860")
+        map_heading = ttk.Frame(map_frame)
+        map_heading.pack(fill="x", pady=(8, 4))
+        ttk.Label(map_heading, text="Destination map · public remote endpoints only",
+                  font=("Segoe UI", 11, "bold")).pack(side="left")
+        ttk.Button(map_heading, text="?", width=3, command=self._show_map_help).pack(side="left", padx=6)
+        self.map_status = ttk.Label(map_heading, text="No public destinations yet", foreground="#90abc4")
+        self.map_status.pack(side="left")
+        ttk.Button(map_heading, text="Fit destinations", command=self._fit_map).pack(side="right")
+        ttk.Button(map_heading, text="−", width=3, command=lambda: self.map.zoom_by(-1)).pack(side="right", padx=3)
+        ttk.Button(map_heading, text="+", width=3, command=lambda: self.map.zoom_by(1)).pack(side="right")
+        ttk.Label(map_heading, text="Drag to move · wheel to zoom", foreground="#90abc4").pack(side="right", padx=10)
+        self.map = SlippyMap(map_frame, height=245)
         self.map.pack(fill="both", expand=True)
-        self.map.bind("<Configure>", lambda _event: self._draw_map())
         ttk.Label(map_frame,
-                  text="Endpoint geolocation is approximate. Only public remote IPs are sent to ipwho.is while monitoring is active.",
+                  text="Map © OpenStreetMap contributors. Locations are approximate; only public remote IPs are sent to ipwho.is while monitoring is active.",
                   foreground="#90abc4").pack(anchor="w", pady=(4, 0))
 
     def toggle(self) -> None:
@@ -166,30 +174,71 @@ class ConnectionMonitorView(ttk.Frame):
         self._draw_map()
 
     def _draw_map(self) -> None:
-        canvas = self.map
-        canvas.delete("all")
-        width, height = max(canvas.winfo_width(), 400), max(canvas.winfo_height(), 180)
-        for longitude in range(-180, 181, 30):
-            x = (longitude + 180) / 360 * width
-            canvas.create_line(x, 0, x, height, fill="#173149")
-        for latitude in range(-60, 61, 30):
-            y = (90 - latitude) / 180 * height
-            canvas.create_line(0, y, width, y, fill="#173149")
         plotted: set[str] = set()
+        markers: list[MapMarker] = []
         for record in self._filtered_records():
             location = self.locations.get(record.remote_address)
             if (not location or location.latitude is None or location.longitude is None or
                     record.remote_address in plotted):
                 continue
             plotted.add(record.remote_address)
-            x = (location.longitude + 180) / 360 * width
-            y = (90 - location.latitude) / 180 * height
-            colour = "#ffad4f" if record.direction == "Inbound" else "#31b8ff"
-            canvas.create_oval(x - 5, y - 5, x + 5, y + 5, fill=colour, outline="#ffffff")
-            canvas.create_text(x + 8, y, text=location.city or location.country or record.remote_address,
-                               fill="#dcecff", anchor="w", font=("Segoe UI", 8))
-        canvas.create_text(10, 10, text=f"{len(plotted)} mapped public destination(s)",
-                           fill="#8fb4d4", anchor="nw")
+            markers.append(MapMarker(
+                location.latitude, location.longitude,
+                location.city or location.country or record.remote_address,
+                record.remote_address,
+                "#ffad4f" if record.direction == "Inbound" else "#31b8ff",
+            ))
+        self.map.set_markers(markers)
+        self.map_status.configure(
+            text=f"{len(markers)} mapped public destination{'s' if len(markers) != 1 else ''}")
+
+    def _fit_map(self) -> None:
+        self.map.fit_markers()
+
+    def _show_map_help(self) -> None:
+        dialog = tk.Toplevel(self)
+        dialog.title("Destination map help")
+        dialog.transient(self.winfo_toplevel())
+        dialog.resizable(True, True)
+        dialog.minsize(520, 460)
+        body = ttk.Frame(dialog, padding=18)
+        body.pack(fill="both", expand=True)
+        ttk.Label(body, text="Destination map", font=("Segoe UI", 18, "bold")).pack(anchor="w")
+        help_text = (
+            "WHAT IT DOES\n"
+            "Shows the approximate geographic destination of public remote IP addresses in the "
+            "Live Connections table. Blue markers are outbound connections and orange markers are "
+            "inbound connections. A numbered marker combines nearby or overlapping endpoints.\n\n"
+            "HOW TO USE IT\n"
+            "• Start monitoring and wait for public destinations to be located.\n"
+            "• Drag the map with the left mouse button to move it.\n"
+            "• Use the mouse wheel or + and − buttons to zoom.\n"
+            "• Select Fit destinations to bring all current markers back into view.\n"
+            "• Use the table filter to limit both the rows and the markers shown.\n\n"
+            "HOW IT WORKS\n"
+            "The app reads the operating system's current TCP and UDP endpoint table. Public remote "
+            "IP addresses are looked up through ipwho.is for approximate latitude, longitude, city and "
+            "network-provider information. Map tiles are then downloaded from OpenStreetMap. Private, "
+            "loopback, link-local and listening-only addresses are never sent for geolocation.\n\n"
+            "WHY IT DOES IT\n"
+            "The map makes unusual destinations, unexpected international traffic and groups of "
+            "connections easier to notice than in a long endpoint table. It is an investigation aid, "
+            "not proof that a connection is malicious.\n\n"
+            "PRIVACY AND LIMITS\n"
+            "Geolocation is approximate and often identifies a provider or data centre rather than a "
+            "person or device. While monitoring, public destination IPs go to ipwho.is and visible map "
+            "tile coordinates go to OpenStreetMap. The app does not upload process names, PIDs, local "
+            "addresses or the complete connection table to either service."
+        )
+        text = tk.Text(body, wrap="word", height=24, width=74, relief="flat", borderwidth=0,
+                       background="#102336", foreground="#dcecff", insertbackground="#dcecff",
+                       font=("Segoe UI", 10), padx=12, pady=12)
+        text.insert("1.0", help_text)
+        text.configure(state="disabled")
+        text.pack(fill="both", expand=True, pady=(12, 12))
+        ttk.Button(body, text="Close", command=dialog.destroy).pack(anchor="e")
+        dialog.bind("<Escape>", lambda _event: dialog.destroy())
+        dialog.grab_set()
 
     def export(self) -> None:
         destination = filedialog.asksaveasfilename(

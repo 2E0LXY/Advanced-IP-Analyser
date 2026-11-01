@@ -1,4 +1,4 @@
-# Advanced IP Analyser 2.8.6 Instruction Book
+# Advanced IP Analyser 2.9.3 Instruction Book
 
 Windows 10/11 and Debian 13 edition
 
@@ -64,7 +64,7 @@ service, disconnect Wi-Fi clients, inject frames, or recover passwords.
 
 ### Install on Windows
 
-Download `Advanced-IP-Analyser-Setup-2.8.6.exe` from the project release page
+Download `Advanced-IP-Analyser-Setup-2.9.3.exe` from the project release page
 and run it. The per-user installer normally needs no administrator rights and
 offers Start-menu and desktop shortcuts. Windows supports network scanning,
 inventory, Wi-Fi adapter/nearby-network scanning, selected saved-profile key
@@ -74,12 +74,12 @@ visibly disabled because the project does not bundle a Windows capture driver.
 
 ### Install on Debian 13
 
-Download `advanced-ip-analyser_2.8.6_all.deb` from the project release page.
+Download `advanced-ip-analyser_2.9.3_all.deb` from the project release page.
 In a terminal:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.8.6_all.deb
+sudo apt install ./advanced-ip-analyser_2.9.3_all.deb
 ```
 
 Use `apt install ./file.deb`, not `dpkg -i`, because APT resolves dependencies.
@@ -173,6 +173,36 @@ The Network Scan page is arranged from setup to action:
 - **Sidebar:** Dashboard, Network Scan, Diagnostics, Favorites, packet and security tools, Settings, and Help.
 - **Footer:** status, centered green progress, version, and Update.
 - **Top toolbar:** a yellow Install button replaces Scan Network when an update is available.
+
+### Live Connections and destination map
+
+Open **Diagnostics → Live Connections** and select **Start monitoring**. The
+table refreshes every two seconds and inventories inbound, outbound and
+listening TCP/UDP endpoints. It shows the owning application and PID when the
+operating system makes them available, together with protocol, local and remote
+endpoint, state and approximate public destination.
+
+The destination map is interactive:
+
+- blue markers represent outbound connections and orange markers represent
+  inbound connections;
+- a numbered marker clusters endpoints that overlap at the current zoom;
+- drag with the left mouse button to pan;
+- use the mouse wheel or the `+` and `−` buttons to zoom;
+- select **Fit destinations** to place every current marker in view; and
+- enter text in **Filter** to limit both the table and map.
+
+Select the `?` beside the map heading for an in-app explanation of what the map
+does, how to use it, how it works, why it is useful, and its privacy limits.
+
+The app obtains the endpoint inventory from the operating system. It sends only
+public remote IP addresses to `ipwho.is` for approximate coordinates, city and
+provider information, then requests the visible map tiles from OpenStreetMap.
+Private, loopback, link-local and listening-only addresses are not sent for
+geolocation. Process names, PIDs, local addresses and the full connection table
+are not sent to either service. Geolocation frequently identifies a provider or
+data centre rather than an end user, so the map is an investigation aid and not
+proof of malicious activity.
 
 ### AI settings and analysis
 
@@ -659,7 +689,10 @@ advanced-ip-analyser web-audit https://server.example \
 The app has no analytics/telemetry endpoint. Local data leaves the computer only
 through explicit export/copy, tools the user launches, or an AI payload the user
 has inspected and approved. Update checks contact this project's GitHub Releases
-API. AI keys remain in the desktop keyring.
+API. When Live Connections monitoring is active, public destination IPs are
+looked up through `ipwho.is` and visible OpenStreetMap tiles are requested; the
+app does not send process names, PIDs or the full connection table. AI keys
+remain in the desktop keyring.
 
 ## 19. Troubleshooting
 
@@ -702,6 +735,17 @@ and narrowly scoped passwordless `sudo shutdown` permission.
 Use Help → Check for updates. Confirm GitHub connectivity. A release without the
 expected filename or SHA-256 digest is deliberately ignored/rejected.
 
+### Destination map remains blank
+
+- Confirm the computer can reach `https://tile.openstreetmap.org`.
+- Start monitoring and wait for at least one public remote endpoint; private and
+  listening-only endpoints do not produce markers.
+- Select **Fit destinations** if the map was moved away from the markers.
+- Clear the table filter if it excludes the public endpoints.
+- A firewall, proxy or content filter can allow endpoint geolocation while
+  blocking OpenStreetMap tiles. The endpoint table continues working if tiles
+  are unavailable.
+
 ### Web audit finds no pages
 
 Confirm the URL includes `http://` or `https://`, the hostname resolves, and the
@@ -724,6 +768,8 @@ protocol/cipher inventory; validation failures are shown as High findings.
 | Double-click | Open service/preferred web service |
 | Right-click result | Open, copy, expand/collapse |
 | Right-click TCP ports | Port presets |
+| Drag destination map | Move the map |
+| Mouse wheel over destination map | Zoom around the pointer |
 
 ## 21. Security and interpretation notes
 

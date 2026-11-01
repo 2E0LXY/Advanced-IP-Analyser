@@ -19,6 +19,7 @@ an independent GPL implementation and is not affiliated with Famatech.
 | Automatic updates | Detects newer GitHub tags, flashes the Update button, requires the GitHub SHA-256 digest, validates package identity, requests PolicyKit authorization, and restarts |
 | Packet capture and analysis | Built-in Linux interface discovery, bounded selected-host/service capture, PCAP/PCAPNG reading, Wireshark-style display filters, protocol summaries, and byte previews; no Wireshark dependency |
 | Monitoring over time | Network Security Monitor timelines, all observed ports and directions, conversations, devices, DNS, TCP health estimates, baselines, colour-coded findings, alert rules, reports, bookmarks, retention, and local history |
+| Live operating-system connections | Inbound, outbound and listening endpoint table with owning process/PID, filtering, export, approximate public destination and an interactive OpenStreetMap with clustered markers, pan, zoom, fit controls and in-app help |
 | Passive wireless discovery | Compatible monitor-mode adapters can observe access points, security advertisements, clients, probe requests, signal, and EAPOL presence; disruptive and password-attack functions are deliberately excluded |
 
 ## Lansweeper free IP scanner comparison

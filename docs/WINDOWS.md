@@ -20,6 +20,8 @@ This also covers processes that remain active after the visible window closes.
 - saved Wi-Fi profile inventory and confirmation-gated reveal of one locally stored key;
 - OpenAI, Gemini, and OpenRouter model discovery and consent-gated analysis;
 - API keys stored through Windows Credential Manager;
+- live inbound, outbound and listening connection inventory with process/PID,
+  filtering, export and a movable/zoomable public-destination map;
 - bounded PCAP, PCAPNG, and compressed capture-file analysis and display filters;
 - platform-specific verified update download, silent replacement, and relaunch.
 
@@ -46,6 +48,30 @@ values remain in application memory until hidden or the window closes. A copied
 key is cleared after 30 seconds when the clipboard still contains the same value.
 Windows can deny clear-text retrieval unless the signed-in account has the
 required permission.
+
+## Live Connections and destination map
+
+Open **Diagnostics → Live Connections** and select **Start monitoring**. The
+table refreshes every two seconds and shows the owning application, PID,
+protocol, local and remote endpoint, direction, state and approximate public
+destination.
+
+The map uses OpenStreetMap tiles and displays only public remote endpoints:
+
+- blue markers are outbound and orange markers are inbound;
+- a numbered marker clusters destinations that overlap at the current zoom;
+- drag with the left mouse button to move the map;
+- use the mouse wheel or the `+` and `−` buttons to zoom;
+- select **Fit destinations** to return every current marker to view; and
+- filtering the table also filters the visible markers.
+
+Select the `?` beside the map title for the same instructions inside the app,
+including how the feature works and why it exists. Public destination IPs are
+sent to `ipwho.is` for approximate coordinates, and visible map tiles are
+requested from OpenStreetMap. Process names, PIDs, private/local addresses and
+the complete connection table are not sent to either service. Locations often
+represent a provider or data centre and are not proof of a person, device or
+malicious activity.
 
 ## Release integrity
 
