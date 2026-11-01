@@ -1,10 +1,12 @@
 package uk.co.twoe0lxy.ipanalyser.ui.main
 
 import android.Manifest
+import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.net.VpnService
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -41,12 +43,18 @@ import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.SettingsEthernet
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.Wifi
+import androidx.compose.material.icons.outlined.Terminal
+import androidx.compose.material.icons.outlined.PowerSettingsNew
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -80,6 +88,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import uk.co.twoe0lxy.ipanalyser.data.HostResult
 import uk.co.twoe0lxy.ipanalyser.data.ScannerUtils
+import uk.co.twoe0lxy.ipanalyser.data.SmartDevice
+import uk.co.twoe0lxy.ipanalyser.data.DnsEvent
+import uk.co.twoe0lxy.ipanalyser.data.DnsMonitorRepository
+import uk.co.twoe0lxy.ipanalyser.data.DnsMonitorService
+import uk.co.twoe0lxy.ipanalyser.data.InventoryStore
 import uk.co.twoe0lxy.ipanalyser.data.WifiNetwork
 import uk.co.twoe0lxy.ipanalyser.theme.Green400
 import uk.co.twoe0lxy.ipanalyser.theme.Navy700
@@ -99,6 +112,8 @@ fun MainScreen(
   viewModel: MainScreenViewModel = viewModel(),
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
+  val dnsEvents by DnsMonitorRepository.events.collectAsStateWithLifecycle()
+  val dnsRunning by DnsMonitorRepository.running.collectAsStateWithLifecycle()
   var selectedPage by rememberSaveable { mutableIntStateOf(0) }
   val pages = AppPage.entries
 
@@ -144,9 +159,22 @@ fun MainScreen(
     Box(Modifier.padding(padding).fillMaxSize()) {
       when (pages[selectedPage]) {
         AppPage.Dashboard -> DashboardPage(state, { selectedPage = it.ordinal }, viewModel::scanLan)
-        AppPage.Lan -> LanPage(state, viewModel::scanLan, viewModel::refreshNetwork)
+        AppPage.Lan -> LanPage(state, viewModel::scanLan, viewModel::refreshNetwork, viewModel::toggleFavorite)
         AppPage.Wifi -> WifiPage(state, viewModel::scanWifi, viewModel::connectWifi)
-        AppPage.Tools -> ToolsPage(state, viewModel::runDiagnostic)
+        AppPage.Tools -> ToolsPage(
+          state,
+          viewModel::runDiagnostic,
+          viewModel::runSsh,
+          viewModel::listSftp,
+          viewModel::discoverSmartHome,
+          viewModel::setSmartPower,
+          viewModel::pairDesktop,
+          viewModel::scanFromDesktop,
+          viewModel::setPeerListener,
+          viewModel::revokeDesktop,
+          dnsEvents,
+          dnsRunning,
+        )
       }
     }
   }
@@ -234,6 +262,9 @@ private fun DashboardPage(state: MainScreenUiState, onPage: (AppPage) -> Unit, o
         InfoLine("Current status", state.status)
         InfoLine("Scan progress", if (state.total > 0) "${state.completed} / ${state.total}" else "Not started")
         InfoLine("Nearby Wi-Fi", "${state.wifiNetworks.size} networks")
+        InfoLine("Favorites", state.favorites.size.toString())
+        InfoLine("Saved scans", state.savedScans.toString())
+        state.activity.take(4).forEach { Text(it, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 5.dp)) }
       }
     }
     item {
@@ -293,7 +324,12 @@ private fun VisibilityValue(label: String, value: String, modifier: Modifier, ac
 }
 
 @Composable
-private fun LanPage(state: MainScreenUiState, onScan: () -> Unit, onRefresh: () -> Unit) {
+private fun LanPage(state: MainScreenUiState, onScan: () -> Unit, onRefresh: () -> Unit, onFavorite: (String) -> Unit) {
+  val context = LocalContext.current
+  fun share(label: String, content: String, mime: String) {
+    val intent = Intent(Intent.ACTION_SEND).apply { type = mime; putExtra(Intent.EXTRA_SUBJECT, label); putExtra(Intent.EXTRA_TEXT, content) }
+    context.startActivity(Intent.createChooser(intent, label))
+  }
   Column(Modifier.fillMaxSize().padding(16.dp)) {
     PageHeading("LAN discovery", "Find active devices and common services", Icons.Outlined.Search)
     Spacer(Modifier.height(12.dp))
@@ -301,6 +337,13 @@ private fun LanPage(state: MainScreenUiState, onScan: () -> Unit, onRefresh: () 
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(onClick = onScan, modifier = Modifier.weight(1f)) { Text(if (state.scanningLan) "Stop scan" else "Scan network") }
         OutlinedButton(onClick = onRefresh) { Text("Refresh") }
+      }
+      if (state.hosts.isNotEmpty()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.padding(top = 8.dp)) {
+          OutlinedButton(onClick = { share("LAN scan CSV", InventoryStore.csv(state.hosts), "text/csv") }, modifier = Modifier.weight(1f)) { Text("CSV") }
+          OutlinedButton(onClick = { share("LAN scan JSON", InventoryStore.json(state.hosts), "application/json") }, modifier = Modifier.weight(1f)) { Text("JSON") }
+          OutlinedButton(onClick = { share("Network topology SVG", InventoryStore.topologySvg(state.hosts, state.network.gateway), "image/svg+xml") }, modifier = Modifier.weight(1f)) { Text("Topology") }
+        }
       }
       if (state.scanningLan && state.total > 0) {
         Spacer(Modifier.height(10.dp))
@@ -316,14 +359,14 @@ private fun LanPage(state: MainScreenUiState, onScan: () -> Unit, onRefresh: () 
       EmptyPanel(if (state.scanningLan) "Looking for devices…" else "Press Scan network to discover devices on this LAN.")
     } else {
       LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(state.hosts, key = HostResult::address) { HostRow(it) }
+        items(state.hosts, key = HostResult::address) { HostRow(it, it.address in state.favorites, onFavorite) }
       }
     }
   }
 }
 
 @Composable
-private fun HostRow(host: HostResult) {
+private fun HostRow(host: HostResult, favorite: Boolean, onFavorite: (String) -> Unit) {
   val context = LocalContext.current
   val serviceUrl = ScannerUtils.preferredServiceUrl(host.address, host.openPorts)
   var showPorts by remember { mutableStateOf(false) }
@@ -344,14 +387,19 @@ private fun HostRow(host: HostResult) {
     shape = RoundedCornerShape(9.dp),
   ) {
     Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
+      IconButton(onClick = { onFavorite(host.address) }, modifier = Modifier.size(30.dp)) {
+        Icon(if (favorite) Icons.Outlined.Star else Icons.Outlined.StarBorder, "Favorite", tint = if (favorite) Color(0xFFFFD54F) else MaterialTheme.colorScheme.onSurfaceVariant)
+      }
       Icon(Icons.Outlined.Devices, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
       Column(Modifier.padding(start = 11.dp).weight(1f)) {
-        Text(host.address, fontWeight = FontWeight.Bold)
+        Text(host.hostname.ifBlank { host.address }, fontWeight = FontWeight.Bold)
+        if (host.hostname.isNotBlank()) Text(host.address, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
           if (host.openPorts.isEmpty()) "Online · no common ports responded" else host.services,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
           fontSize = 12.sp,
         )
+        if (host.macAddress.isNotBlank()) Text(host.macAddress.uppercase(), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
       }
       Column(horizontalAlignment = Alignment.End) {
         Text(if (host.latencyMs > 0) "${host.latencyMs} ms" else "Online", color = Green400, fontSize = 12.sp)
@@ -449,7 +497,20 @@ private fun WifiRow(network: WifiNetwork, onConnect: (WifiNetwork, String) -> Un
         Text(network.review, color = reviewColor, fontSize = 12.sp)
       }
       Column(horizontalAlignment = Alignment.End) {
-        Text("${network.signalPercent}%", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        val signalColor = when {
+          network.signalPercent < 25 -> Color(0xFFFF5252)
+          network.signalPercent < 50 -> Orange400
+          network.signalPercent < 75 -> Color(0xFFFFD54F)
+          else -> Green400
+        }
+        val bars = when {
+          network.signalPercent < 25 -> "▂"
+          network.signalPercent < 50 -> "▂▃"
+          network.signalPercent < 75 -> "▂▃▅"
+          else -> "▂▃▅▇"
+        }
+        Text(bars, color = signalColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Text("${network.signalPercent}%", color = signalColor, fontWeight = FontWeight.Bold, fontSize = 11.sp)
         TextButton(onClick = {
           if (network.security !in setOf("WPA", "WPA2", "WPA3")) onConnect(network, "")
           else showPassword = true
@@ -491,10 +552,46 @@ private fun WifiRow(network: WifiNetwork, onConnect: (WifiNetwork, String) -> Un
 }
 
 @Composable
-private fun ToolsPage(state: MainScreenUiState, onRun: (DiagnosticKind, String) -> Unit) {
+private fun ToolsPage(
+  state: MainScreenUiState,
+  onRun: (DiagnosticKind, String, String) -> Unit,
+  onSsh: (String, String, String, String) -> Unit,
+  onSftp: (String, String, String, String) -> Unit,
+  onDiscoverSmart: () -> Unit,
+  onSmartPower: (SmartDevice, Boolean) -> Unit,
+  onPairDesktop: (String, String) -> Unit,
+  onScanDesktop: (String) -> Unit,
+  onPeerListener: (Boolean) -> Unit,
+  onRevokeDesktop: () -> Unit,
+  dnsEvents: List<DnsEvent>,
+  dnsRunning: Boolean,
+) {
+  val context = LocalContext.current
   var target by rememberSaveable { mutableStateOf("8.8.8.8") }
+  var options by rememberSaveable { mutableStateOf("22,53,80,443,8080-8090") }
+  var sshHost by rememberSaveable { mutableStateOf("") }
+  var sshUser by rememberSaveable { mutableStateOf("") }
+  var sshPassword by rememberSaveable { mutableStateOf("") }
+  var sshCommand by rememberSaveable { mutableStateOf("uname -a") }
+  var sftpPath by rememberSaveable { mutableStateOf(".") }
+  var desktopAddress by rememberSaveable { mutableStateOf(state.pairedDesktop) }
+  var pairingToken by rememberSaveable { mutableStateOf("") }
+  fun startDnsService() {
+    ContextCompat.startForegroundService(context, Intent(context, DnsMonitorService::class.java).setAction(DnsMonitorService.ACTION_START))
+  }
+  val vpnPermission = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+    if (result.resultCode == Activity.RESULT_OK) startDnsService()
+  }
+  fun toggleDnsMonitor() {
+    if (dnsRunning) {
+      context.startService(Intent(context, DnsMonitorService::class.java).setAction(DnsMonitorService.ACTION_STOP))
+    } else {
+      val approval = VpnService.prepare(context)
+      if (approval == null) startDnsService() else vpnPermission.launch(approval)
+    }
+  }
   Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-    PageHeading("Diagnostics", "Test a host, address or URL", Icons.Outlined.Analytics)
+    PageHeading("Network toolkit", "Diagnostics, security, SSH and Smart Home", Icons.Outlined.Analytics)
     Spacer(Modifier.height(12.dp))
     OutlinedTextField(
       value = target,
@@ -503,20 +600,157 @@ private fun ToolsPage(state: MainScreenUiState, onRun: (DiagnosticKind, String) 
       singleLine = true,
       modifier = Modifier.fillMaxWidth(),
     )
+    OutlinedTextField(
+      value = options,
+      onValueChange = { options = it },
+      label = { Text("Ports, broadcast address or tool option") },
+      supportingText = { Text("Custom ports: 1-1024 · Wake-on-LAN: target is MAC, option is broadcast") },
+      singleLine = true,
+      modifier = Modifier.fillMaxWidth(),
+    )
     Spacer(Modifier.height(10.dp))
     DiagnosticKind.entries.chunked(2).forEach { row ->
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 8.dp)) {
-        row.forEach { kind -> Button(onClick = { onRun(kind, target) }, modifier = Modifier.weight(1f)) { Text(kind.label) } }
+        row.forEach { kind -> Button(onClick = { onRun(kind, target, options) }, enabled = !state.working, modifier = Modifier.weight(1f)) { Text(kind.label) } }
       }
     }
-    SectionCard("Result", Icons.Outlined.NetworkCheck) { Text(state.diagnosticResult) }
+    SectionCard("Result", Icons.Outlined.NetworkCheck) {
+      if (state.working) LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp))
+      Text(state.diagnosticResult)
+      Spacer(Modifier.height(8.dp))
+      OutlinedButton(onClick = {
+        val share = Intent(Intent.ACTION_SEND).apply {
+          type = "text/plain"
+          putExtra(Intent.EXTRA_SUBJECT, "Advanced IP Analyser result")
+          putExtra(Intent.EXTRA_TEXT, state.diagnosticResult)
+        }
+        context.startActivity(Intent.createChooser(share, "Export result"))
+      }, modifier = Modifier.fillMaxWidth()) {
+        Icon(Icons.Outlined.Share, null, modifier = Modifier.size(17.dp))
+        Text("  Export / share result")
+      }
+    }
     Spacer(Modifier.height(12.dp))
-    SectionCard("Android network access", Icons.Outlined.Security) {
+    SectionCard("Desktop ↔ Android private LAN pairing", Icons.Outlined.Hub) {
       Text(
-        "Device MAC addresses and saved Wi-Fi passwords are protected by Android.",
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        fontSize = 12.sp,
+        if (state.pairedDesktop.isBlank()) "Not paired" else "Paired with ${state.pairedDesktop}",
+        color = if (state.pairedDesktop.isBlank()) Orange400 else Green400,
+        fontWeight = FontWeight.Bold,
       )
+      OutlinedTextField(
+        desktopAddress,
+        { desktopAddress = it },
+        label = { Text("Desktop private LAN address") },
+        placeholder = { Text("192.168.1.201") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+      )
+      OutlinedTextField(
+        pairingToken,
+        { pairingToken = it },
+        label = { Text("Private pairing token") },
+        visualTransformation = PasswordVisualTransformation(),
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+      )
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(
+          onClick = { onPairDesktop(desktopAddress, pairingToken); pairingToken = "" },
+          enabled = !state.working,
+          modifier = Modifier.weight(1f),
+        ) { Text("Pair securely") }
+        OutlinedButton(
+          onClick = { onScanDesktop(target) },
+          enabled = state.pairedDesktop.isNotBlank() && !state.working,
+          modifier = Modifier.weight(1f),
+        ) { Text("Scan on desktop") }
+      }
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(
+          onClick = { onPeerListener(!state.peerListening) },
+          enabled = state.pairedDesktop.isNotBlank(),
+          modifier = Modifier.weight(1f),
+        ) { Text(if (state.peerListening) "Stop peer scans" else "Allow desktop scans") }
+        OutlinedButton(
+          onClick = onRevokeDesktop,
+          enabled = state.pairedDesktop.isNotBlank() && !state.working,
+          modifier = Modifier.weight(1f),
+        ) { Text("Revoke") }
+      }
+      Text(
+        "The secret is encrypted with Android Keystore and never sent in an API request. Requests are signed, expire after 60 seconds and cannot be replayed. The listener runs only while this app process is active.",
+        fontSize = 11.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+    Spacer(Modifier.height(12.dp))
+    SectionCard("Live DNS monitor", Icons.Outlined.Dns) {
+      Text(
+        if (dnsRunning) "Monitoring and forwarding DNS requests" else "Stopped",
+        color = if (dnsRunning) Green400 else MaterialTheme.colorScheme.onSurfaceVariant,
+        fontWeight = FontWeight.Bold,
+      )
+      Button(onClick = ::toggleDnsMonitor, modifier = Modifier.fillMaxWidth()) {
+        Text(if (dnsRunning) "Stop DNS monitor" else "Start DNS monitor")
+      }
+      if (dnsEvents.isNotEmpty()) {
+        OutlinedButton(onClick = DnsMonitorRepository::clear, modifier = Modifier.fillMaxWidth()) { Text("Clear DNS history") }
+        dnsEvents.take(40).forEach { event ->
+          HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant)
+          Text("${event.time}  ${event.query}", fontWeight = FontWeight.Bold)
+          Text("Requested by: ${event.appName}", fontSize = 11.sp)
+          Text("Resolver: ${event.resolver}", fontSize = 11.sp)
+          Text("Answers: ${event.answers.joinToString().ifBlank { "None" }}", fontSize = 11.sp)
+          Text("Destination: ${event.location}", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp)
+        }
+      } else {
+        Text("Start monitoring to see the requested domain, requesting app where Android permits attribution, DNS resolver, returned addresses and destination country/region.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+      }
+      Text("Android shows a system VPN approval because DNS is captured locally. No traffic is sent to the desktop or cloud; only returned public IPs are submitted to ipwho.is for the location label.", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+    }
+    Spacer(Modifier.height(12.dp))
+    SectionCard("SSH terminal & SFTP", Icons.Outlined.Terminal) {
+      OutlinedTextField(sshHost, { sshHost = it }, label = { Text("Host or host:port") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(sshUser, { sshUser = it }, label = { Text("Username") }, singleLine = true, modifier = Modifier.weight(1f))
+        OutlinedTextField(
+          sshPassword,
+          { sshPassword = it },
+          label = { Text("Password") },
+          singleLine = true,
+          visualTransformation = PasswordVisualTransformation(),
+          modifier = Modifier.weight(1f),
+        )
+      }
+      OutlinedTextField(sshCommand, { sshCommand = it }, label = { Text("SSH command") }, modifier = Modifier.fillMaxWidth())
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = { onSsh(sshHost, sshUser, sshPassword, sshCommand) }, enabled = !state.working, modifier = Modifier.weight(1f)) { Text("Run command") }
+        OutlinedButton(onClick = { onSftp(sshHost, sshUser, sshPassword, sftpPath) }, enabled = !state.working, modifier = Modifier.weight(1f)) { Text("List SFTP") }
+      }
+      OutlinedTextField(sftpPath, { sftpPath = it }, label = { Text("Remote SFTP path") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+      Text("The first connection asks Android to approve the server host key. Credentials remain in this screen only.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    Spacer(Modifier.height(12.dp))
+    SectionCard("Smart Home", Icons.Outlined.PowerSettingsNew) {
+      Button(onClick = onDiscoverSmart, enabled = !state.working, modifier = Modifier.fillMaxWidth()) { Text("Discover local TP-Link / Kasa devices") }
+      if (state.smartDevices.isEmpty()) {
+        Text("Supports local Kasa protocol devices. Home Assistant remains the bridge for encrypted Tapo, Tuya and other vendors.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+      } else {
+        state.smartDevices.forEach { device ->
+          HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant)
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+              Text(device.name, fontWeight = FontWeight.Bold)
+              Text("${device.address} · ${device.model}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            OutlinedButton(onClick = { onSmartPower(device, device.isOn != true) }) { Text(if (device.isOn == true) "Turn off" else "Turn on") }
+          }
+        }
+      }
+    }
+    Spacer(Modifier.height(12.dp))
+    SectionCard("Packet and Wi-Fi access", Icons.Outlined.Security) {
+      Text("Android protects other devices' MAC addresses and saved Wi-Fi passwords. Full packet capture requires a user-approved local VPN session; this build provides the live connection table without intercepting or decrypting traffic.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
     }
   }
 }

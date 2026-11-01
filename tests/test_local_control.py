@@ -1,7 +1,11 @@
 """Regression checks for the opt-in local control API."""
 
 import http.client
+import hashlib
+import hmac
 import json
+import secrets
+import time
 import threading
 import unittest
 from http.server import ThreadingHTTPServer
@@ -38,6 +42,23 @@ class LocalControlTests(unittest.TestCase):
         conn.close()
         return status, payload
 
+    def peer_request(self, path, data, *, device="android-test-device-1234", nonce=None):
+        body = json.dumps(data).encode()
+        timestamp = str(int(time.time()))
+        nonce = nonce or secrets.token_urlsafe(18)
+        digest = hashlib.sha256(body).hexdigest()
+        message = "\n".join(("POST", path, timestamp, nonce, device, digest)).encode()
+        signature = hmac.new(self.state.token.encode(), message, hashlib.sha256).hexdigest()
+        headers = {"Host": f"127.0.0.1:{PORT}", "Content-Type": "application/json",
+                   "X-Peer-Device": device, "X-Peer-Timestamp": timestamp,
+                   "X-Peer-Nonce": nonce, "X-Peer-Signature": signature}
+        conn = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+        conn.request("POST", path, body=body, headers=headers)
+        response = conn.getresponse()
+        result = response.status, response.read()
+        conn.close()
+        return result
+
     def test_requires_token_for_local_data(self):
         status, _ = self.request("/api/report")
         self.assertEqual(status, 401)
@@ -55,6 +76,27 @@ class LocalControlTests(unittest.TestCase):
             status, payload = self.request("/api/report", token=self.state.token)
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(payload), {"local_only": True})
+
+    def test_signed_android_pairing_binds_device(self):
+        status, payload = self.peer_request("/api/pair", {"peer_address": "192.168.1.52"})
+        self.assertEqual(status, 200)
+        self.assertTrue(json.loads(payload)["paired"])
+        self.assertEqual(self.state.device_id, "android-test-device-1234")
+        self.assertEqual(self.state.peer_address, "192.168.1.52")
+
+    def test_signed_request_cannot_be_replayed(self):
+        nonce = secrets.token_urlsafe(18)
+        status, _ = self.peer_request("/api/pair", {"peer_address": "192.168.1.52"}, nonce=nonce)
+        self.assertEqual(status, 200)
+        status, _ = self.peer_request("/api/pair", {"peer_address": "192.168.1.52"}, nonce=nonce)
+        self.assertEqual(status, 401)
+
+    def test_pairing_rejects_second_android_identity(self):
+        status, _ = self.peer_request("/api/pair", {"peer_address": "192.168.1.52"})
+        self.assertEqual(status, 200)
+        status, _ = self.peer_request("/api/pair", {"peer_address": "192.168.1.53"},
+                                      device="different-android-device")
+        self.assertEqual(status, 401)
 
     def test_router_unknown_action_denied_without_approval(self):
         with patch("ip_analyser.local_control.approve_router_action") as approval:

@@ -765,7 +765,7 @@ class Application(tk.Tk):
         """Create a user-authorised loopback session from the packaged Windows GUI."""
         from http.server import ThreadingHTTPServer
 
-        from .local_control import PORT, ControlState, make_handler
+        from .local_control import PORT, ControlState, make_handler, private_lan_address
 
         if self.local_control_server is None:
             if not messagebox.askyesno(
@@ -775,9 +775,10 @@ class Application(tk.Tk):
                 "No cloud service or VPN will be started.", parent=self,
             ):
                 return
-            state = ControlState()
+            lan_address = private_lan_address()
+            state = ControlState(persistent=True)
             try:
-                server = ThreadingHTTPServer(("127.0.0.1", PORT), make_handler(state))
+                server = ThreadingHTTPServer((lan_address, PORT), make_handler(state))
             except OSError as exc:
                 messagebox.showerror("Local AI Control", f"Cannot start local control: {exc}", parent=self)
                 return
@@ -787,7 +788,7 @@ class Application(tk.Tk):
 
         panel = tk.Toplevel(self)
         panel.title("Local AI Control - authorised session")
-        panel.geometry("620x230")
+        panel.geometry("700x300")
         panel.transient(self)
         frame = ttk.Frame(panel, padding=16)
         frame.pack(fill="both", expand=True)
@@ -796,7 +797,11 @@ class Application(tk.Tk):
         token_box.insert(0, self.local_control_state.token)
         token_box.configure(state="readonly")
         token_box.pack(fill="x", pady=8)
-        ttk.Label(frame, text=f"Dashboard: http://127.0.0.1:{PORT}/").pack(anchor="w")
+        lan_address = self.local_control_server.server_address[0]
+        ttk.Label(frame, text=f"Desktop address for Android: http://{lan_address}:{PORT}/").pack(anchor="w")
+        peer_text = (f"Paired Android: {self.local_control_state.peer_address}"
+                     if self.local_control_state.device_id else "No Android device paired yet")
+        ttk.Label(frame, text=peer_text).pack(anchor="w", pady=(4, 0))
         buttons = ttk.Frame(frame)
         buttons.pack(anchor="w", pady=10)
 
@@ -805,6 +810,7 @@ class Application(tk.Tk):
             self.clipboard_append(self.local_control_state.token)
 
         def stop_control():
+            self.local_control_state.revoke()
             self.local_control_state.stop()
             self.local_control_server.shutdown()
             self.local_control_server.server_close()
@@ -813,9 +819,24 @@ class Application(tk.Tk):
 
         ttk.Button(buttons, text="Copy token", command=copy_token).pack(side="left")
         ttk.Button(buttons, text="Open local dashboard", command=lambda: webbrowser.open(
-            f"http://127.0.0.1:{PORT}/")).pack(side="left", padx=8)
+            f"http://{lan_address}:{PORT}/")).pack(side="left", padx=8)
         ttk.Button(buttons, text="Revoke access", command=stop_control).pack(side="left")
-        ttk.Label(frame, text="Closing this panel does not revoke access. Use Revoke access or close the app.").pack(anchor="w")
+        def scan_android():
+            def worker():
+                try:
+                    result = self.local_control_state.scan_android_peer()
+                    count = len(result.get("hosts", [])) if isinstance(result, dict) else 0
+                    self.after(0, lambda: messagebox.showinfo(
+                        "Android peer scan", f"Android found {count} device(s) on its LAN view.", parent=panel))
+                except Exception as exc:
+                    self.after(0, lambda error=str(exc): messagebox.showerror(
+                        "Android peer scan", error, parent=panel))
+            threading.Thread(target=worker, daemon=True).start()
+
+        ttk.Button(buttons, text="Scan from Android", command=scan_android).pack(side="left", padx=8)
+        ttk.Label(frame, text=(
+            "The token persists in the OS credential store. Closing this panel or app stops the listener but keeps pairing. "
+            "Revoke access rotates the token and removes the paired Android identity."), wraplength=660).pack(anchor="w")
 
     def show_local_ai_monitor(self) -> None:
         """Optional foreground-session monitor; all observations remain local."""

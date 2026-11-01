@@ -43,7 +43,13 @@ data class NetworkInfo(
   val range: String get() = if (localIp == "Unavailable") "Unavailable" else "$localIp/$prefixLength"
 }
 
-data class HostResult(val address: String, val latencyMs: Long, val openPorts: List<Int>) {
+data class HostResult(
+  val address: String,
+  val latencyMs: Long,
+  val openPorts: List<Int>,
+  val hostname: String = "",
+  val macAddress: String = "",
+) {
   val services: String get() = openPorts.joinToString { portName(it) }
 
   companion object {
@@ -278,7 +284,15 @@ class NetworkScanner(context: Context) {
       }
     }
     if (!knownNeighbour && !reachable && open.isEmpty()) return null
-    return HostResult(address, if (latency == Long.MAX_VALUE) 0 else latency, open)
+    val hostname = runCatching { InetAddress.getByName(address).canonicalHostName }
+      .getOrDefault("").takeUnless { it == address }.orEmpty()
+    val mac = runCatching {
+      File("/proc/net/arp").readLines().drop(1).firstNotNullOfOrNull { line ->
+        val fields = line.trim().split(Regex("\\s+"))
+        fields.getOrNull(3)?.takeIf { fields.firstOrNull() == address && it != "00:00:00:00:00:00" }
+      }
+    }.getOrNull().orEmpty()
+    return HostResult(address, if (latency == Long.MAX_VALUE) 0 else latency, open, hostname, mac)
   }
 
   @SuppressLint("MissingPermission")

@@ -1,3 +1,11 @@
+advanced-ip-analyser (2.9.0) stable; urgency=medium
+
+  * Add persistent, revocable desktop-to-Android LAN pairing.
+  * Bind signed peer requests to one Android device with replay protection.
+  * Allow desktop and Android to request LAN scans from each other.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Sun, 01 Nov 2026 12:00:00 +0000
+
 advanced-ip-analyser (2.8.8) stable; urgency=medium
 
   * Display colour-coded four-bar signal quality for smart-home devices.

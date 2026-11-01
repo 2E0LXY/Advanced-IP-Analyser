@@ -2,7 +2,7 @@
 
 Native Android companion for Advanced IP Analyser, built with Kotlin and Jetpack Compose.
 
-## Included in the first APK
+## Included in Android 1.2
 
 - modern dashboard matching the desktop application's dark network-tool interface;
 - current local IPv4 address, gateway, interface, Wi-Fi name and network prefix;
@@ -13,12 +13,24 @@ Native Android companion for Advanced IP Analyser, built with Kotlin and Jetpack
 - nearby Wi-Fi names, BSSIDs, channels, signal levels and advertised security review;
 - user-approved connection to a selected nearby Wi-Fi network;
 - ping/reachability, DNS, common-port and HTTP response diagnostics; and
+- custom TCP ranges, traceroute, connection inspection, TLS certificate and email-security checks;
+- Wake-on-LAN, SSH command execution and SFTP directory inspection;
+- local TP-Link/Kasa discovery and power control;
+- favorites, retained scan history, CSV/JSON export and SVG topology export;
+- persistent, revocable desktop pairing with signed two-way LAN scan requests;
+- an opt-in local-VPN DNS monitor showing queries, requesting app where Android exposes it,
+  resolver, returned addresses and destination region; and
 - explicit Android permission prompts for nearby Wi-Fi results.
 
 Android does not give ordinary applications access to other devices' MAC addresses,
 saved Wi-Fi passwords, monitor-mode packet capture, raw ICMP sockets, or unrestricted
 background Wi-Fi scanning. The app explains these platform limits instead of showing
 invented values.
+
+Encrypted DNS-over-HTTPS traffic is not visible to the DNS monitor. App attribution can
+also be hidden by Android or by the app issuing the request. Public answer addresses are
+sent to `ipwho.is` only while the user has enabled DNS monitoring so that the app can show
+a country/region label.
 
 ## Build
 

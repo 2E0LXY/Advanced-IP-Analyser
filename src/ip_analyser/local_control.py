@@ -6,6 +6,10 @@ import hmac
 import ipaddress
 import json
 import secrets
+import hashlib
+import socket
+import time
+import urllib.request
 import subprocess
 import threading
 import tkinter as tk
@@ -14,8 +18,10 @@ from tkinter import messagebox
 from urllib.parse import urlsplit
 
 from .ai_network_monitor import local_report, monitor_loop, monitor_once, validate_monitor_target
+from .peer_credentials import load_or_create_pairing, rotate_pairing, save_pairing
 
 PORT = 18796
+ANDROID_PORT = 18797
 ROUTER_ACTIONS = {"reboot": "reboot", "wifi_reload": "wifi reload"}
 
 
@@ -51,14 +57,100 @@ def approve_router_action(router: str, action: str) -> bool:
         window.destroy()
 
 
+def private_lan_address() -> str:
+    """Return the active private IPv4 address without opening a connection."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.connect(("192.0.2.1", 9))
+        value = sock.getsockname()[0]
+        return value if ipaddress.ip_address(value).is_private else "127.0.0.1"
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        sock.close()
+
+
 class ControlState:
-    def __init__(self, router: str = "192.168.1.1"):
+    def __init__(self, router: str = "192.168.1.1", *, persistent: bool = False):
         self.router = validate_router(router)
-        self.token = secrets.token_urlsafe(32)
+        pairing = load_or_create_pairing() if persistent else {
+            "token": secrets.token_urlsafe(32), "device_id": "", "peer_address": ""}
+        self.token = pairing["token"]
+        self.device_id = pairing["device_id"]
+        self.peer_address = pairing["peer_address"]
+        self.persistent = persistent
+        self.nonces: dict[str, float] = {}
         self.stop_event = None
         self.worker = None
         self.lock = threading.Lock()
         self.router_lock = threading.Lock()
+
+    def pair(self, device_id: str, peer_address: str) -> dict:
+        if not 16 <= len(device_id) <= 128 or any(ord(char) < 33 for char in device_id):
+            raise ValueError("invalid Android device identity")
+        address = ipaddress.ip_address(peer_address)
+        if not address.is_private or address.is_loopback or address.is_link_local:
+            raise ValueError("Android peer must use a private LAN address")
+        with self.lock:
+            if self.device_id and not hmac.compare_digest(self.device_id, device_id):
+                raise PermissionError("a different Android device is already paired; revoke it first")
+            self.device_id = device_id
+            self.peer_address = str(address)
+            if self.persistent:
+                save_pairing({"token": self.token, "device_id": self.device_id,
+                              "peer_address": self.peer_address})
+        return {"paired": True, "device_id": device_id, "peer_address": self.peer_address}
+
+    def revoke(self) -> None:
+        pairing = rotate_pairing() if self.persistent else {
+            "token": secrets.token_urlsafe(32), "device_id": "", "peer_address": ""}
+        with self.lock:
+            self.token = pairing["token"]
+            self.device_id = ""
+            self.peer_address = ""
+            self.nonces.clear()
+
+    def verify_peer(self, method: str, path: str, body: bytes, headers) -> bool:
+        device = headers.get("X-Peer-Device", "")
+        timestamp = headers.get("X-Peer-Timestamp", "")
+        nonce = headers.get("X-Peer-Nonce", "")
+        signature = headers.get("X-Peer-Signature", "")
+        try:
+            moment = int(timestamp)
+        except ValueError:
+            return False
+        now = int(time.time())
+        if abs(now - moment) > 60 or not 16 <= len(nonce) <= 128:
+            return False
+        with self.lock:
+            self.nonces = {key: seen for key, seen in self.nonces.items() if now - seen < 120}
+            if nonce in self.nonces or (self.device_id and not hmac.compare_digest(self.device_id, device)):
+                return False
+            digest = hashlib.sha256(body).hexdigest()
+            message = "\n".join((method, path, timestamp, nonce, device, digest)).encode()
+            expected = hmac.new(self.token.encode(), message, hashlib.sha256).hexdigest()
+            if not hmac.compare_digest(expected, signature):
+                return False
+            self.nonces[nonce] = now
+        return True
+
+    def scan_android_peer(self) -> dict:
+        if not self.device_id or not self.peer_address:
+            raise ValueError("pair the Android app first")
+        path = "/api/scan"
+        body = b"{}"
+        timestamp = str(int(time.time()))
+        nonce = secrets.token_urlsafe(18)
+        digest = hashlib.sha256(body).hexdigest()
+        message = "\n".join(("POST", path, timestamp, nonce, "desktop", digest)).encode()
+        signature = hmac.new(self.token.encode(), message, hashlib.sha256).hexdigest()
+        request = urllib.request.Request(
+            f"http://{self.peer_address}:{ANDROID_PORT}{path}", data=body, method="POST",
+            headers={"Content-Type": "application/json", "X-Peer-Device": "desktop",
+                     "X-Peer-Timestamp": timestamp, "X-Peer-Nonce": nonce,
+                     "X-Peer-Signature": signature})
+        with urllib.request.urlopen(request, timeout=90) as response:
+            return json.loads(response.read(2_000_000))
 
     def start(self, target: str, interval: int) -> dict:
         validate_monitor_target(target)
@@ -114,15 +206,26 @@ def make_handler(state: ControlState):
             self.wfile.write(payload)
 
         def route(self):
-            if self.headers.get("Host") not in (f"localhost:{PORT}", f"127.0.0.1:{PORT}"):
+            host = self.headers.get("Host", "").split(":", 1)[0].strip("[]")
+            try:
+                allowed_host = host == "localhost" or ipaddress.ip_address(host).is_private
+            except ValueError:
+                allowed_host = False
+            if not allowed_host:
                 return self.send_data(403, {"error": "invalid host"})
             if self.headers.get("Origin") not in (None, f"http://localhost:{PORT}", f"http://127.0.0.1:{PORT}"):
                 return self.send_data(403, {"error": "invalid origin"})
             path = urlsplit(self.path).path
             if self.command == "GET" and path == "/":
                 return self.send_data(200, HTML, "text/html; charset=utf-8")
-            if not hmac.compare_digest(self.headers.get("X-Local-Control-Token", ""), state.token):
-                return self.send_data(401, {"error": "session token required"})
+            size = int(self.headers.get("Content-Length", "0"))
+            if not 0 <= size <= 8192:
+                return self.send_data(413, {"error": "body too large"})
+            raw_body = self.rfile.read(size) if size else b""
+            legacy = hmac.compare_digest(self.headers.get("X-Local-Control-Token", ""), state.token)
+            peer = state.verify_peer(self.command, path, raw_body, self.headers)
+            if not legacy and not peer:
+                return self.send_data(401, {"error": "valid local or paired-device authentication required"})
             try:
                 if self.command == "GET":
                     if path == "/api/report":
@@ -130,14 +233,22 @@ def make_handler(state: ControlState):
                     if path == "/api/router/status":
                         return self.send_data(200, {"router": state.router, "status": json.loads(router_ssh(state.router, "ubus call system board"))})
                 if self.command == "POST":
-                    size = int(self.headers.get("Content-Length", "0"))
-                    if not 0 <= size <= 8192:
-                        return self.send_data(413, {"error": "body too large"})
-                    body = json.loads(self.rfile.read(size)) if size else {}
+                    body = json.loads(raw_body) if raw_body else {}
                     if not isinstance(body, dict):
                         raise ValueError("JSON object required")
+                    if path == "/api/pair":
+                        return self.send_data(200, state.pair(
+                            self.headers.get("X-Peer-Device", ""), str(body.get("peer_address", ""))))
+                    if path == "/api/pair/revoke":
+                        if not peer:
+                            return self.send_data(403, {"error": "paired-device authentication required"})
+                        self.send_data(200, {"revoked": True})
+                        state.revoke()
+                        return None
                     if path == "/api/scan":
                         return self.send_data(200, monitor_once(str(body.get("target", ""))))
+                    if path == "/api/peer/scan":
+                        return self.send_data(200, state.scan_android_peer())
                     if path == "/api/monitor/start":
                         return self.send_data(200, state.start(str(body.get("target", "")), int(body.get("interval", 300))))
                     if path == "/api/monitor/stop":
@@ -158,6 +269,8 @@ def make_handler(state: ControlState):
                 return self.send_data(404, {"error": "unknown action"})
             except (ValueError, TypeError) as exc:
                 return self.send_data(400, {"error": str(exc)})
+            except PermissionError as exc:
+                return self.send_data(403, {"error": str(exc)})
             except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
                 return self.send_data(502, {"error": str(exc)})
             except tk.TclError:

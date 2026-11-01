@@ -10,8 +10,8 @@ android {
         applicationId = "uk.co.twoe0lxy.ipanalyser"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10101
-        versionName = "1.1.1"
+        versionCode = 10200
+        versionName = "1.2.0"
     }
 
     signingConfigs {
@@ -69,6 +69,7 @@ dependencies {
   implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
   implementation(libs.kotlinx.coroutines.android)
+  implementation(libs.jsch)
 
   // Compose
   implementation(libs.androidx.compose.ui)
