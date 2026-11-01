@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -75,6 +76,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -684,7 +686,7 @@ private fun ToolsPage(
       )
     }
     Spacer(Modifier.height(12.dp))
-    SectionCard("Live DNS monitor", Icons.Outlined.Dns) {
+    SectionCard("Live DNS connections & map", Icons.Outlined.Dns) {
       Text(
         if (dnsRunning) "Monitoring and forwarding DNS requests" else "Stopped",
         color = if (dnsRunning) Green400 else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -695,13 +697,27 @@ private fun ToolsPage(
       }
       if (dnsEvents.isNotEmpty()) {
         OutlinedButton(onClick = DnsMonitorRepository::clear, modifier = Modifier.fillMaxWidth()) { Text("Clear DNS history") }
+        DnsDestinationMap(dnsEvents)
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth()) {
+          Text("Time / request", modifier = Modifier.weight(1.2f), fontWeight = FontWeight.Bold, fontSize = 10.sp)
+          Text("Application", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, fontSize = 10.sp)
+          Text("Destination", modifier = Modifier.weight(1.2f), fontWeight = FontWeight.Bold, fontSize = 10.sp)
+        }
         dnsEvents.take(40).forEach { event ->
           HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant)
-          Text("${event.time}  ${event.query}", fontWeight = FontWeight.Bold)
-          Text("Requested by: ${event.appName}", fontSize = 11.sp)
-          Text("Resolver: ${event.resolver}", fontSize = 11.sp)
-          Text("Answers: ${event.answers.joinToString().ifBlank { "None" }}", fontSize = 11.sp)
-          Text("Destination: ${event.location}", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp)
+          Row(Modifier.fillMaxWidth()) {
+            Column(Modifier.weight(1.2f)) {
+              Text(event.time, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+              Text(event.query, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            Text(event.appName, modifier = Modifier.weight(1f), fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Column(Modifier.weight(1.2f)) {
+              Text(event.answers.firstOrNull() ?: "No address", color = MaterialTheme.colorScheme.primary, fontSize = 10.sp)
+              Text(event.location, fontSize = 9.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+          }
+          Text("DNS resolver: ${event.resolver} · ${event.answers.joinToString().ifBlank { "No answer" }}", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
       } else {
         Text("Start monitoring to see the requested domain, requesting app where Android permits attribution, DNS resolver, returned addresses and destination country/region.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
@@ -753,6 +769,34 @@ private fun ToolsPage(
       Text("Android protects other devices' MAC addresses and saved Wi-Fi passwords. Full packet capture requires a user-approved local VPN session; this build provides the live connection table without intercepting or decrypting traffic.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
     }
   }
+}
+
+@Composable
+private fun DnsDestinationMap(events: List<DnsEvent>) {
+  val mapped = events.filter { it.latitude != null && it.longitude != null }
+    .distinctBy { it.answers.firstOrNull().orEmpty() }
+  Canvas(
+    Modifier.fillMaxWidth().height(210.dp)
+      .padding(top = 8.dp),
+  ) {
+    val grid = Color(0xFF244158)
+    for (step in 0..6) {
+      val x = size.width * step / 6f
+      drawLine(grid, Offset(x, 0f), Offset(x, size.height), 1f)
+    }
+    for (step in 0..4) {
+      val y = size.height * step / 4f
+      drawLine(grid, Offset(0f, y), Offset(size.width, y), 1f)
+    }
+    mapped.forEach { event ->
+      val x = ((event.longitude!! + 180.0) / 360.0 * size.width).toFloat()
+      val y = ((90.0 - event.latitude!!) / 180.0 * size.height).toFloat()
+      drawCircle(Color(0xFF31B8FF), 7f, Offset(x, y))
+      drawCircle(Color.White, 7f, Offset(x, y), style = androidx.compose.ui.graphics.drawscope.Stroke(2f))
+    }
+  }
+  Text("${mapped.size} public destination${if (mapped.size == 1) "" else "s"} mapped · approximate IP location",
+    fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable

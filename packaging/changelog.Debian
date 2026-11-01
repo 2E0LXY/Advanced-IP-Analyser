@@ -1,3 +1,12 @@
+advanced-ip-analyser (2.9.2) stable; urgency=medium
+
+  * Add a live inbound, outbound and listening connection table.
+  * Identify owning applications and processes where the OS permits it.
+  * Add approximate public endpoint organisation/location and an embedded map.
+  * Export filtered connection evidence to CSV or JSON.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Sun, 01 Nov 2026 17:10:00 +0000
+
 advanced-ip-analyser (2.9.1) stable; urgency=medium
 
   * Prevent Android releases from masking Windows and Debian updates.

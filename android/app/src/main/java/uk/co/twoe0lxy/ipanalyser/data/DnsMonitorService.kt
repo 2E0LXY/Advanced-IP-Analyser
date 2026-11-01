@@ -39,6 +39,16 @@ data class DnsEvent(
   val resolver: String,
   val answers: List<String>,
   val location: String,
+  val latitude: Double? = null,
+  val longitude: Double? = null,
+  val organisation: String = "",
+)
+
+private data class DnsGeo(
+  val label: String,
+  val latitude: Double?,
+  val longitude: Double?,
+  val organisation: String,
 )
 
 object DnsMonitorRepository {
@@ -47,8 +57,12 @@ object DnsMonitorRepository {
   val running = MutableStateFlow(false)
 
   fun add(event: DnsEvent) { mutableEvents.value = (listOf(event) + mutableEvents.value).take(300) }
-  fun locate(id: Long, location: String) {
-    mutableEvents.value = mutableEvents.value.map { if (it.id == id) it.copy(location = location) else it }
+  fun locate(id: Long, location: String, latitude: Double? = null,
+             longitude: Double? = null, organisation: String = "") {
+    mutableEvents.value = mutableEvents.value.map {
+      if (it.id == id) it.copy(location = location, latitude = latitude,
+        longitude = longitude, organisation = organisation) else it
+    }
   }
   fun clear() { mutableEvents.value = emptyList() }
 }
@@ -56,7 +70,7 @@ object DnsMonitorRepository {
 class DnsMonitorService : VpnService() {
   private var descriptor: ParcelFileDescriptor? = null
   @Volatile private var active = false
-  private val geoCache = ConcurrentHashMap<String, String>()
+  private val geoCache = ConcurrentHashMap<String, DnsGeo>()
   private lateinit var connectivity: ConnectivityManager
 
   override fun onCreate() {
@@ -167,8 +181,14 @@ class DnsMonitorService : VpnService() {
   }
 
   private fun locateAsync(eventId: Long, address: String) {
-    geoCache[address]?.let { DnsMonitorRepository.locate(eventId, it); return }
+    geoCache[address]?.let {
+      DnsMonitorRepository.locate(eventId, it.label, it.latitude, it.longitude, it.organisation)
+      return
+    }
     Thread({
+      var latitude: Double? = null
+      var longitude: Double? = null
+      var organisation = ""
       val location = runCatching {
         val ip = InetAddress.getByName(address)
         if (ip.isSiteLocalAddress || ip.isLoopbackAddress || ip.isLinkLocalAddress) return@runCatching "Private/local destination"
@@ -177,14 +197,17 @@ class DnsMonitorService : VpnService() {
         val json = connection.inputStream.bufferedReader().use { JSONObject(it.readText()) }
         connection.disconnect()
         if (!json.optBoolean("success")) "Location unavailable" else buildList {
+          latitude = json.optDouble("latitude").takeUnless(Double::isNaN)
+          longitude = json.optDouble("longitude").takeUnless(Double::isNaN)
+          organisation = json.optJSONObject("connection")?.optString("isp").orEmpty()
           json.optString("city").takeIf(String::isNotBlank)?.let(::add)
           json.optString("region").takeIf(String::isNotBlank)?.let(::add)
           json.optString("country").takeIf(String::isNotBlank)?.let(::add)
           json.optJSONObject("connection")?.optString("isp")?.takeIf(String::isNotBlank)?.let(::add)
         }.joinToString(", ").ifBlank { "Location unavailable" }
       }.getOrDefault("Location unavailable")
-      geoCache[address] = location
-      DnsMonitorRepository.locate(eventId, location)
+      geoCache[address] = DnsGeo(location, latitude, longitude, organisation)
+      DnsMonitorRepository.locate(eventId, location, latitude, longitude, organisation)
     }, "dns-geo").apply { isDaemon = true }.start()
   }
 

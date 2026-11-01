@@ -2,7 +2,7 @@
 
 Native Android companion for Advanced IP Analyser, built with Kotlin and Jetpack Compose.
 
-## Included in Android 1.2
+## Included in Android 1.2.1
 
 - modern dashboard matching the desktop application's dark network-tool interface;
 - current local IPv4 address, gateway, interface, Wi-Fi name and network prefix;
@@ -19,7 +19,7 @@ Native Android companion for Advanced IP Analyser, built with Kotlin and Jetpack
 - favorites, retained scan history, CSV/JSON export and SVG topology export;
 - persistent, revocable desktop pairing with signed two-way LAN scan requests;
 - an opt-in local-VPN DNS monitor showing queries, requesting app where Android exposes it,
-  resolver, returned addresses and destination region; and
+  resolver, returned addresses, destination region and an approximate map; and
 - explicit Android permission prompts for nearby Wi-Fi results.
 
 Android does not give ordinary applications access to other devices' MAC addresses,

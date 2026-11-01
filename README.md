@@ -41,6 +41,7 @@ live progress, expandable service results, inventory exchange, and remote action
 | Packet engine | Native Linux `AF_PACKET` capture, selected-host/service scope, interface discovery, Ethernet PCAP/PCAPNG/gzip reading, endpoint/port/protocol summaries, byte preview |
 | Display filters | IP/CIDR, TCP/UDP ports, DNS, HTTP, TLS, ICMP, ARP, TCP flags, lengths, comparisons, text/regex matching, boolean expressions, 20 quick filters, saved named filters |
 | Network Security Monitor | Up to 24-hour sessions across all observed ports and both directions, minute timeline, conversations, devices, DNS, TCP diagnostics, behavioural baselines, colour-coded findings, alerts, bookmarks, reports, retention, history |
+| Live connections | Windows/Debian inbound, outbound and listening endpoint table, owning process/PID, protocol and state, approximate public destination organisation/location, embedded map, filtering, CSV/JSON export |
 | Windows Wi-Fi Analyzer | Nearby SSIDs, signal quality, approximate dBm, security, active connection, adapter status, saved-profile inventory, selected-profile password reveal with confirmation, credential-free CSV export |
 | Passive Wi-Fi | Monitor-mode AP/client discovery, BSSID manufacturer, channel/signal/security/WPS review, beacons/data/probes, passive EAPOL observation, bounded history and comparison, PCAP/JSON/CSV/HTML reports |
 | Web Security Audit | Same-host bounded crawler, path exclusions, extra allowed hosts, custom headers, page/form/technology inventory, TLS fingerprint, security-header, cookie, cleartext, mixed-content, directory-listing, CORS, and password-form observations, HTML/JSON reports |
@@ -76,7 +77,7 @@ the APK.
 
 The Android companion includes a mobile version of the dark network dashboard, bounded LAN discovery,
 common TCP service checks, nearby Wi-Fi security review, and ping/reachability,
-DNS, port, and HTTP diagnostics. Android protects other devices' MAC addresses,
+DNS, port, and HTTP diagnostics, plus a live DNS destination table and map. Android protects other devices' MAC addresses,
 saved Wi-Fi passwords, raw packet capture, and unrestricted background Wi-Fi
 scanning, so those desktop features are not presented as available on Android.
 See the [Android build guide](android/README.md).

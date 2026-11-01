@@ -36,6 +36,7 @@ from .ai_settings import (
     save_api_key,
 )
 from .config import parse_ports
+from .connections_gui import ConnectionMonitorView
 from .dashboard import DashboardView
 from .diagnostics import run_diagnostic
 from .models import Host
@@ -371,16 +372,19 @@ class Application(tk.Tk):
         self.dashboard_page = ttk.Frame(self.notebook)
         self.scan_page = ttk.Frame(self.notebook)
         self.smart_home_page = ttk.Frame(self.notebook)
+        self.connections_page = ttk.Frame(self.notebook)
         self.diagnostic_page = ttk.Frame(self.notebook)
         self.favorites_page = ttk.Frame(self.notebook)
         self.notebook.add(self.dashboard_page, text="Dashboard")
         self.notebook.add(self.scan_page, text="Network scan")
         self.notebook.add(self.smart_home_page, text="Smart home")
+        self.notebook.add(self.connections_page, text="Live connections")
         self.notebook.add(self.diagnostic_page, text="Diagnostics")
         self.notebook.add(self.favorites_page, text="Favorites")
         self._nav_buttons = {}
         for label, page in (("⌂  Dashboard", self.dashboard_page), ("⌕  Network Scan", self.scan_page),
                             ("⌁  Smart Home", self.smart_home_page),
+                            ("⇄  Connections", self.connections_page),
                             ("⚙  Diagnostics", self.diagnostic_page),
                             ("★  Favorites", self.favorites_page)):
             button = tk.Button(sidebar, text=label, anchor="w", relief="flat", bd=0,
@@ -588,6 +592,7 @@ class Application(tk.Tk):
         self._refresh_favorites_table()
         self._build_dashboard()
         self._build_smart_home()
+        self._build_connections()
         self._build_diagnostics()
 
         self.links = ttk.Frame(self.scan_page, padding=(12, 8, 12, 0))
@@ -679,6 +684,10 @@ class Application(tk.Tk):
     def _build_smart_home(self) -> None:
         self.smart_home = SmartHomeView(self.smart_home_page)
         self.smart_home.pack(fill="both", expand=True)
+
+    def _build_connections(self) -> None:
+        self.connection_monitor = ConnectionMonitorView(self.connections_page)
+        self.connection_monitor.pack(fill="both", expand=True)
 
     def _open_port_scan(self) -> None:
         self._navigate(self.scan_page)
