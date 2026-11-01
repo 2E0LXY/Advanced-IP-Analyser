@@ -192,7 +192,7 @@ class DnsMonitorService : VpnService() {
       val location = runCatching {
         val ip = InetAddress.getByName(address)
         if (ip.isSiteLocalAddress || ip.isLoopbackAddress || ip.isLinkLocalAddress) return@runCatching "Private/local destination"
-        val connection = URL("https://ipwho.is/$address?fields=success,country,region,city,connection").openConnection() as HttpURLConnection
+        val connection = URL(DnsGeoLookup.url(address)).openConnection() as HttpURLConnection
         connection.connectTimeout = 3_000; connection.readTimeout = 3_000
         val json = connection.inputStream.bufferedReader().use { JSONObject(it.readText()) }
         connection.disconnect()
@@ -231,6 +231,11 @@ class DnsMonitorService : VpnService() {
     private const val CHANNEL_ID = "dns-monitor"
     private const val NOTIFICATION_ID = 18798
   }
+}
+
+internal object DnsGeoLookup {
+  fun url(address: String): String =
+    "https://ipwho.is/$address?fields=success,country,region,city,latitude,longitude,connection"
 }
 
 data class ParsedDnsPacket(

@@ -2,9 +2,17 @@ package uk.co.twoe0lxy.ipanalyser.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DnsPacketTest {
+  @Test
+  fun geolocationRequestIncludesCoordinatesForMapPins() {
+    val url = DnsGeoLookup.url("104.16.249.249")
+    assertTrue(url.contains("latitude"))
+    assertTrue(url.contains("longitude"))
+  }
+
   @Test
   fun parsesDnsQueryFromIpv4UdpPacket() {
     val dns = byteArrayOf(

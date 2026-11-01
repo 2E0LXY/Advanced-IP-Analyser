@@ -77,6 +77,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -779,6 +780,25 @@ private fun DnsDestinationMap(events: List<DnsEvent>) {
     Modifier.fillMaxWidth().height(210.dp)
       .padding(top = 8.dp),
   ) {
+    drawRect(Color(0xFF081827))
+    val land = Color(0xFF193A4D)
+    fun continent(points: List<Pair<Float, Float>>) {
+      if (points.isEmpty()) return
+      val path = Path().apply {
+        moveTo(points.first().first * size.width, points.first().second * size.height)
+        points.drop(1).forEach { (x, y) -> lineTo(x * size.width, y * size.height) }
+        close()
+      }
+      drawPath(path, land)
+      drawPath(path, Color(0xFF315A6F), style = androidx.compose.ui.graphics.drawscope.Stroke(1.5f))
+    }
+    continent(listOf(.05f to .23f, .11f to .10f, .22f to .13f, .30f to .25f, .25f to .38f, .17f to .40f, .10f to .32f))
+    continent(listOf(.25f to .42f, .35f to .47f, .36f to .61f, .30f to .88f, .25f to .69f))
+    continent(listOf(.41f to .10f, .47f to .08f, .49f to .18f, .44f to .24f))
+    continent(listOf(.45f to .24f, .56f to .20f, .61f to .31f, .55f to .38f, .47f to .34f))
+    continent(listOf(.47f to .36f, .58f to .37f, .61f to .55f, .54f to .78f, .47f to .61f, .43f to .46f))
+    continent(listOf(.57f to .18f, .75f to .10f, .92f to .24f, .91f to .38f, .79f to .49f, .65f to .42f, .58f to .31f))
+    continent(listOf(.78f to .64f, .90f to .60f, .95f to .73f, .87f to .83f, .77f to .75f))
     val grid = Color(0xFF244158)
     for (step in 0..6) {
       val x = size.width * step / 6f
@@ -791,11 +811,18 @@ private fun DnsDestinationMap(events: List<DnsEvent>) {
     mapped.forEach { event ->
       val x = ((event.longitude!! + 180.0) / 360.0 * size.width).toFloat()
       val y = ((90.0 - event.latitude!!) / 180.0 * size.height).toFloat()
+      drawCircle(Color(0x5531B8FF), 14f, Offset(x, y))
       drawCircle(Color(0xFF31B8FF), 7f, Offset(x, y))
       drawCircle(Color.White, 7f, Offset(x, y), style = androidx.compose.ui.graphics.drawscope.Stroke(2f))
     }
   }
-  Text("${mapped.size} public destination${if (mapped.size == 1) "" else "s"} mapped · approximate IP location",
+  val mapStatus = when {
+    mapped.isNotEmpty() -> "${mapped.size} public destination${if (mapped.size == 1) "" else "s"} mapped"
+    events.any { it.location == "Locating…" } -> "Locating public destinations…"
+    events.isNotEmpty() -> "No public destination coordinates available yet"
+    else -> "DNS destinations will appear here"
+  }
+  Text("$mapStatus · approximate IP location",
     fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
