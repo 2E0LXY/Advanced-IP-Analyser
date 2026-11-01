@@ -6,7 +6,7 @@ The main GitHub **Latest** release contains Android, Windows and Debian download
 together. Android also retains a separate version tag for its independent build
 and signing history.
 
-**[Download Advanced IP Analyser Android 1.2.2](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.3/Advanced-IP-Analyser-Android-1.2.2.apk)**
+**[Download Advanced IP Analyser Android 1.2.2](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.2/Advanced-IP-Analyser-Android-1.2.2.apk)**
 
 File name: `Advanced-IP-Analyser-Android-1.2.2.apk`
 
@@ -39,7 +39,7 @@ file is the signed release APK rather than a debug build.
 ## Verify the download
 
 The release includes the generated SHA-256 checksum in
-[`SHA256SUMS-ANDROID.txt`](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.3/SHA256SUMS-ANDROID.txt)
+[`SHA256SUMS-ANDROID.txt`](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.2/SHA256SUMS-ANDROID.txt)
 file.
 
 ## Permissions and privacy
