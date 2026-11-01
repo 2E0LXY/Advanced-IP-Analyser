@@ -12,7 +12,7 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-RELEASE_API = "https://api.github.com/repos/2E0LXY/Advanced-IP-Analyser/releases/latest"
+RELEASE_API = "https://api.github.com/repos/2E0LXY/Advanced-IP-Analyser/releases?per_page=30"
 MAX_PACKAGE_BYTES = 50 * 1024 * 1024
 MAX_RELEASE_METADATA_BYTES = 1024 * 1024
 VERSION_PATTERN = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
@@ -64,29 +64,39 @@ def check_for_update(current_version: str, timeout: float = 5.0,
         payload = json.loads(encoded)
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise ValueError("GitHub returned invalid release metadata") from error
-    if not isinstance(payload, dict):
+    # GitHub's /releases/latest endpoint can point at the separately-versioned
+    # Android release. Inspect recent releases and select the newest compatible
+    # desktop installer instead of treating an Android tag as "up to date".
+    releases = [payload] if isinstance(payload, dict) else payload
+    if not isinstance(releases, list):
         raise ValueError("GitHub returned an invalid release record")
-    latest = str(payload.get("tag_name", "")).removeprefix("v")
-    if not VERSION_PATTERN.fullmatch(latest):
-        return None
-    if version_key(latest) <= version_key(current_version):
-        return None
-    assets = payload.get("assets", [])
-    if not isinstance(assets, list):
-        raise ValueError("GitHub release assets are invalid")
-    for asset in assets[:1_000]:
-        if not isinstance(asset, dict):
+    candidates: list[Update] = []
+    for release in releases[:30]:
+        if not isinstance(release, dict) or release.get("draft") or release.get("prerelease"):
             continue
-        filename = str(asset.get("name", ""))
-        match = package_pattern.fullmatch(filename)
-        url = str(asset.get("browser_download_url", ""))
-        expected_url = f"{DOWNLOAD_PREFIX}v{latest}/{filename}"
-        if match and match.group(1) == latest and url == expected_url:
-            digest = str(asset.get("digest", ""))
-            sha256 = digest.removeprefix("sha256:") if digest.startswith("sha256:") else ""
-            if not SHA256_PATTERN.fullmatch(sha256):
-                raise ValueError("the GitHub release does not publish a valid SHA-256 package digest")
-            return Update(latest, url, filename, sha256, installer_kind)
+        latest = str(release.get("tag_name", "")).removeprefix("v")
+        if (not VERSION_PATTERN.fullmatch(latest) or
+                version_key(latest) <= version_key(current_version)):
+            continue
+        assets = release.get("assets", [])
+        if not isinstance(assets, list):
+            raise ValueError("GitHub release assets are invalid")
+        for asset in assets[:1_000]:
+            if not isinstance(asset, dict):
+                continue
+            filename = str(asset.get("name", ""))
+            match = package_pattern.fullmatch(filename)
+            url = str(asset.get("browser_download_url", ""))
+            expected_url = f"{DOWNLOAD_PREFIX}v{latest}/{filename}"
+            if match and match.group(1) == latest and url == expected_url:
+                digest = str(asset.get("digest", ""))
+                sha256 = digest.removeprefix("sha256:") if digest.startswith("sha256:") else ""
+                if not SHA256_PATTERN.fullmatch(sha256):
+                    raise ValueError("the GitHub release does not publish a valid SHA-256 package digest")
+                candidates.append(Update(latest, url, filename, sha256, installer_kind))
+                break
+    if candidates:
+        return max(candidates, key=lambda update: version_key(update.version))
     return None
 
 

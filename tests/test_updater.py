@@ -76,7 +76,7 @@ class UpdaterTests(unittest.TestCase):
 
     @patch("ip_analyser.updater.urllib.request.urlopen")
     def test_invalid_release_document_is_rejected(self, urlopen):
-        urlopen.return_value = _Response(b"[]")
+        urlopen.return_value = _Response(b'"invalid"')
         with self.assertRaisesRegex(ValueError, "release record"):
             check_for_update("0.5.0", installer_kind="debian")
 
@@ -90,6 +90,27 @@ class UpdaterTests(unittest.TestCase):
         }]}).encode())
         self.assertEqual(check_for_update("0.5.0", installer_kind="windows"),
                          Update("0.5.1", url, name, digest, "windows"))
+
+    @patch("ip_analyser.updater.urllib.request.urlopen")
+    def test_android_release_does_not_hide_desktop_update(self, urlopen):
+        digest = "c" * 64
+        name = "Advanced-IP-Analyser-Setup-2.9.0.exe"
+        url = f"https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.0/{name}"
+        urlopen.return_value = _Response(json.dumps([
+            {"tag_name": "android-v1.2.0", "assets": [{
+                "name": "Advanced-IP-Analyser-Android-1.2.0.apk",
+                "browser_download_url": "https://example.invalid/android.apk",
+                "digest": f"sha256:{'d' * 64}",
+            }]},
+            {"tag_name": "v2.9.0", "assets": [{
+                "name": name, "browser_download_url": url,
+                "digest": f"sha256:{digest}",
+            }]},
+        ]).encode())
+        self.assertEqual(
+            check_for_update("2.8.8", installer_kind="windows"),
+            Update("2.9.0", url, name, digest, "windows"),
+        )
 
     @patch("ip_analyser.updater.urllib.request.urlopen")
     def test_windows_installer_requires_pe_header(self, urlopen):

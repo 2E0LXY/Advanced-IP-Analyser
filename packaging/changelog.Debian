@@ -1,3 +1,11 @@
+advanced-ip-analyser (2.9.1) stable; urgency=medium
+
+  * Prevent Android releases from masking Windows and Debian updates.
+  * Select the newest compatible desktop installer from recent releases.
+  * Keep Android-only releases from becoming the desktop latest release.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Sun, 01 Nov 2026 16:20:00 +0000
+
 advanced-ip-analyser (2.9.0) stable; urgency=medium
 
   * Add persistent, revocable desktop-to-Android LAN pairing.
