@@ -106,6 +106,7 @@ private enum class AppPage(val label: String, val icon: ImageVector) {
   Dashboard("Dashboard", Icons.Outlined.Dashboard),
   Lan("LAN scan", Icons.Outlined.Search),
   Wifi("Wi-Fi", Icons.Outlined.Wifi),
+  DnsBench("DNS test", Icons.Outlined.Speed),
   Tools("Tools", Icons.Outlined.Analytics),
 }
 
@@ -164,6 +165,7 @@ fun MainScreen(
         AppPage.Dashboard -> DashboardPage(state, { selectedPage = it.ordinal }, viewModel::scanLan)
         AppPage.Lan -> LanPage(state, viewModel::scanLan, viewModel::refreshNetwork, viewModel::toggleFavorite)
         AppPage.Wifi -> WifiPage(state, viewModel::scanWifi, viewModel::connectWifi)
+        AppPage.DnsBench -> DnsBenchmarkPage(state, viewModel::toggleDnsBenchmark)
         AppPage.Tools -> ToolsPage(
           state,
           viewModel::runDiagnostic,
@@ -550,6 +552,99 @@ private fun WifiRow(network: WifiNetwork, onConnect: (WifiNetwork, String) -> Un
           showPassword = false
         }) { Text("Cancel") }
       },
+    )
+  }
+}
+
+@Composable
+private fun DnsBenchmarkPage(state: MainScreenUiState, onToggle: () -> Unit) {
+  var showHelp by rememberSaveable { mutableStateOf(false) }
+  LazyColumn(
+    modifier = Modifier.fillMaxSize().padding(16.dp),
+    verticalArrangement = Arrangement.spacedBy(10.dp),
+  ) {
+    item { PageHeading("DNS latency benchmark", "Real UDP DNS queries from this device", Icons.Outlined.Speed) }
+    item {
+      SectionCard("Five-round comparison", Icons.Outlined.Dns) {
+        Text(
+          "Each of 36 resolvers receives the same A-record query. Results measure a validated DNS reply, not a web request.",
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          fontSize = 12.sp,
+        )
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          Button(onClick = onToggle, modifier = Modifier.weight(1f)) {
+            Text(if (state.dnsBenchmarkRunning) "Stop benchmark" else "Start 5-round benchmark")
+          }
+          OutlinedButton(onClick = { showHelp = true }) { Text("?") }
+        }
+        if (state.dnsBenchmarkRunning) {
+          Spacer(Modifier.height(10.dp))
+          LinearProgressIndicator(progress = { state.dnsBenchmarkRound / 5f }, modifier = Modifier.fillMaxWidth())
+          Text("Round ${state.dnsBenchmarkRound.coerceAtLeast(1)} of 5", fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+      }
+    }
+    if (state.dnsBenchmark.isEmpty()) {
+      item { EmptyPanel("Start the benchmark to compare public DNS resolvers from your current connection.") }
+    } else {
+      items(state.dnsBenchmark, key = { it.resolver.address }) { row ->
+        val average = row.averageMs
+        val accent = when {
+          average == null -> MaterialTheme.colorScheme.onSurfaceVariant
+          average < 50 -> Green400
+          average < 150 -> Orange400
+          else -> MaterialTheme.colorScheme.error
+        }
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+          border = panelBorder(), shape = RoundedCornerShape(10.dp)) {
+          Column(Modifier.fillMaxWidth().padding(13.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              Column(Modifier.weight(1f)) {
+                Text(row.resolver.name, fontWeight = FontWeight.Bold)
+                Text(row.resolver.address, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+              }
+              Column(horizontalAlignment = Alignment.End) {
+                Text(average?.let { "%.1f ms".format(it) } ?: "No reply",
+                  color = accent, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                Text(row.jitterMs?.let { "jitter %.1f ms".format(it) } ?: "jitter —",
+                  color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
+              }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+              repeat(5) { index ->
+                val sample = row.rounds.getOrNull(index)
+                Card(modifier = Modifier.weight(1f), colors = CardDefaults.cardColors(containerColor = Navy700),
+                  shape = RoundedCornerShape(6.dp)) {
+                  Column(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("R${index + 1}", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(sample?.let { "${it}ms" } ?: if (index < row.rounds.size) "T/O" else "—",
+                      fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                  }
+                }
+              }
+            }
+            Text("${row.successfulRounds}/${row.rounds.size} validated replies", modifier = Modifier.padding(top = 7.dp),
+              fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+          }
+        }
+      }
+    }
+  }
+  if (showHelp) {
+    AlertDialog(
+      onDismissRequest = { showHelp = false },
+      title = { Text("DNS benchmark help") },
+      text = { Text(
+        "What it does: sends real UDP A-record queries to 36 public DNS resolvers and ranks valid replies by average latency and jitter.\n\n" +
+          "How to use it: select Start and keep the app open for five rounds. Stop keeps completed results.\n\n" +
+          "How it works: each request has a transaction ID and only a matching DNS response counts. Timeouts reduce the reply total.\n\n" +
+          "Why: DNS speed depends on this device, Wi-Fi, ISP, route and current resolver load.\n\n" +
+          "Limits: this measures unencrypted UDP port 53, not privacy, filtering, encrypted DNS or cache quality. Fastest does not automatically mean best."
+      ) },
+      confirmButton = { TextButton(onClick = { showHelp = false }) { Text("Close") } },
     )
   }
 }

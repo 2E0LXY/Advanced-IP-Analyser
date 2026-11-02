@@ -1,4 +1,4 @@
-# Advanced IP Analyser 2.9.3 Instruction Book
+# Advanced IP Analyser 2.9.4 Instruction Book
 
 Windows 10/11 and Debian 13 edition
 
@@ -64,7 +64,7 @@ service, disconnect Wi-Fi clients, inject frames, or recover passwords.
 
 ### Install on Windows
 
-Download `Advanced-IP-Analyser-Setup-2.9.3.exe` from the project release page
+Download `Advanced-IP-Analyser-Setup-2.9.4.exe` from the project release page
 and run it. The per-user installer normally needs no administrator rights and
 offers Start-menu and desktop shortcuts. Windows supports network scanning,
 inventory, Wi-Fi adapter/nearby-network scanning, selected saved-profile key
@@ -74,12 +74,12 @@ visibly disabled because the project does not bundle a Windows capture driver.
 
 ### Install on Debian 13
 
-Download `advanced-ip-analyser_2.9.3_all.deb` from the project release page.
+Download `advanced-ip-analyser_2.9.4_all.deb` from the project release page.
 In a terminal:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.9.3_all.deb
+sudo apt install ./advanced-ip-analyser_2.9.4_all.deb
 ```
 
 Use `apt install ./file.deb`, not `dpkg -i`, because APT resolves dependencies.
@@ -203,6 +203,24 @@ geolocation. Process names, PIDs, local addresses and the full connection table
 are not sent to either service. Geolocation frequently identifies a provider or
 data centre rather than an end user, so the map is an investigation aid and not
 proof of malicious activity.
+
+### DNS Benchmark
+
+Open the **DNS Benchmark** tab to compare 36 public resolvers from the computer
+and network you are currently using. Enter a DNS name, choose one to five rounds,
+set the delay between rounds and the per-query timeout, then select **Start
+benchmark**. **Skip wait** starts the next round early; **Stop** retains completed
+samples; **Filter** narrows the table; and **Copy report** copies the full ranking.
+
+Each sample sends a real UDP A-record query directly to port 53 with a random
+transaction ID. Only a matching DNS response is accepted. Successful replies are
+ranked by average latency and jitter; timeouts reduce the reply count. The test
+does not use a web request, favicon fetch or ICMP ping.
+
+Results describe this device and route at this moment. They do not assess a
+resolver's privacy policy, filtering accuracy, encrypted DNS support, cache
+quality or security. A firewall may block third-party DNS. Select the `?` inside
+the tab for the same operating and interpretation guidance.
 
 ### AI settings and analysis
 

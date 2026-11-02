@@ -2,7 +2,7 @@
 
 Native Android companion for Advanced IP Analyser, built with Kotlin and Jetpack Compose.
 
-## Included in Android 1.2.1
+## Included in Android 1.2.3
 
 - modern dashboard matching the desktop application's dark network-tool interface;
 - current local IPv4 address, gateway, interface, Wi-Fi name and network prefix;
@@ -13,6 +13,8 @@ Native Android companion for Advanced IP Analyser, built with Kotlin and Jetpack
 - nearby Wi-Fi names, BSSIDs, channels, signal levels and advertised security review;
 - user-approved connection to a selected nearby Wi-Fi network;
 - ping/reachability, DNS, common-port and HTTP response diagnostics; and
+- real UDP latency benchmarking for 36 public DNS resolvers, with five-round
+  average, jitter, timeout and validated-reply results;
 - custom TCP ranges, traceroute, connection inspection, TLS certificate and email-security checks;
 - Wake-on-LAN, SSH command execution and SFTP directory inspection;
 - local TP-Link/Kasa discovery and power control;

@@ -14,14 +14,14 @@ Wireshark.
 
 ## Download
 
-[![Download Android APK](https://img.shields.io/badge/ANDROID-DOWNLOAD_APK_1.2.2-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.2/Advanced-IP-Analyser-Android-1.2.2.apk)
-[![Download Windows](https://img.shields.io/badge/WINDOWS-DOWNLOAD_2.9.3-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.3/Advanced-IP-Analyser-Setup-2.9.3.exe)
+[![Download Android APK](https://img.shields.io/badge/ANDROID-DOWNLOAD_APK_1.2.3-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.3/Advanced-IP-Analyser-Android-1.2.3.apk)
+[![Download Windows](https://img.shields.io/badge/WINDOWS-DOWNLOAD_2.9.4-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.4/Advanced-IP-Analyser-Setup-2.9.4.exe)
 
 | Platform | Current version | Download | Installation help |
 | --- | ---: | --- | --- |
-| **Android phone/tablet** | **1.2.2** | **[Download the signed APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.2/Advanced-IP-Analyser-Android-1.2.2.apk)** | **[Android installation instructions](docs/ANDROID-INSTALL.md)** |
-| Windows 10/11 | 2.9.3 | [Download the Windows installer](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.3/Advanced-IP-Analyser-Setup-2.9.3.exe) | Run the downloaded `.exe`; the installer closes and upgrades running copies |
-| Debian 13 | 2.9.3 | [Download the Debian package](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.3/advanced-ip-analyser_2.9.3_all.deb) | Install with `sudo apt install ./advanced-ip-analyser_2.9.3_all.deb` |
+| **Android phone/tablet** | **1.2.3** | **[Download the signed APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.3/Advanced-IP-Analyser-Android-1.2.3.apk)** | **[Android installation instructions](docs/ANDROID-INSTALL.md)** |
+| Windows 10/11 | 2.9.4 | [Download the Windows installer](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.4/Advanced-IP-Analyser-Setup-2.9.4.exe) | Run the downloaded `.exe`; the installer closes and upgrades running copies |
+| Debian 13 | 2.9.4 | [Download the Debian package](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.4/advanced-ip-analyser_2.9.4_all.deb) | Install with `sudo apt install ./advanced-ip-analyser_2.9.4_all.deb` |
 
 > **Looking for Android?** The signed Android APK is included on the main
 > **Latest** release page alongside Windows and Debian. Android also retains a
@@ -57,6 +57,7 @@ live progress, expandable service results, inventory exchange, and remote action
 | Display filters | IP/CIDR, TCP/UDP ports, DNS, HTTP, TLS, ICMP, ARP, TCP flags, lengths, comparisons, text/regex matching, boolean expressions, 20 quick filters, saved named filters |
 | Network Security Monitor | Up to 24-hour sessions across all observed ports and both directions, minute timeline, conversations, devices, DNS, TCP diagnostics, behavioural baselines, colour-coded findings, alerts, bookmarks, reports, retention, history |
 | Live connections | Windows/Debian inbound, outbound and listening endpoint table, owning process/PID, protocol and state, approximate public destination organisation/location, movable and zoomable OpenStreetMap view with clustered markers, filtering, CSV/JSON export and in-app `?` help |
+| DNS benchmark | Real UDP DNS A-record queries to 36 public resolver endpoints, one to five rounds, adjustable delay/timeout, average/jitter/reply ranking, filtering, partial stop and a copyable report |
 | Windows Wi-Fi Analyzer | Nearby SSIDs, signal quality, approximate dBm, security, active connection, adapter status, saved-profile inventory, selected-profile password reveal with confirmation, credential-free CSV export |
 | Passive Wi-Fi | Monitor-mode AP/client discovery, BSSID manufacturer, channel/signal/security/WPS review, beacons/data/probes, passive EAPOL observation, bounded history and comparison, PCAP/JSON/CSV/HTML reports |
 | Web Security Audit | Same-host bounded crawler, path exclusions, extra allowed hosts, custom headers, page/form/technology inventory, TLS fingerprint, security-header, cookie, cleartext, mixed-content, directory-listing, CORS, and password-form observations, HTML/JSON reports |
@@ -64,7 +65,7 @@ live progress, expandable service results, inventory exchange, and remote action
 | Updates | Automatic GitHub release check, flashing button, platform-specific asset selection, trusted release URL, SHA-256 verification, package/installer checks, close/install/restart workflow |
 | Debian packaging | Reproducible `.deb`, Lintian/AppStream/desktop validation, install/GUI/remove smoke test, release checksum, optional signed GitHub Pages APT feed |
 | Windows packaging | Self-contained x64 application, per-user Inno Setup installer, native launcher adaptations, smoke test, checksum, and GitHub build-provenance attestation |
-| Android companion | Native Kotlin/Compose dashboard, bounded LAN discovery, common-service checks, nearby Wi-Fi security review, ping/reachability, DNS, port and HTTP diagnostics |
+| Android companion | Native Kotlin/Compose dashboard, bounded LAN discovery, common-service checks, nearby Wi-Fi security review, real UDP DNS resolver benchmark, ping/reachability, DNS, port and HTTP diagnostics |
 
 Scan rows appear as each host finishes its bounded port checks. Hostnames, vendor names, and service fingerprints are added as discovery completes. The first vendor lookup downloads public IEEE MA-L/MA-M/MA-S assignment lists into the local cache; no device MAC address is sent to IEEE. A blank hostname or OS means the network did not provide enough evidence to identify it reliably.
 
@@ -85,7 +86,7 @@ packet-capture driver. See [Windows edition details](docs/WINDOWS.md).
 
 ## Android installation
 
-**[Download the current signed Android APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.2/Advanced-IP-Analyser-Android-1.2.2.apk)**
+**[Download the current signed Android APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.3/Advanced-IP-Analyser-Android-1.2.3.apk)**
 and open it on a phone or tablet running Android 8.0 or later. Android may ask
 you to allow installation from the browser or file manager used to open the APK.
 See the **[step-by-step Android installation guide](docs/ANDROID-INSTALL.md)** for
@@ -97,6 +98,20 @@ DNS, port, and HTTP diagnostics, plus a live DNS destination table and map. Andr
 saved Wi-Fi passwords, raw packet capture, and unrestricted background Wi-Fi
 scanning, so those desktop features are not presented as available on Android.
 See the [Android build guide](android/README.md).
+
+## DNS latency benchmark
+
+Open **DNS Benchmark** on Windows or Debian, or **DNS test** on Android. The
+benchmark sends real UDP A-record queries directly to 36 public resolvers and
+ranks validated replies by average latency, jitter and reply count. It does not
+use HTTPS, a favicon request or ICMP ping as a substitute for DNS timing.
+
+Desktop users can choose one to five rounds, the query name, inter-round delay
+and timeout, stop while keeping partial results, skip a wait, filter the table and
+copy a report. Android performs five rounds and shows each sample, average,
+jitter and validated reply count. The fastest result is not automatically the
+best resolver: privacy, filtering, encrypted DNS support and cache quality are
+outside this latency test.
 
 ## Live Connections and destination map
 
@@ -124,7 +139,7 @@ then run:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.9.3_all.deb
+sudo apt install ./advanced-ip-analyser_2.9.4_all.deb
 ```
 
 Launch it from the desktop application menu or run:

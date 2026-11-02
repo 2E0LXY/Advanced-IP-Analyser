@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uk.co.twoe0lxy.ipanalyser.data.HostResult
 import uk.co.twoe0lxy.ipanalyser.data.AdvancedNetworkTools
+import uk.co.twoe0lxy.ipanalyser.data.DnsBenchmark
+import uk.co.twoe0lxy.ipanalyser.data.DnsBenchmarkRow
 import uk.co.twoe0lxy.ipanalyser.data.NetworkInfo
 import uk.co.twoe0lxy.ipanalyser.data.NetworkScanner
 import uk.co.twoe0lxy.ipanalyser.data.SmartDevice
@@ -36,6 +38,9 @@ data class MainScreenUiState(
   val peerListening: Boolean = false,
   val favorites: Set<String> = emptySet(),
   val savedScans: Int = 0,
+  val dnsBenchmark: List<DnsBenchmarkRow> = emptyList(),
+  val dnsBenchmarkRound: Int = 0,
+  val dnsBenchmarkRunning: Boolean = false,
 )
 
 class MainScreenViewModel(application: Application) : AndroidViewModel(application) {
@@ -43,6 +48,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
   private val advanced = AdvancedNetworkTools(application)
   private val pairing = PeerPairing(application)
   private val inventory = InventoryStore(application)
+  private val dnsBenchmark = DnsBenchmark()
   private val mutableState = MutableStateFlow(MainScreenUiState(
     network = scanner.networkInfo(),
     pairedDesktop = pairing.load()?.desktopAddress.orEmpty(),
@@ -51,6 +57,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
   ))
   val uiState: StateFlow<MainScreenUiState> = mutableState.asStateFlow()
   private var scanJob: Job? = null
+  private var dnsBenchmarkJob: Job? = null
 
   fun refreshNetwork() {
     mutableState.update { it.copy(network = scanner.networkInfo()) }
@@ -218,7 +225,37 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
     }
   }
 
+  fun toggleDnsBenchmark() {
+    if (mutableState.value.dnsBenchmarkRunning) {
+      dnsBenchmarkJob?.cancel()
+      return
+    }
+    dnsBenchmarkJob = viewModelScope.launch {
+      mutableState.update {
+        it.copy(dnsBenchmark = emptyList(), dnsBenchmarkRound = 0,
+          dnsBenchmarkRunning = true, status = "Benchmarking 36 DNS resolvers…")
+      }
+      try {
+        val results = dnsBenchmark.run(rounds = 5) { round, rows ->
+          mutableState.update { it.copy(dnsBenchmark = rows, dnsBenchmarkRound = round) }
+        }
+        mutableState.update {
+          it.copy(dnsBenchmark = results, dnsBenchmarkRunning = false,
+            status = "DNS benchmark complete · ${results.count { row -> row.averageMs != null }} resolvers replied")
+        }
+        record("DNS benchmark · 5 rounds")
+      } catch (_: CancellationException) {
+        mutableState.update { it.copy(dnsBenchmarkRunning = false, status = "DNS benchmark stopped") }
+      } catch (error: Exception) {
+        mutableState.update {
+          it.copy(dnsBenchmarkRunning = false, status = error.message ?: "DNS benchmark failed")
+        }
+      }
+    }
+  }
+
   override fun onCleared() {
+    dnsBenchmarkJob?.cancel()
     pairing.stopBridge()
     super.onCleared()
   }

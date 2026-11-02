@@ -22,6 +22,8 @@ This also covers processes that remain active after the visible window closes.
 - API keys stored through Windows Credential Manager;
 - live inbound, outbound and listening connection inventory with process/PID,
   filtering, export and a movable/zoomable public-destination map;
+- real UDP DNS resolver benchmarking with adjustable rounds, delay and timeout,
+  average/jitter/reply ranking, partial stop and a copyable report;
 - bounded PCAP, PCAPNG, and compressed capture-file analysis and display filters;
 - platform-specific verified update download, silent replacement, and relaunch.
 

@@ -38,6 +38,7 @@ from .ai_settings import (
 from .config import parse_ports
 from .connections_gui import ConnectionMonitorView
 from .dashboard import DashboardView
+from .dns_benchmark_gui import DNSBenchmarkView
 from .diagnostics import run_diagnostic
 from .models import Host
 from .network import (
@@ -372,18 +373,21 @@ class Application(tk.Tk):
         self.dashboard_page = ttk.Frame(self.notebook)
         self.scan_page = ttk.Frame(self.notebook)
         self.smart_home_page = ttk.Frame(self.notebook)
+        self.dns_benchmark_page = ttk.Frame(self.notebook)
         self.connections_page = ttk.Frame(self.notebook)
         self.diagnostic_page = ttk.Frame(self.notebook)
         self.favorites_page = ttk.Frame(self.notebook)
         self.notebook.add(self.dashboard_page, text="Dashboard")
         self.notebook.add(self.scan_page, text="Network scan")
         self.notebook.add(self.smart_home_page, text="Smart home")
+        self.notebook.add(self.dns_benchmark_page, text="DNS benchmark")
         self.notebook.add(self.connections_page, text="Live connections")
         self.notebook.add(self.diagnostic_page, text="Diagnostics")
         self.notebook.add(self.favorites_page, text="Favorites")
         self._nav_buttons = {}
         for label, page in (("⌂  Dashboard", self.dashboard_page), ("⌕  Network Scan", self.scan_page),
                             ("⌁  Smart Home", self.smart_home_page),
+                            ("◉  DNS Benchmark", self.dns_benchmark_page),
                             ("⇄  Connections", self.connections_page),
                             ("⚙  Diagnostics", self.diagnostic_page),
                             ("★  Favorites", self.favorites_page)):
@@ -592,6 +596,7 @@ class Application(tk.Tk):
         self._refresh_favorites_table()
         self._build_dashboard()
         self._build_smart_home()
+        self._build_dns_benchmark()
         self._build_connections()
         self._build_diagnostics()
 
@@ -684,6 +689,10 @@ class Application(tk.Tk):
     def _build_smart_home(self) -> None:
         self.smart_home = SmartHomeView(self.smart_home_page)
         self.smart_home.pack(fill="both", expand=True)
+
+    def _build_dns_benchmark(self) -> None:
+        self.dns_benchmark = DNSBenchmarkView(self.dns_benchmark_page)
+        self.dns_benchmark.pack(fill="both", expand=True)
 
     def _build_connections(self) -> None:
         self.connection_monitor = ConnectionMonitorView(self.connections_page)
@@ -1357,6 +1366,10 @@ class Application(tk.Tk):
         add_tab("Windows Wi-Fi Analyzer",
                 "Wi-Fi in the sidebar opens a read-only Windows analyzer showing adapters, the current connection, nearby network names, signal quality, approximate dBm, security, and saved-profile status. Nearby results can be exported to CSV without credentials.\n\n"
                 "The Saved profiles tab lists profiles already stored by Windows. Passwords remain masked until one profile is selected and its Reveal action is confirmed. A revealed password stays only in application memory, is excluded from exports, and can be hidden immediately. Copy clears the matching clipboard value after 30 seconds. Windows controls whether the signed-in account may retrieve a clear-text key and may require administrator permission.")
+        add_tab("DNS Benchmark",
+                "DNS Benchmark sends real UDP A-record queries to each listed public resolver and ranks successful replies by average latency, then jitter. It does not substitute HTTPS, ping, or a favicon request for a DNS measurement.\n\n"
+                "Choose the test name, one to five rounds, the delay between rounds, and the timeout, then select Start benchmark. Stop keeps partial results; Skip wait begins the next round early; Filter narrows the table; Copy report copies the complete ranking. Double-click a resolver to copy its address.\n\n"
+                "Each request uses a random transaction ID and only a matching DNS response is accepted. Eight bounded worker queries run concurrently. Jitter is the population standard deviation of successful samples, while a timeout reduces the reply count. This tests unencrypted UDP port 53 from this computer only; it does not assess privacy policy, filtering correctness, encrypted DNS, cache quality, or security. A firewall may block third-party DNS.")
         add_tab("Live Connections map",
                 "Diagnostics → Live Connections inventories current inbound, outbound, and listening TCP/UDP endpoints, with the owning application and PID where the operating system permits it. Start monitoring to refresh the table every two seconds and locate new public remote endpoints.\n\n"
                 "The destination map uses OpenStreetMap. Blue markers are outbound, orange markers are inbound, and numbered markers cluster nearby endpoints. Drag with the left mouse button to move the map; use the wheel or + and − controls to zoom; select Fit destinations to bring every current marker into view. Filtering the table also filters the map. The ? beside the map title repeats the complete help at the point of use.\n\n"

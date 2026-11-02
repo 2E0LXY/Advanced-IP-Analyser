@@ -1,3 +1,12 @@
+advanced-ip-analyser (2.9.4) stable; urgency=medium
+
+  * Add real UDP DNS latency benchmarking for 36 public resolvers.
+  * Rank validated replies by average latency, jitter and reliability.
+  * Add bounded rounds, timeout, inter-round delay, stop, skip and report tools.
+  * Add matching Android DNS benchmark results and in-app help.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Mon, 02 Nov 2026 23:30:00 +0000
+
 advanced-ip-analyser (2.9.3) stable; urgency=medium
 
   * Replace the endpoint coordinate grid with an interactive OpenStreetMap.
