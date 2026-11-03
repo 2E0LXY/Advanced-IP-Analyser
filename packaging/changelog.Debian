@@ -1,3 +1,13 @@
+advanced-ip-analyser (2.9.5) stable; urgency=medium
+
+  * Organise desktop features into clearer tabs and remove duplicate actions.
+  * Add disk-usage analysis, live system monitoring and Windows settings shortcuts.
+  * Rank DNS benchmark results using latency, reliability and jitter.
+  * Add a direct Windows DNS settings button after benchmarking.
+  * Add Android storage reporting and streamline its dashboard layout.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Tue, 03 Nov 2026 19:30:00 +0000
+
 advanced-ip-analyser (2.9.4) stable; urgency=medium
 
   * Add real UDP DNS latency benchmarking for 36 public resolvers.
