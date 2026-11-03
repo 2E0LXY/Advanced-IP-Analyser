@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+import os
 import queue
 import threading
 import tkinter as tk
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tkinter import messagebox, ttk
 
-from .dns_benchmark import (DNS_RESOLVERS, DNSBenchmarkResult, DNSResolver,
-                            probe_resolver, result_sort_key, validate_query_name)
+from .dns_benchmark import (
+    DNS_RESOLVERS,
+    DNSBenchmarkResult,
+    probe_resolver,
+    result_sort_key,
+    validate_query_name,
+)
+from .windows_settings import open_windows_dns_settings
 
 
 class DNSBenchmarkView(ttk.Frame):
@@ -39,6 +46,12 @@ class DNSBenchmarkView(ttk.Frame):
         ttk.Button(header, text="?", width=3, command=self._show_help).pack(side="right", padx=(8, 0))
         self.copy_button = ttk.Button(header, text="Copy report", command=self.copy_report)
         self.copy_button.pack(side="right", padx=(8, 0))
+        self.dns_settings_button = ttk.Button(
+            header, text="Windows DNS settings", command=self._open_dns_settings,
+            state="disabled",
+        )
+        if os.name == "nt":
+            self.dns_settings_button.pack(side="right", padx=(8, 0))
         self.stop_button = ttk.Button(header, text="Stop", command=self.stop, state="disabled",
                                       style="Danger.TButton")
         self.stop_button.pack(side="right", padx=(8, 0))
@@ -108,7 +121,7 @@ class DNSBenchmarkView(ttk.Frame):
             self.table.tag_configure(tag, foreground=colour)
 
         ttk.Label(self,
-                  text="Lower is faster. Jitter is population standard deviation across successful rounds; timeouts reduce reply count.",
+                  text="Ranking uses the displayed average first, then lower jitter for equal averages. Timeouts reduce reply count.",
                   foreground="#90abc4", padding=(12, 0, 12, 10)).pack(fill="x")
 
     def start(self) -> None:
@@ -133,6 +146,7 @@ class DNSBenchmarkView(ttk.Frame):
         self.total_probes = rounds * len(DNS_RESOLVERS)
         self.progress.configure(value=0)
         self.start_button.configure(state="disabled")
+        self.dns_settings_button.configure(state="disabled")
         self.stop_button.configure(state="normal")
         self.skip_button.configure(state="disabled")
         self.query_entry.configure(state="disabled")
@@ -165,10 +179,7 @@ class DNSBenchmarkView(ttk.Frame):
                                for index, resolver in enumerate(DNS_RESOLVERS)}
                     for future in as_completed(futures):
                         index = futures[future]
-                        try:
-                            latency, rcode = future.result()
-                        except Exception:
-                            latency, rcode = None, None
+                        latency, rcode = future.result()
                         self.events.put(("result", (round_index, index, latency, rcode)))
                 if self.stop_event.is_set() or round_index + 1 >= rounds:
                     break
@@ -181,7 +192,7 @@ class DNSBenchmarkView(ttk.Frame):
                 self.events.put(("waiting", False))
             self.events.put(("complete", "Benchmark stopped — partial results retained" if self.stop_event.is_set()
                              else "Benchmark complete — ranked fastest to slowest"))
-        except Exception as error:
+        except (OSError, RuntimeError, ValueError) as error:
             self.events.put(("error", str(error)))
 
     def _drain_events(self) -> None:
@@ -221,15 +232,25 @@ class DNSBenchmarkView(ttk.Frame):
         self.rounds.configure(state="normal")
         self.delay.configure(state="normal")
         self.timeout.configure(state="normal")
+        has_reply = any(result.average is not None for result in self.results)
+        if os.name == "nt":
+            self.dns_settings_button.configure(state="normal" if has_reply else "disabled")
         self._render()
+
+    def _open_dns_settings(self) -> None:
+        try:
+            open_windows_dns_settings()
+            self.status.configure(text="Opened Windows network settings · select Edit beside DNS server assignment")
+        except (OSError, RuntimeError) as error:
+            messagebox.showerror("Cannot open Windows DNS settings", str(error), parent=self)
 
     def _filtered_results(self) -> list[DNSBenchmarkResult]:
         needle = self.filter_text.get().strip().casefold()
         ordered = sorted(self.results, key=result_sort_key)
         if not needle:
             return ordered
-        return [result for result in ordered if needle in " ".join((
-            result.resolver.name, result.resolver.address, result.resolver.category)).casefold()]
+        return [result for result in ordered if needle in
+                f"{result.resolver.name} {result.resolver.address} {result.resolver.category}".casefold()]
 
     def _render(self) -> None:
         self.table.delete(*self.table.get_children())
@@ -277,7 +298,7 @@ class DNSBenchmarkView(ttk.Frame):
             "WHAT IT DOES\n"
             "Sends real UDP DNS A-record queries directly to each listed resolver and ranks successful replies by average latency, then jitter.\n\n"
             "HOW TO USE IT\n"
-            "Choose a query name, 1–5 rounds, the delay between rounds and a timeout. Select Start benchmark. Stop retains partial results; Skip wait starts the next round early. Filter narrows the table and double-clicking a row copies its IP.\n\n"
+            "Choose a query name, 1–5 rounds, the delay between rounds and a timeout. Select Start benchmark. Stop retains partial results; Skip wait starts the next round early. Filter narrows the table and double-clicking a row copies its IP. After a successful Windows test, Windows DNS settings opens the active Ethernet or Wi-Fi page; select Edit beside DNS server assignment.\n\n"
             "HOW IT WORKS\n"
             "Every query has a random transaction ID. Replies must match that ID and be marked as DNS responses. Up to eight resolvers are tested concurrently so an unreachable server cannot stall the complete list. Jitter is the population standard deviation of successful samples.\n\n"
             "WHY IT DOES IT\n"

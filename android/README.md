@@ -15,6 +15,7 @@ Native Android companion for Advanced IP Analyser, built with Kotlin and Jetpack
 - ping/reachability, DNS, common-port and HTTP response diagnostics; and
 - real UDP latency benchmarking for 36 public DNS resolvers, with five-round
   average, jitter, timeout and validated-reply results;
+- device storage used and free-space reporting on the dashboard;
 - custom TCP ranges, traceroute, connection inspection, TLS certificate and email-security checks;
 - Wake-on-LAN, SSH command execution and SFTP directory inspection;
 - local TP-Link/Kasa discovery and power control;

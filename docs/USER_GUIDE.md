@@ -1,4 +1,4 @@
-# Advanced IP Analyser 2.9.4 Instruction Book
+# Advanced IP Analyser 2.9.3 Instruction Book
 
 Windows 10/11 and Debian 13 edition
 
@@ -64,7 +64,7 @@ service, disconnect Wi-Fi clients, inject frames, or recover passwords.
 
 ### Install on Windows
 
-Download `Advanced-IP-Analyser-Setup-2.9.4.exe` from the project release page
+Download `Advanced-IP-Analyser-Setup-2.9.3.exe` from the project release page
 and run it. The per-user installer normally needs no administrator rights and
 offers Start-menu and desktop shortcuts. Windows supports network scanning,
 inventory, Wi-Fi adapter/nearby-network scanning, selected saved-profile key
@@ -74,12 +74,12 @@ visibly disabled because the project does not bundle a Windows capture driver.
 
 ### Install on Debian 13
 
-Download `advanced-ip-analyser_2.9.4_all.deb` from the project release page.
+Download `advanced-ip-analyser_2.9.3_all.deb` from the project release page.
 In a terminal:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.9.4_all.deb
+sudo apt install ./advanced-ip-analyser_2.9.3_all.deb
 ```
 
 Use `apt install ./file.deb`, not `dpkg -i`, because APT resolves dependencies.
@@ -170,13 +170,29 @@ The Network Scan page is arranged from setup to action:
 - **Action row:** copy, favorites, Wake-on-LAN, Ping, Trace, and packet tools.
 - **Remote administration:** Shutdown, Reboot, and Abort shutdown.
 - **Scan results/Favorites:** inventory tables.
-- **Sidebar:** Dashboard, Network Scan, Diagnostics, Favorites, packet and security tools, Settings, and Help.
+- **Main tabs:** Dashboard, Network Scan, Smart Home, System, Disk Usage, DNS Benchmark, Connections, Diagnostics, Favorites, and Tools. Settings and Help remain available in the header.
 - **Footer:** status, centered green progress, version, and Update.
-- **Top toolbar:** a yellow Install button replaces Scan Network when an update is available.
+- **Header:** application identity and status on the left, with Settings and Help on the right. Available updates appear in the footer without replacing a feature control.
+
+### System Monitor
+
+Open **System** for local CPU, memory, storage and network history plus the
+processes contributing most strongly to current load. Missing measurements stay
+visibly unavailable instead of being presented as zero. **Pause** freezes the
+view and **Export flight recorder** saves the bounded local history as JSON.
+The page cannot terminate processes or change their priority.
+
+### Disk Usage
+
+Open **Disk Usage**, select a folder and choose **Analyze**. The bounded,
+read-only scan shows the largest folders and files with a proportional size map.
+Use the filter to narrow the file list, **Cancel** to stop after the current file,
+and **Export CSV** to save the results. Symbolic links are not followed and the
+feature never deletes, moves, compresses or modifies files.
 
 ### Live Connections and destination map
 
-Open **Diagnostics → Live Connections** and select **Start monitoring**. The
+Open **Connections** and select **Start monitoring**. The
 table refreshes every two seconds and inventories inbound, outbound and
 listening TCP/UDP endpoints. It shows the owning application and PID when the
 operating system makes them available, together with protocol, local and remote
@@ -206,21 +222,30 @@ proof of malicious activity.
 
 ### DNS Benchmark
 
-Open the **DNS Benchmark** tab to compare 36 public resolvers from the computer
-and network you are currently using. Enter a DNS name, choose one to five rounds,
+Open the **DNS Benchmark** tab to compare public resolvers from the computer and
+network you are currently using. Enter a DNS name, choose one to five rounds,
 set the delay between rounds and the per-query timeout, then select **Start
-benchmark**. **Skip wait** starts the next round early; **Stop** retains completed
-samples; **Filter** narrows the table; and **Copy report** copies the full ranking.
+benchmark**. **Skip wait** starts the next round early; **Stop** retains the
+completed samples; **Filter** narrows the table; and **Copy report** copies the
+full ranking. Double-click a row to copy that resolver address.
 
-Each sample sends a real UDP A-record query directly to port 53 with a random
-transaction ID. Only a matching DNS response is accepted. Successful replies are
-ranked by average latency and jitter; timeouts reduce the reply count. The test
-does not use a web request, favicon fetch or ICMP ping.
+After at least one resolver replies on Windows, **Windows DNS settings** becomes
+available. It opens the supported Ethernet or Wi-Fi Settings page for the active
+adapter type. Select **Edit** beside **DNS server assignment** to enter the chosen
+preferred and alternative resolver addresses. The analyser never changes DNS
+configuration itself.
 
-Results describe this device and route at this moment. They do not assess a
-resolver's privacy policy, filtering accuracy, encrypted DNS support, cache
-quality or security. A firewall may block third-party DNS. Select the `?` inside
-the tab for the same operating and interpretation guidance.
+This is a real DNS test: each sample sends a UDP A-record query directly to port
+53 with a random transaction ID, and only a matching DNS response is accepted.
+The table ranks successful replies by average latency and then jitter, and shows
+timeouts in the reply count. It does not measure a web request, favicon fetch or
+ICMP ping.
+
+Results describe this device and route at this moment. The test does not assess
+a resolver's privacy policy, filtering accuracy, encrypted DNS support, cache
+quality or security, and a firewall may block third-party DNS. The fastest result
+is therefore useful evidence, not an automatic recommendation. Select the `?`
+inside the tab for the same operating and interpretation guidance.
 
 ### AI settings and analysis
 
@@ -529,7 +554,7 @@ encrypted application content remains encrypted.
 
 ## 13. Windows Wi-Fi Analyzer
 
-On Windows 10 or 11, select **Wi-Fi** in the sidebar. The Nearby networks tab
+On Windows 10 or 11, select **Tools → Wi-Fi Analyzer**. The Nearby networks tab
 shows SSID, signal percentage, approximate dBm, security, saved-profile status,
 connection state, and adapter. The Adapters tab reports Windows WLAN interface
 state. Refresh is read-only, and CSV export excludes credentials.

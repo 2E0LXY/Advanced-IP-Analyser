@@ -38,7 +38,9 @@ from .ai_settings import (
 from .config import parse_ports
 from .connections_gui import ConnectionMonitorView
 from .dashboard import DashboardView
+from .disk_usage import DiskUsageView
 from .dns_benchmark_gui import DNSBenchmarkView
+from .system_monitor import SystemMonitorView
 from .diagnostics import run_diagnostic
 from .models import Host
 from .network import (
@@ -333,92 +335,67 @@ class Application(tk.Tk):
         style.map("Treeview", background=[("selected", "#246398")], foreground=[("selected", "#ffffff")])
         style.configure("Dark.TNotebook", background="#0d1b29", borderwidth=0, tabmargins=0,
                         bordercolor="#0d1b29", lightcolor="#0d1b29", darkcolor="#0d1b29")
-        style.layout("Dark.TNotebook.Tab", [])
+        style.layout("Dark.TNotebook.Tab", style.layout("TNotebook.Tab"))
+        style.configure("Dark.TNotebook.Tab", background="#14283b", foreground="#b9cde0",
+                        padding=(11, 8), font=("Segoe UI", 9, "bold"), borderwidth=0)
+        style.map("Dark.TNotebook.Tab",
+                  background=[("selected", "#1d5d8f"), ("active", "#244764")],
+                  foreground=[("selected", "#ffffff"), ("active", "#ffffff")])
+        style.configure("Tools.TNotebook", background="#0d1b29", borderwidth=0, tabmargins=(0, 8, 0, 0))
+        style.configure("Tools.TNotebook.Tab", background="#152b3e", foreground="#a9bfd4",
+                        padding=(16, 9), font=("Segoe UI", 9, "bold"))
+        style.map("Tools.TNotebook.Tab",
+                  background=[("selected", "#254f70"), ("active", "#203f58")],
+                  foreground=[("selected", "#ffffff"), ("active", "#ffffff")])
 
     def _build(self) -> None:
         shell = ttk.Frame(self)
         shell.pack(fill="both", expand=True)
-        sidebar = tk.Frame(shell, bg="#132334", width=190)
-        sidebar.pack(side="left", fill="y")
-        sidebar.pack_propagate(False)
-        brand = tk.Frame(sidebar, bg="#132334")
-        brand.pack(fill="x", padx=12, pady=(18, 25))
-        if self.app_icon is not None:
-            self.brand_icon = self.app_icon.subsample(7, 7)
-            tk.Label(brand, image=self.brand_icon, bg="#132334").pack(side="left", padx=(0, 8))
-        name = tk.Frame(brand, bg="#132334")
-        name.pack(side="left")
-        tk.Label(name, text="Advanced IP", bg="#132334", fg="#f2f7ff",
-                 font=("Segoe UI", 12, "bold"), anchor="w").pack(anchor="w")
-        tk.Label(name, text="Analyser", bg="#132334", fg="#77a9d5",
-                 font=("Segoe UI", 9), anchor="w").pack(anchor="w")
         content = ttk.Frame(shell)
-        content.pack(side="left", fill="both", expand=True)
+        content.pack(fill="both", expand=True)
         top = tk.Frame(content, bg="#102132", padx=19, pady=10)
         top.pack(fill="x")
-        tk.Label(top, text="Advanced IP Analyser", bg="#102132", fg="#eff6ff",
-                 font=("Segoe UI", 13, "bold")).pack(side="left")
-        tk.Label(top, text=f"v{__version__}", bg="#102132", fg="#93aac1",
-                 font=("Segoe UI", 9)).pack(side="left", padx=(10, 0))
-        self.header_update_button = tk.Button(
-            top, text="Scan Network", command=self.start_scan, relief="flat", bd=0,
-            bg="#1688e7", fg="#ffffff", activebackground="#369cf0",
-            activeforeground="#ffffff", font=("Segoe UI", 9, "bold"),
-            padx=13, pady=7)
-        self.header_update_button.pack(side="right")
+        brand = tk.Frame(top, bg="#102132")
+        brand.pack(side="left")
+        if self.app_icon is not None:
+            self.brand_icon = self.app_icon.subsample(7, 7)
+            tk.Label(brand, image=self.brand_icon, bg="#102132").pack(side="left", padx=(0, 9))
+        name = tk.Frame(brand, bg="#132334")
+        name.pack(side="left")
+        name.configure(bg="#102132")
+        tk.Label(name, text="Advanced IP Analyser", bg="#102132", fg="#f2f7ff",
+                 font=("Segoe UI", 13, "bold"), anchor="w").pack(anchor="w")
+        tk.Label(name, text=f"Network toolkit · v{__version__}", bg="#102132", fg="#77a9d5",
+                 font=("Segoe UI", 8), anchor="w").pack(anchor="w")
+        for label, command in (("Help", self.show_help), ("Settings", self.show_ai_settings)):
+            tk.Button(top, text=label, command=command, relief="flat", bd=0,
+                      bg="#1a3146", fg="#c6d8ea", activebackground="#254b71",
+                      activeforeground="#ffffff", font=("Segoe UI", 9),
+                      padx=12, pady=7).pack(side="right", padx=(8, 0))
         tk.Label(top, text="●  Ready", bg="#102132", fg="#55d992",
-                 font=("Segoe UI", 9)).pack(side="right", padx=18)
+                 font=("Segoe UI", 9)).pack(side="right", padx=(0, 12))
         self.notebook = ttk.Notebook(content, style="Dark.TNotebook")
-        self.notebook.pack(fill="both", expand=True, padx=16)
+        self.notebook.pack(fill="both", expand=True, padx=16, pady=(8, 0))
         self.dashboard_page = ttk.Frame(self.notebook)
         self.scan_page = ttk.Frame(self.notebook)
         self.smart_home_page = ttk.Frame(self.notebook)
+        self.system_monitor_page = ttk.Frame(self.notebook)
+        self.disk_usage_page = ttk.Frame(self.notebook)
         self.dns_benchmark_page = ttk.Frame(self.notebook)
         self.connections_page = ttk.Frame(self.notebook)
         self.diagnostic_page = ttk.Frame(self.notebook)
         self.favorites_page = ttk.Frame(self.notebook)
+        self.tools_page = ttk.Frame(self.notebook)
         self.notebook.add(self.dashboard_page, text="Dashboard")
-        self.notebook.add(self.scan_page, text="Network scan")
-        self.notebook.add(self.smart_home_page, text="Smart home")
-        self.notebook.add(self.dns_benchmark_page, text="DNS benchmark")
-        self.notebook.add(self.connections_page, text="Live connections")
+        self.notebook.add(self.scan_page, text="Network Scan")
+        self.notebook.add(self.smart_home_page, text="Smart Home")
+        self.notebook.add(self.system_monitor_page, text="System")
+        self.notebook.add(self.disk_usage_page, text="Disk Usage")
+        self.notebook.add(self.dns_benchmark_page, text="DNS Benchmark")
+        self.notebook.add(self.connections_page, text="Connections")
         self.notebook.add(self.diagnostic_page, text="Diagnostics")
         self.notebook.add(self.favorites_page, text="Favorites")
-        self._nav_buttons = {}
-        for label, page in (("⌂  Dashboard", self.dashboard_page), ("⌕  Network Scan", self.scan_page),
-                            ("⌁  Smart Home", self.smart_home_page),
-                            ("◉  DNS Benchmark", self.dns_benchmark_page),
-                            ("⇄  Connections", self.connections_page),
-                            ("⚙  Diagnostics", self.diagnostic_page),
-                            ("★  Favorites", self.favorites_page)):
-            button = tk.Button(sidebar, text=label, anchor="w", relief="flat", bd=0,
-                               bg="#132334", fg="#c6d8ea", activebackground="#254b71",
-                               activeforeground="#ffffff", font=("Segoe UI", 10), padx=15, pady=11,
-                               command=lambda selected=page: self._navigate(selected))
-            button.pack(fill="x", padx=8, pady=2)
-            self._nav_buttons[str(page)] = button
-        tk.Frame(sidebar, height=1, bg="#294159").pack(fill="x", padx=16, pady=14)
-        for label, action in (("⌁  Ping", lambda: self._run_diagnostic("ping")),
-                              ("↗  Traceroute", lambda: self._run_diagnostic("trace")),
-                              ("▦  Port Scan", self._open_port_scan),
-                              ("⌁  Wi-Fi", self.open_wifi_tools),
-                              ("◫  Packets", self.open_packet_capture),
-                              ("⬡  Security", self.open_web_audit),
-                              ("◎  Local AI Control", self.show_local_ai_control)):
-            tk.Button(sidebar, text=label, anchor="w", relief="flat", bd=0, bg="#132334",
-                      fg="#a9bfd4", activebackground="#254b71", activeforeground="#ffffff",
-                      font=("Segoe UI", 9), padx=15, pady=10,
-                      command=action).pack(fill="x", padx=8, pady=1)
-        sidebar_bottom = tk.Frame(sidebar, bg="#132334")
-        sidebar_bottom.pack(side="bottom", fill="x", padx=8, pady=(0, 13))
-        for label, command in (("⚙  Settings", self.show_ai_settings),
-                               ("ⓘ  Help", self.show_help)):
-            tk.Button(sidebar_bottom, text=label, command=command, anchor="w", relief="flat",
-                      bd=0, bg="#132334", fg="#a9bfd4", activebackground="#254b71",
-                      activeforeground="#ffffff", font=("Segoe UI", 9), padx=15,
-                      pady=7).pack(fill="x")
-        tk.Label(sidebar_bottom, text=f"Version {__version__}", bg="#132334", fg="#6f8ca6",
-                 font=("Segoe UI", 8)).pack(anchor="w", padx=15, pady=(8, 0))
+        self.notebook.add(self.tools_page, text="Tools")
         self._navigate(self.dashboard_page)
 
         header = ttk.Frame(self.scan_page, padding=12)
@@ -596,9 +573,12 @@ class Application(tk.Tk):
         self._refresh_favorites_table()
         self._build_dashboard()
         self._build_smart_home()
+        self._build_system_monitor()
+        self._build_disk_usage()
         self._build_dns_benchmark()
         self._build_connections()
         self._build_diagnostics()
+        self._build_tools()
 
         self.links = ttk.Frame(self.scan_page, padding=(12, 8, 12, 0))
         self.links.pack(fill="x")
@@ -635,17 +615,13 @@ class Application(tk.Tk):
         # Reserve the status strip before the large notebook requests space.
         self.notebook.pack_forget()
         footer.pack(side="bottom", fill="x")
-        self.notebook.pack(fill="both", expand=True, padx=16)
+        self.notebook.pack(fill="both", expand=True, padx=16, pady=(8, 0))
         self.refresh_subnets(show_errors=False)
         self._refresh_dashboard()
         self.after(1500, self.check_updates)
 
     def _navigate(self, page: ttk.Frame) -> None:
         self.notebook.select(page)
-        for name, button in self._nav_buttons.items():
-            active = name == str(page)
-            button.configure(bg="#224c74" if active else "#132334",
-                             fg="#ffffff" if active else "#c6d8ea")
 
     def _build_dashboard(self) -> None:
         holder = tk.Frame(self.dashboard_page, bg="#0d1b29")
@@ -657,10 +633,6 @@ class Application(tk.Tk):
         canvas.pack(side="left", fill="both", expand=True)
         self.dashboard = DashboardView(
             canvas,
-            scan=self.start_scan,
-            ping=lambda: self._run_diagnostic("ping"),
-            trace=lambda: self._run_diagnostic("trace"),
-            port_scan=self._open_port_scan,
             favorites=self.show_favorites,
             interface=self._capture_interface_hint,
         )
@@ -690,6 +662,14 @@ class Application(tk.Tk):
         self.smart_home = SmartHomeView(self.smart_home_page)
         self.smart_home.pack(fill="both", expand=True)
 
+    def _build_system_monitor(self) -> None:
+        self.system_monitor = SystemMonitorView(self.system_monitor_page)
+        self.system_monitor.pack(fill="both", expand=True, padx=6)
+
+    def _build_disk_usage(self) -> None:
+        self.disk_usage = DiskUsageView(self.disk_usage_page)
+        self.disk_usage.pack(fill="both", expand=True, padx=6)
+
     def _build_dns_benchmark(self) -> None:
         self.dns_benchmark = DNSBenchmarkView(self.dns_benchmark_page)
         self.dns_benchmark.pack(fill="both", expand=True)
@@ -697,6 +677,40 @@ class Application(tk.Tk):
     def _build_connections(self) -> None:
         self.connection_monitor = ConnectionMonitorView(self.connections_page)
         self.connection_monitor.pack(fill="both", expand=True)
+
+    def _build_tools(self) -> None:
+        page = self.tools_page
+        heading = ttk.Frame(page, padding=(18, 18, 18, 8))
+        heading.pack(fill="x")
+        ttk.Label(heading, text="Specialist tools", font=("Segoe UI", 22, "bold")).pack(anchor="w")
+        ttk.Label(heading, text="Choose a category, then open its dedicated workspace.",
+                  foreground="#90abc4", font=("Segoe UI", 10)).pack(anchor="w", pady=(3, 0))
+        tools = ttk.Notebook(page, style="Tools.TNotebook")
+        tools.pack(fill="both", expand=True, padx=18, pady=(0, 18))
+        entries = (
+            ("Wi-Fi Analyzer", "Inspect Windows Wi-Fi adapters, nearby networks and saved profiles.",
+             "Open Wi-Fi Analyzer", self.open_wifi_tools),
+            ("Packet Analysis", "Open a capture file for filtering, inspection and defensive analysis.",
+             "Open Packet Analysis", self.open_packet_capture),
+            ("Web Security", "Run a focused, read-only audit against a web address you control.",
+             "Open Web Security Audit", self.open_web_audit),
+            ("Local AI", "Configure local monitoring and review bounded network evidence.",
+             "Open Local AI Control", self.show_local_ai_control),
+        )
+        for tab_name, description, action_label, command in entries:
+            tab = ttk.Frame(tools, padding=26)
+            tools.add(tab, text=tab_name)
+            card = tk.Frame(tab, bg="#152535", highlightbackground="#294155", highlightthickness=1,
+                            padx=30, pady=28)
+            card.pack(fill="x", pady=10)
+            tk.Label(card, text=tab_name, bg="#152535", fg="#eef6ff",
+                     font=("Segoe UI", 18, "bold")).pack(anchor="w")
+            tk.Label(card, text=description, bg="#152535", fg="#9fb4ca",
+                     font=("Segoe UI", 10), wraplength=680, justify="left").pack(anchor="w", pady=(8, 22))
+            tk.Button(card, text=action_label, command=command, relief="flat", bd=0,
+                      bg="#1688e7", fg="#ffffff", activebackground="#329cf0",
+                      activeforeground="#ffffff", font=("Segoe UI", 10, "bold"),
+                      padx=18, pady=10).pack(anchor="w")
 
     def _open_port_scan(self) -> None:
         self._navigate(self.scan_page)
@@ -1364,8 +1378,14 @@ class Application(tk.Tk):
                 "The adapter must support monitor mode. A temporary virtual monitor interface is created through PolicyKit and removed when the watch stops, leaving the normal interface unchanged where the driver supports concurrent interfaces. "
                 "The feature is passive: it does not send deauthentication frames, inject traffic, disconnect clients, or attempt password recovery.")
         add_tab("Windows Wi-Fi Analyzer",
-                "Wi-Fi in the sidebar opens a read-only Windows analyzer showing adapters, the current connection, nearby network names, signal quality, approximate dBm, security, and saved-profile status. Nearby results can be exported to CSV without credentials.\n\n"
+                "Tools → Wi-Fi Analyzer opens a read-only Windows analyzer showing adapters, the current connection, nearby network names, signal quality, approximate dBm, security, and saved-profile status. Nearby results can be exported to CSV without credentials.\n\n"
                 "The Saved profiles tab lists profiles already stored by Windows. Passwords remain masked until one profile is selected and its Reveal action is confirmed. A revealed password stays only in application memory, is excluded from exports, and can be hidden immediately. Copy clears the matching clipboard value after 30 seconds. Windows controls whether the signed-in account may retrieve a clear-text key and may require administrator permission.")
+        add_tab("System Monitor",
+                "System Monitor measures CPU, memory, storage throughput, network throughput, and the processes using the machine. It identifies the strongest current pressure signal without converting missing sensors into zeroes. Per-process CPU is normalized across logical processors, and PID plus process creation time is used as the row identity so a recycled PID cannot silently refer to a different process.\n\n"
+                "Pause freezes the visible evidence. Search and Sort refine the process list. Export flight recorder saves the bounded in-memory sample history as local JSON. The page does not terminate processes, change priorities, upload telemetry, or infer a fault when the operating system does not provide a measurement.")
+        add_tab("Disk Usage",
+                "Disk Usage performs a bounded, read-only folder scan and shows the largest folders and files together with a proportional size map. Choose a folder, set a file limit, and select Analyze. The filter narrows the largest-file list and Export CSV saves the evidence.\n\n"
+                "Symbolic links are not followed, inaccessible items are counted, and Cancel stops after the current file. This feature does not delete, move, compress, install, or otherwise change files.")
         add_tab("DNS Benchmark",
                 "DNS Benchmark sends real UDP A-record queries to each listed public resolver and ranks successful replies by average latency, then jitter. It does not substitute HTTPS, ping, or a favicon request for a DNS measurement.\n\n"
                 "Choose the test name, one to five rounds, the delay between rounds, and the timeout, then select Start benchmark. Stop keeps partial results; Skip wait begins the next round early; Filter narrows the table; Copy report copies the complete ranking. Double-click a resolver to copy its address.\n\n"
@@ -1410,11 +1430,7 @@ class Application(tk.Tk):
             self.available_update = value
             self.update_button.configure(text=f"Update to v{value.version}")
             self.update_button.pack(side="right", padx=(0, 8))
-            self.header_update_button.configure(
-                text=f"Install v{value.version}", command=self.install_available_update,
-                bg="#ffd34f", fg="#302400", activebackground="#ffad3f",
-                activeforeground="#302400", state="normal")
-            self.status.configure(text=f"Version {value.version} is available · use the yellow Install button above")
+            self.status.configure(text=f"Version {value.version} is available · use the Update button below")
             self._flash_update_button()
         elif event == "current":
             if manual:
@@ -1428,22 +1444,19 @@ class Application(tk.Tk):
                 self.after(350, self.destroy)
             except OSError as error:
                 self.update_button.configure(state="normal")
-                self.header_update_button.configure(state="normal")
                 messagebox.showerror("Cannot start updater", str(error))
         else:
             self.update_button.configure(state="normal")
-            self.header_update_button.configure(state="normal")
             if manual or event == "download_error":
                 messagebox.showerror("Update failed", str(value))
             if manual:
                 self.status.configure(text="Could not check for updates")
 
     def _flash_update_button(self) -> None:
-        if not self.available_update or not self.header_update_button.winfo_ismapped():
+        if not self.available_update or not self.update_button.winfo_ismapped():
             return
         self.update_flash_on = not self.update_flash_on
         self.update_button.configure(style="UpdateFlash.TButton" if self.update_flash_on else "Update.TButton")
-        self.header_update_button.configure(bg="#ffad3f" if self.update_flash_on else "#ffd34f")
         self.after(650, self._flash_update_button)
 
     def install_available_update(self) -> None:
@@ -1461,7 +1474,6 @@ class Application(tk.Tk):
                 f"{installer_note}and the updated version will reopen automatically."):
             return
         self.update_button.configure(state="disabled", text=f"Downloading v{update.version}…")
-        self.header_update_button.configure(state="disabled", text=f"Downloading v{update.version}…")
         self.status.configure(text=f"Downloading verified update v{update.version}…")
         threading.Thread(target=self._download_update_worker, args=(update,), daemon=True).start()
         self.after(50, self._drain_update_events)

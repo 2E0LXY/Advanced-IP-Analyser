@@ -14,14 +14,14 @@ Wireshark.
 
 ## Download
 
-[![Download Android APK](https://img.shields.io/badge/ANDROID-DOWNLOAD_APK_1.2.3-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.3/Advanced-IP-Analyser-Android-1.2.3.apk)
-[![Download Windows](https://img.shields.io/badge/WINDOWS-DOWNLOAD_2.9.4-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.4/Advanced-IP-Analyser-Setup-2.9.4.exe)
+[![Download Android APK](https://img.shields.io/badge/ANDROID-DOWNLOAD_APK_1.2.2-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.2/Advanced-IP-Analyser-Android-1.2.2.apk)
+[![Download Windows](https://img.shields.io/badge/WINDOWS-DOWNLOAD_2.9.3-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.3/Advanced-IP-Analyser-Setup-2.9.3.exe)
 
 | Platform | Current version | Download | Installation help |
 | --- | ---: | --- | --- |
-| **Android phone/tablet** | **1.2.3** | **[Download the signed APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.3/Advanced-IP-Analyser-Android-1.2.3.apk)** | **[Android installation instructions](docs/ANDROID-INSTALL.md)** |
-| Windows 10/11 | 2.9.4 | [Download the Windows installer](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.4/Advanced-IP-Analyser-Setup-2.9.4.exe) | Run the downloaded `.exe`; the installer closes and upgrades running copies |
-| Debian 13 | 2.9.4 | [Download the Debian package](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.4/advanced-ip-analyser_2.9.4_all.deb) | Install with `sudo apt install ./advanced-ip-analyser_2.9.4_all.deb` |
+| **Android phone/tablet** | **1.2.2** | **[Download the signed APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.2/Advanced-IP-Analyser-Android-1.2.2.apk)** | **[Android installation instructions](docs/ANDROID-INSTALL.md)** |
+| Windows 10/11 | 2.9.3 | [Download the Windows installer](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.3/Advanced-IP-Analyser-Setup-2.9.3.exe) | Run the downloaded `.exe`; the installer closes and upgrades running copies |
+| Debian 13 | 2.9.3 | [Download the Debian package](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.3/advanced-ip-analyser_2.9.3_all.deb) | Install with `sudo apt install ./advanced-ip-analyser_2.9.3_all.deb` |
 
 > **Looking for Android?** The signed Android APK is included on the main
 > **Latest** release page alongside Windows and Debian. Android also retains a
@@ -35,7 +35,7 @@ Wireshark.
 
 ![Scanner overview](docs/images/scanner-overview.png)
 
-The first page is a dark network dashboard with scan totals, live interface
+The tabbed desktop layout opens on a dark network dashboard with scan totals, live interface
 traffic, recent tool activity, favorite hosts, and local adapter details. The
 Network Scan page combines target selection, scan profiles, TCP-port controls,
 live progress, expandable service results, inventory exchange, and remote actions.
@@ -44,7 +44,7 @@ live progress, expandable service results, inventory exchange, and remote action
 
 | Area | Features |
 | --- | --- |
-| Dashboard | Live scan metrics, interface traffic, recent actions, favorite hosts, local IP/MAC/gateway details, and direct access to common tools |
+| Dashboard | Live scan metrics, interface traffic, recent actions, favorite hosts, and local IP/MAC/gateway details |
 | Network discovery | IPv4/IPv6 addresses, CIDRs, inclusive ranges, exclusions, recurring scans, active-interface presets, `/24` shortcut, bounded local IPv6 NDP discovery, reachability, connection or ICMP latency, DNS/NetBIOS names, local MAC addresses, cached IEEE vendor lookup |
 | Asset profiles | Conservative device type, operating system/version, model, and confidence inferred from manufacturer, services, HTTP metadata, and protocol banners without credentials or agents |
 | TCP services | Custom ports/ranges, common and web presets, optional all-65,535-port scan, expandable port rows, safe HTTP/TLS/banner metadata, cancellable two-stage discovery |
@@ -57,8 +57,10 @@ live progress, expandable service results, inventory exchange, and remote action
 | Display filters | IP/CIDR, TCP/UDP ports, DNS, HTTP, TLS, ICMP, ARP, TCP flags, lengths, comparisons, text/regex matching, boolean expressions, 20 quick filters, saved named filters |
 | Network Security Monitor | Up to 24-hour sessions across all observed ports and both directions, minute timeline, conversations, devices, DNS, TCP diagnostics, behavioural baselines, colour-coded findings, alerts, bookmarks, reports, retention, history |
 | Live connections | Windows/Debian inbound, outbound and listening endpoint table, owning process/PID, protocol and state, approximate public destination organisation/location, movable and zoomable OpenStreetMap view with clustered markers, filtering, CSV/JSON export and in-app `?` help |
-| DNS benchmark | Real UDP DNS A-record queries to 36 public resolver endpoints, one to five rounds, adjustable delay/timeout, average/jitter/reply ranking, filtering, partial stop and a copyable report |
+| DNS benchmark | Real UDP DNS A-record queries to 36 public resolver endpoints, one to five rounds, adjustable inter-round delay and timeout, average/jitter/reply ranking, filtering, stoppable partial results, copyable report, and a post-test shortcut to Windows DNS settings |
 | Windows Wi-Fi Analyzer | Nearby SSIDs, signal quality, approximate dBm, security, active connection, adapter status, saved-profile inventory, selected-profile password reveal with confirmation, credential-free CSV export |
+| System Monitor | Local-only CPU, memory, storage and network history, cautious bottleneck diagnosis, top-process attribution, process identity tied to creation time, explicit unavailable states, pause and bounded JSON flight-recorder export |
+| Disk Usage | Read-only bounded folder analysis, largest folders and files, live progress, file-name filtering, proportional size map, cancellation and CSV export |
 | Passive Wi-Fi | Monitor-mode AP/client discovery, BSSID manufacturer, channel/signal/security/WPS review, beacons/data/probes, passive EAPOL observation, bounded history and comparison, PCAP/JSON/CSV/HTML reports |
 | Web Security Audit | Same-host bounded crawler, path exclusions, extra allowed hosts, custom headers, page/form/technology inventory, TLS fingerprint, security-header, cookie, cleartext, mixed-content, directory-listing, CORS, and password-form observations, HTML/JSON reports |
 | AI intelligence | Separate OpenAI, Gemini, and OpenRouter keys in Debian Secret Service or Windows Credential Manager; supplier-native live model lists; exact outbound preview; redaction; explicit consent; evidence-backed advisory analysis |
@@ -86,7 +88,7 @@ packet-capture driver. See [Windows edition details](docs/WINDOWS.md).
 
 ## Android installation
 
-**[Download the current signed Android APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.3/Advanced-IP-Analyser-Android-1.2.3.apk)**
+**[Download the current signed Android APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.2/Advanced-IP-Analyser-Android-1.2.2.apk)**
 and open it on a phone or tablet running Android 8.0 or later. Android may ask
 you to allow installation from the browser or file manager used to open the APK.
 See the **[step-by-step Android installation guide](docs/ANDROID-INSTALL.md)** for
@@ -99,23 +101,9 @@ saved Wi-Fi passwords, raw packet capture, and unrestricted background Wi-Fi
 scanning, so those desktop features are not presented as available on Android.
 See the [Android build guide](android/README.md).
 
-## DNS latency benchmark
-
-Open **DNS Benchmark** on Windows or Debian, or **DNS test** on Android. The
-benchmark sends real UDP A-record queries directly to 36 public resolvers and
-ranks validated replies by average latency, jitter and reply count. It does not
-use HTTPS, a favicon request or ICMP ping as a substitute for DNS timing.
-
-Desktop users can choose one to five rounds, the query name, inter-round delay
-and timeout, stop while keeping partial results, skip a wait, filter the table and
-copy a report. Android performs five rounds and shows each sample, average,
-jitter and validated reply count. The fastest result is not automatically the
-best resolver: privacy, filtering, encrypted DNS support and cache quality are
-outside this latency test.
-
 ## Live Connections and destination map
 
-Open **Diagnostics → Live Connections** on Windows or Debian to see inbound,
+Open **Connections** on Windows or Debian to see inbound,
 outbound and listening endpoints with their owning application/PID, protocol,
 state and approximate public destination. The OpenStreetMap view is fully
 interactive: drag to move, use the mouse wheel or `+`/`−` controls to zoom, and
@@ -139,7 +127,7 @@ then run:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.9.4_all.deb
+sudo apt install ./advanced-ip-analyser_2.9.3_all.deb
 ```
 
 Launch it from the desktop application menu or run:
@@ -353,7 +341,7 @@ See [Network Security Monitor documentation](docs/NETWORK_WATCH.md).
 
 ## Windows Wi-Fi Analyzer
 
-Open **Wi-Fi** in the sidebar on Windows 10 or 11. The analyzer uses Windows'
+Open **Tools → Wi-Fi Analyzer** on Windows 10 or 11. The analyzer uses Windows'
 native WLAN service to list wireless adapters, nearby network names, signal
 quality, approximate dBm, advertised security, the active connection, and saved
 profiles. Nearby results can be exported to CSV; credentials are never included.
@@ -363,6 +351,29 @@ computer, select its profile and confirm **Reveal selected password**. The app
 requests only that profile, retains the result only in memory, provides an
 immediate Hide action, and clears a matching copied clipboard value after 30
 seconds. Windows controls access and may require an administrator account.
+
+## System Monitor
+
+Open the **System** tab to see live CPU and memory pressure,
+storage and network throughput, a bounded history graph, and the processes most
+responsible for current CPU, memory, and storage activity. Process CPU is
+normalized across logical processors and process rows use PID plus creation time
+so a recycled PID cannot silently change identity.
+
+The diagnosis names a dominant CPU, memory, or storage signal only when the
+measured sample supports it. Missing providers remain **Unavailable** rather than
+becoming plausible-looking zeroes. Pause freezes the view, while **Export flight
+recorder** saves the bounded local sample history to JSON. No system telemetry is
+sent to a remote service and the page cannot terminate or reprioritize processes.
+
+## Disk Usage
+
+Open **Disk Usage**, choose a folder and select **Analyze**. The read-only scan
+shows the largest folders and files, a proportional size map, live progress and
+a searchable results list. The file limit keeps very large scans bounded;
+symbolic links are not followed, inaccessible items are counted, and the scan
+can be cancelled. Results can be exported to CSV. The feature does not delete,
+move, compress or otherwise change files.
 
 ## Passive Wi-Fi Watch
 

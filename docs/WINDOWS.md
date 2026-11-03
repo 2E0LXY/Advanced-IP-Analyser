@@ -23,7 +23,11 @@ This also covers processes that remain active after the visible window closes.
 - live inbound, outbound and listening connection inventory with process/PID,
   filtering, export and a movable/zoomable public-destination map;
 - real UDP DNS resolver benchmarking with adjustable rounds, delay and timeout,
-  average/jitter/reply ranking, partial stop and a copyable report;
+  average/jitter/reply ranking, partial stop, a copyable report and a post-test
+  shortcut to the active adapter type's Windows DNS settings page;
+- local CPU, memory, storage and network monitoring with bounded JSON history;
+- bounded read-only disk-usage analysis with largest-file/folder views, a
+  proportional size map, cancellation and CSV export;
 - bounded PCAP, PCAPNG, and compressed capture-file analysis and display filters;
 - platform-specific verified update download, silent replacement, and relaunch.
 
@@ -38,7 +42,7 @@ analysed on Windows.
 
 ## Wi-Fi Analyzer
 
-Open **Wi-Fi** in the sidebar. Nearby-network scanning and adapter status are
+Open **Tools → Wi-Fi Analyzer**. Nearby-network scanning and adapter status are
 read-only and use the Windows WLAN service. CSV exports contain SSID, signal,
 security, cautious configuration review, connection, saved-profile, and adapter
 fields; they exclude passwords. Open and legacy security advertisements are
@@ -53,7 +57,7 @@ required permission.
 
 ## Live Connections and destination map
 
-Open **Diagnostics → Live Connections** and select **Start monitoring**. The
+Open **Connections** and select **Start monitoring**. The
 table refreshes every two seconds and shows the owning application, PID,
 protocol, local and remote endpoint, direction, state and approximate public
 destination.

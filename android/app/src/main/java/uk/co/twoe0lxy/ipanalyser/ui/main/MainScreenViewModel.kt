@@ -1,6 +1,8 @@
 package uk.co.twoe0lxy.ipanalyser.ui.main
 
 import android.app.Application
+import android.os.Environment
+import android.os.StatFs
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
@@ -41,6 +43,8 @@ data class MainScreenUiState(
   val dnsBenchmark: List<DnsBenchmarkRow> = emptyList(),
   val dnsBenchmarkRound: Int = 0,
   val dnsBenchmarkRunning: Boolean = false,
+  val storageTotalBytes: Long = 0,
+  val storageFreeBytes: Long = 0,
 )
 
 class MainScreenViewModel(application: Application) : AndroidViewModel(application) {
@@ -49,11 +53,14 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
   private val pairing = PeerPairing(application)
   private val inventory = InventoryStore(application)
   private val dnsBenchmark = DnsBenchmark()
+  private val storage = storageInfo()
   private val mutableState = MutableStateFlow(MainScreenUiState(
     network = scanner.networkInfo(),
     pairedDesktop = pairing.load()?.desktopAddress.orEmpty(),
     favorites = inventory.favorites(),
     savedScans = inventory.historyCount(),
+    storageTotalBytes = storage.first,
+    storageFreeBytes = storage.second,
   ))
   val uiState: StateFlow<MainScreenUiState> = mutableState.asStateFlow()
   private var scanJob: Job? = null
@@ -258,6 +265,11 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
     dnsBenchmarkJob?.cancel()
     pairing.stopBridge()
     super.onCleared()
+  }
+
+  private fun storageInfo(): Pair<Long, Long> {
+    val stats = StatFs(Environment.getDataDirectory().path)
+    return stats.totalBytes to stats.availableBytes
   }
 }
 

@@ -11,6 +11,7 @@ from ip_analyser.dns_benchmark import (
     benchmark_resolvers,
     build_query,
     probe_resolver,
+    result_sort_key,
     valid_response,
 )
 
@@ -42,6 +43,12 @@ class DNSBenchmarkTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             benchmark_resolvers(timeout=float("nan"))
         self.assertEqual(len(RESOLVERS), 36)
+
+    def test_ranking_uses_lower_jitter_when_displayed_averages_match(self):
+        stable = DNSBenchmarkResult(DNSResolver("Stable", "192.0.2.1"), [8.0, 8.6])
+        variable = DNSBenchmarkResult(DNSResolver("Variable", "192.0.2.2"), [7.5, 9.1])
+        self.assertEqual(stable.average_ms, variable.average_ms)
+        self.assertEqual(sorted([variable, stable], key=result_sort_key), [stable, variable])
 
     @patch("ip_analyser.dns_benchmark.secrets.randbelow", return_value=0x1234)
     @patch("ip_analyser.dns_benchmark.socket.socket")

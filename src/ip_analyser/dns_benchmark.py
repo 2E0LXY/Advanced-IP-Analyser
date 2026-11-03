@@ -155,8 +155,16 @@ def query_resolver(resolver: Resolver, *, name: str = "example.com", timeout: fl
     return latency
 
 
-def result_sort_key(result: DNSBenchmarkResult) -> tuple[bool, float, str]:
-    return (result.average is None, result.average if result.average is not None else math.inf,
+def result_sort_key(result: DNSBenchmarkResult) -> tuple[bool, float, float, float, str]:
+    """Rank by displayed average, then stability, then exact average.
+
+    Average and jitter are shown to one decimal place in the interface. Using
+    those displayed values first prevents two apparently equal rows being
+    ordered alphabetically while the less stable resolver ranks higher.
+    """
+    average = result.average if result.average is not None else math.inf
+    jitter = result.jitter if result.jitter is not None else math.inf
+    return (result.average is None, round(average, 1), round(jitter, 1), average,
             result.resolver.name.casefold())
 
 

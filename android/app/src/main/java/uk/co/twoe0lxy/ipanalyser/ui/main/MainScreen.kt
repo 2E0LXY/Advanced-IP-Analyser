@@ -43,6 +43,7 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.SettingsEthernet
 import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material.icons.outlined.PowerSettingsNew
@@ -162,7 +163,7 @@ fun MainScreen(
   ) { padding ->
     Box(Modifier.padding(padding).fillMaxSize()) {
       when (pages[selectedPage]) {
-        AppPage.Dashboard -> DashboardPage(state, { selectedPage = it.ordinal }, viewModel::scanLan)
+        AppPage.Dashboard -> DashboardPage(state)
         AppPage.Lan -> LanPage(state, viewModel::scanLan, viewModel::refreshNetwork, viewModel::toggleFavorite)
         AppPage.Wifi -> WifiPage(state, viewModel::scanWifi, viewModel::connectWifi)
         AppPage.DnsBench -> DnsBenchmarkPage(state, viewModel::toggleDnsBenchmark)
@@ -218,7 +219,7 @@ private fun AppHeader(state: MainScreenUiState) {
 }
 
 @Composable
-private fun DashboardPage(state: MainScreenUiState, onPage: (AppPage) -> Unit, onScan: () -> Unit) {
+private fun DashboardPage(state: MainScreenUiState) {
   LazyColumn(
     modifier = Modifier.fillMaxSize().padding(16.dp),
     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -228,11 +229,6 @@ private fun DashboardPage(state: MainScreenUiState, onPage: (AppPage) -> Unit, o
         Column(Modifier.weight(1f)) {
           Text("Network Dashboard", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
           Text("Overview and quick actions", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-        }
-        Button(onClick = onScan) {
-          Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-          Spacer(Modifier.width(6.dp))
-          Text(if (state.scanningLan) "Stop" else "Scan")
         }
       }
     }
@@ -250,16 +246,10 @@ private fun DashboardPage(state: MainScreenUiState, onPage: (AppPage) -> Unit, o
       }
     }
     item {
-      SectionCard("Quick actions", Icons.Outlined.NetworkCheck) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          QuickAction("Scan network", Icons.Outlined.Search, Modifier.weight(1f), onScan)
-          QuickAction("Wi-Fi scan", Icons.Outlined.Wifi, Modifier.weight(1f)) { onPage(AppPage.Wifi) }
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          QuickAction("Ping & DNS", Icons.Outlined.Dns, Modifier.weight(1f)) { onPage(AppPage.Tools) }
-          QuickAction("View devices", Icons.Outlined.Devices, Modifier.weight(1f)) { onPage(AppPage.Lan) }
-        }
+      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        val used = (state.storageTotalBytes - state.storageFreeBytes).coerceAtLeast(0)
+        MetricCard("Storage used", formatStorage(used), "device storage", Icons.Outlined.Storage, Modifier.weight(1f), Orange400)
+        MetricCard("Storage free", formatStorage(state.storageFreeBytes), "available", Icons.Outlined.Storage, Modifier.weight(1f), Green400)
       }
     }
     item {
@@ -959,14 +949,6 @@ private fun MetricCard(
 }
 
 @Composable
-private fun QuickAction(label: String, icon: ImageVector, modifier: Modifier = Modifier, onClick: () -> Unit) {
-  OutlinedButton(onClick = onClick, modifier = modifier.height(54.dp), shape = RoundedCornerShape(8.dp)) {
-    Icon(icon, null, modifier = Modifier.size(18.dp))
-    Text("  $label", fontSize = 12.sp)
-  }
-}
-
-@Composable
 private fun SectionCard(title: String, icon: ImageVector, content: @Composable ColumnScope.() -> Unit) {
   Card(
     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -1010,5 +992,16 @@ private fun averageLatency(hosts: List<HostResult>): String =
   hosts.map { it.latencyMs }.filter { it > 0 }.let { samples ->
     if (samples.isEmpty()) "—" else "${samples.average().toInt()} ms"
   }
+
+private fun formatStorage(bytes: Long): String {
+  var value = bytes.coerceAtLeast(0).toDouble()
+  val units = listOf("B", "KB", "MB", "GB", "TB")
+  var index = 0
+  while (value >= 1024 && index < units.lastIndex) {
+    value /= 1024
+    index++
+  }
+  return if (index == 0) "${value.toLong()} ${units[index]}" else "%.1f %s".format(value, units[index])
+}
 
 private fun compactAddress(value: String): String = if (value.length > 15) value.take(15) else value

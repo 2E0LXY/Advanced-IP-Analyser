@@ -33,9 +33,7 @@ ORANGE = "#ff9b36"
 class DashboardView(tk.Frame):
     """A live overview; every count comes from the current scan or saved hosts."""
 
-    def __init__(self, parent: tk.Misc, *, scan: Callable[[], None],
-                 ping: Callable[[], None], trace: Callable[[], None],
-                 port_scan: Callable[[], None], favorites: Callable[[], None],
+    def __init__(self, parent: tk.Misc, *, favorites: Callable[[], None],
                  interface: Callable[[], str]):
         super().__init__(parent, bg=BACKGROUND)
         self.interface = interface
@@ -46,7 +44,7 @@ class DashboardView(tk.Frame):
         self.details: dict[str, tk.Label] = {}
         self.system_values: dict[str, tk.Label] = {}
         self._gateway_cache: tuple[str, str] | None = None
-        self._build(scan, ping, trace, port_scan, favorites)
+        self._build(favorites)
         self.after(1800, self._sample_traffic)
 
     @staticmethod
@@ -59,9 +57,7 @@ class DashboardView(tk.Frame):
         return tk.Label(parent, text=text, bg=background, fg=color, anchor="w",
                         font=("Segoe UI", size, "bold" if bold else "normal"))
 
-    def _build(self, scan: Callable[[], None], ping: Callable[[], None],
-               trace: Callable[[], None], port_scan: Callable[[], None],
-               favorites: Callable[[], None]) -> None:
+    def _build(self, favorites: Callable[[], None]) -> None:
         self.columnconfigure(0, weight=1)
         self.rowconfigure(2, weight=1)
         self.rowconfigure(3, weight=1)
@@ -72,19 +68,8 @@ class DashboardView(tk.Frame):
         title.pack(side="left", fill="x", expand=True)
         self._label(title, "Network Dashboard", size=23, bold=True,
                     background=BACKGROUND).pack(anchor="w")
-        self._label(title, "Overview of your network, quick actions and active tools.",
+        self._label(title, "Live overview of your network and recent tool activity.",
                     size=10, color=MUTED, background=BACKGROUND).pack(anchor="w", pady=(2, 0))
-        buttons = tk.Frame(header, bg=BACKGROUND)
-        buttons.pack(side="right", anchor="e")
-        for label, command, accent in (("Scan Network", scan, True),
-                                       ("Ping", ping, False),
-                                       ("Trace Route", trace, False),
-                                       ("Port Scan", port_scan, False)):
-            tk.Button(buttons, text=label, command=command, relief="flat", bd=0,
-                      bg="#1887e7" if accent else PANEL, fg="#ffffff" if accent else TEXT,
-                      activebackground="#43a7fa" if accent else "#26435d",
-                      activeforeground="#ffffff", font=("Segoe UI", 9, "bold" if accent else "normal"),
-                      padx=15, pady=10, cursor="hand2").pack(side="left", padx=(7, 0))
 
         metrics = tk.Frame(self, bg=BACKGROUND)
         metrics.grid(row=1, column=0, sticky="ew", pady=(0, 13))
