@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import getpass
 import ipaddress
-import webbrowser
 import queue
 import shutil
 import sys
 import threading
 import tkinter as tk
+import webbrowser
 from dataclasses import replace
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
@@ -21,9 +21,13 @@ from .actions import (
     service_url,
     wake,
 )
-from .ai_network_monitor import (local_report, monitor_loop, save_local_report,
-                                 validate_monitor_target)
 from .ai_analysis import ANALYSIS_MODES, SYSTEM_INSTRUCTION, build_analysis_preview
+from .ai_network_monitor import (
+    local_report,
+    monitor_loop,
+    save_local_report,
+    validate_monitor_target,
+)
 from .ai_providers import AIProviderError, generate_text, list_models
 from .ai_settings import (
     PROVIDERS,
@@ -38,12 +42,11 @@ from .ai_settings import (
 from .config import parse_ports
 from .connections_gui import ConnectionMonitorView
 from .dashboard import DashboardView
+from .diagnostics import run_diagnostic
 from .disk_usage import DiskUsageView
 from .dns_benchmark_gui import DNSBenchmarkView
-from .system_monitor import SystemMonitorView
-from .diagnostics import run_diagnostic
+from .endpoint_posture_gui import EndpointPostureView
 from .models import Host
-from .network_intelligence_gui import NetworkIntelligenceView
 from .network import (
     active_ipv4_networks,
     broadcasts_for_host,
@@ -51,6 +54,7 @@ from .network import (
     discover_local_ipv6_hosts,
     ipv4_24_target,
 )
+from .network_intelligence_gui import NetworkIntelligenceView
 from .packet_filters import (
     QUICK_FILTERS,
     FilterSyntaxError,
@@ -76,6 +80,7 @@ from .storage import (
     merge_devices,
     save_favorites,
 )
+from .system_monitor import SystemMonitorView
 from .targets import parse_targets
 from .topology import export_topology
 from .updater import Update, check_for_update, download_update, launch_installer
@@ -385,6 +390,7 @@ class Application(tk.Tk):
         self.dns_benchmark_page = ttk.Frame(self.notebook)
         self.connections_page = ttk.Frame(self.notebook)
         self.intelligence_page = ttk.Frame(self.notebook)
+        self.posture_page = ttk.Frame(self.notebook)
         self.diagnostic_page = ttk.Frame(self.notebook)
         self.favorites_page = ttk.Frame(self.notebook)
         self.tools_page = ttk.Frame(self.notebook)
@@ -396,6 +402,7 @@ class Application(tk.Tk):
         self.notebook.add(self.dns_benchmark_page, text="DNS Benchmark")
         self.notebook.add(self.connections_page, text="Connections")
         self.notebook.add(self.intelligence_page, text="Intelligence")
+        self.notebook.add(self.posture_page, text="Security Posture")
         self.notebook.add(self.diagnostic_page, text="Diagnostics")
         self.notebook.add(self.favorites_page, text="Favorites")
         self.notebook.add(self.tools_page, text="Tools")
@@ -581,6 +588,7 @@ class Application(tk.Tk):
         self._build_dns_benchmark()
         self._build_connections()
         self._build_intelligence()
+        self._build_endpoint_posture()
         self._build_diagnostics()
         self._build_tools()
 
@@ -688,6 +696,10 @@ class Application(tk.Tk):
         self.network_intelligence = NetworkIntelligenceView(
             self.intelligence_page, hosts=lambda: self.results)
         self.network_intelligence.pack(fill="both", expand=True)
+
+    def _build_endpoint_posture(self) -> None:
+        self.endpoint_posture = EndpointPostureView(self.posture_page)
+        self.endpoint_posture.pack(fill="both", expand=True)
 
     def _build_tools(self) -> None:
         page = self.tools_page

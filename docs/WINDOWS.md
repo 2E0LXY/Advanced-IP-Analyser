@@ -24,6 +24,9 @@ This also covers processes that remain active after the visible window closes.
   filtering, export and a movable/zoomable public-destination map;
 - local Network Intelligence with duplicate-device resolution, explainable
   exposure scoring, zone classification, structured queries and GraphML/JSON export;
+- a read-only Security Posture tab for Windows firewall profiles, registered
+  antivirus, Defender real-time status, SMB 1.0, UAC, network category and DNS,
+  with explicit unknown states and local report export;
 - real UDP DNS resolver benchmarking with adjustable rounds, delay and timeout,
   average/jitter/reply ranking, partial stop, a copyable report and a post-test
   shortcut to the active adapter type's Windows DNS settings page;

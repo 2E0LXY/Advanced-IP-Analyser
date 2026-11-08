@@ -238,6 +238,22 @@ Queries accept plain text and field terms such as `risk:>=20`, `zone:iot`,
 in compatible graph-analysis tools. Both exports remain local and contain only
 the inventory currently displayed.
 
+### Endpoint Security Posture (Windows)
+
+Open **Security Posture** and select **Refresh posture** to read Windows' own
+security status providers. The page reports firewall profiles, the registered
+antivirus provider, Microsoft Defender real-time protection where applicable,
+SMB 1.0 server support, User Account Control, active network categories and DNS
+resolver addresses. It gives each result a plain-language explanation and marks
+unavailable evidence as **UNKNOWN** rather than assuming it is safe.
+
+This is a configuration snapshot, not a malware scan. It does not inspect file
+contents, promise ransomware prevention, block websites, or change firewall,
+privacy, antivirus or DNS settings. A third-party antivirus provider is reported
+without incorrectly treating disabled Microsoft Defender Antivirus as proof that
+the computer has no protection. **Copy report** copies a readable summary and
+**Export JSON** saves the same evidence locally for comparison or support.
+
 ### DNS Benchmark
 
 Open the **DNS Benchmark** tab to compare public resolvers from the computer and
