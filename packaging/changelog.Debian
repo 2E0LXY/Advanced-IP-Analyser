@@ -1,3 +1,14 @@
+advanced-ip-analyser (2.9.6) stable; urgency=medium
+
+  * Add explainable local network intelligence, structured queries and graph export.
+  * Add a read-only Windows endpoint security posture workspace.
+  * Scan several detected LAN, VPN and VLAN ranges in one bounded operation.
+  * Discover exact online Tailscale peers without enumerating its full address pool.
+  * Ignore self-assigned disconnected-adapter ranges and deduplicate overlapping scopes.
+  * Remove an undeclared test dependency that blocked Windows and Debian packaging.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Sun, 08 Nov 2026 20:45:00 +0000
+
 advanced-ip-analyser (2.9.5) stable; urgency=medium
 
   * Organise desktop features into clearer tabs and remove duplicate actions.
