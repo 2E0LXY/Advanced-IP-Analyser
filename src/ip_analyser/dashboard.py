@@ -7,9 +7,9 @@ import socket
 import time
 import tkinter as tk
 from collections import deque
-from datetime import datetime
+from collections.abc import Callable, Iterable
+from datetime import UTC, datetime
 from tkinter import ttk
-from typing import Callable, Iterable
 
 from .models import Host
 
@@ -43,6 +43,8 @@ class DashboardView(tk.Frame):
         self.values: dict[str, tk.Label] = {}
         self.details: dict[str, tk.Label] = {}
         self.system_values: dict[str, tk.Label] = {}
+        self.health_values: dict[str, float] = {"reachability": 0.0, "inventory": 0.0}
+        self.health_canvases: dict[str, tk.Canvas] = {}
         self._gateway_cache: tuple[str, str] | None = None
         self._build(favorites)
         self.after(1800, self._sample_traffic)
@@ -97,15 +99,19 @@ class DashboardView(tk.Frame):
 
         middle = tk.Frame(self, bg=BACKGROUND)
         middle.grid(row=2, column=0, sticky="nsew", pady=(0, 13))
-        middle.columnconfigure(0, weight=6)
+        middle.columnconfigure(0, weight=7)
         middle.columnconfigure(1, weight=5)
+        middle.columnconfigure(2, weight=3)
         middle.rowconfigure(0, weight=1)
         traffic = self._panel(middle)
         traffic.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
         self._build_traffic(traffic)
         activity = self._panel(middle)
-        activity.grid(row=0, column=1, sticky="nsew")
+        activity.grid(row=0, column=1, sticky="nsew", padx=(0, 12))
         self._build_activity(activity)
+        health = self._panel(middle)
+        health.grid(row=0, column=2, sticky="nsew")
+        self._build_health(health)
 
         lower = tk.Frame(self, bg=BACKGROUND)
         lower.grid(row=3, column=0, sticky="nsew", pady=(0, 5))
@@ -135,9 +141,55 @@ class DashboardView(tk.Frame):
         header = self._panel_header(panel, "Network Traffic (Live)")
         self.rate_label = self._label(header, "Waiting for traffic counters", color=MUTED, size=8)
         self.rate_label.pack(side="right")
-        self.chart = tk.Canvas(panel, bg=PANEL, highlightthickness=0, height=110)
-        self.chart.pack(fill="both", expand=True, padx=9, pady=(5, 9))
-        self.chart.bind("<Configure>", lambda _event: self._draw_traffic())
+        charts = tk.Frame(panel, bg=PANEL)
+        charts.pack(fill="both", expand=True, padx=9, pady=(4, 9))
+        charts.rowconfigure(0, weight=1)
+        charts.rowconfigure(1, weight=1)
+        charts.columnconfigure(0, weight=1)
+        self.download_chart = tk.Canvas(charts, bg="#101f31", highlightthickness=1,
+                                        highlightbackground=BORDER, height=75)
+        self.download_chart.grid(row=0, column=0, sticky="nsew", pady=(0, 5))
+        self.upload_chart = tk.Canvas(charts, bg="#101f31", highlightthickness=1,
+                                      highlightbackground=BORDER, height=75)
+        self.upload_chart.grid(row=1, column=0, sticky="nsew")
+        self.download_chart.bind("<Configure>", lambda _event: self._draw_traffic())
+        self.upload_chart.bind("<Configure>", lambda _event: self._draw_traffic())
+
+    def _build_health(self, panel: tk.Frame) -> None:
+        self._panel_header(panel, "Coverage")
+        holder = tk.Frame(panel, bg=PANEL)
+        holder.pack(fill="both", expand=True, padx=10, pady=(5, 9))
+        for key, title, color in (("reachability", "Hosts found", GREEN),
+                                  ("inventory", "Identified", BLUE)):
+            card = tk.Frame(holder, bg="#101f31", highlightbackground=BORDER,
+                            highlightthickness=1)
+            card.pack(fill="both", expand=True, pady=(0, 6))
+            canvas = tk.Canvas(card, width=130, height=92, bg="#101f31", highlightthickness=0)
+            canvas.pack(fill="both", expand=True)
+            canvas.bind("<Configure>", lambda _event, selected=key, shade=color:
+                        self._draw_health_ring(selected, shade))
+            self.health_canvases[key] = canvas
+            self._label(card, title, color=MUTED, size=8, background="#101f31").pack(
+                anchor="center", pady=(0, 7))
+
+    def _draw_health_ring(self, key: str, color: str) -> None:
+        canvas = self.health_canvases.get(key)
+        if canvas is None:
+            return
+        canvas.delete("all")
+        width, height = max(1, canvas.winfo_width()), max(1, canvas.winfo_height())
+        diameter = max(42, min(width - 28, height - 18, 74))
+        left = (width - diameter) / 2
+        top = max(8, (height - diameter) / 2)
+        box = (left, top, left + diameter, top + diameter)
+        value = max(0.0, min(1.0, self.health_values.get(key, 0.0)))
+        canvas.create_arc(*box, start=90, extent=-359.9, style="arc", width=9,
+                          outline="#233a50")
+        if value:
+            canvas.create_arc(*box, start=90, extent=-359.9 * value, style="arc", width=9,
+                              outline=color)
+        canvas.create_text(width / 2, top + diameter / 2, text=f"{value:.0%}", fill=TEXT,
+                           font=("Segoe UI", 14, "bold"))
 
     def _build_activity(self, panel: tk.Frame) -> None:
         self._panel_header(panel, "Recent Tool Activity")
@@ -186,6 +238,11 @@ class DashboardView(tk.Frame):
         self.values["range"].configure(text=target or "—", font=("Segoe UI", 12, "bold"))
         self.details["range"].configure(text=("last scan target" if scanned else "selected scan target")
                                         if target else "Select a network")
+        identified = sum(bool(host.hostname or host.manufacturer or host.device_type) for host in hosts)
+        self.health_values["reachability"] = online / scanned if scanned else 0.0
+        self.health_values["inventory"] = identified / online if online else 0.0
+        self._draw_health_ring("reachability", GREEN)
+        self._draw_health_ring("inventory", BLUE)
         self.favorites_table.delete(*self.favorites_table.get_children())
         for host in favorites[:6]:
             self.favorites_table.insert("", "end", values=(host.address, host.hostname or "—",
@@ -193,7 +250,8 @@ class DashboardView(tk.Frame):
         self._refresh_system()
 
     def record_activity(self, description: str, color: str = BLUE) -> None:
-        self.activities.appendleft((datetime.now().strftime("%H:%M:%S"), description, color))
+        self.activities.appendleft((datetime.now(UTC).astimezone().strftime("%H:%M:%S"),
+                                    description, color))
         self._render_activity()
 
     def _render_activity(self) -> None:
@@ -265,34 +323,41 @@ class DashboardView(tk.Frame):
                 self.after(1800, self._sample_traffic)
 
     def _draw_traffic(self) -> None:
-        chart = self.chart
+        self._draw_traffic_series(self.download_chart, 0, BLUE, "DOWNLOAD")
+        self._draw_traffic_series(self.upload_chart, 1, CYAN, "UPLOAD")
+
+    def _draw_traffic_series(self, chart: tk.Canvas, series: int, color: str,
+                             title: str) -> None:
         chart.delete("all")
         width, height = chart.winfo_width(), chart.winfo_height()
-        if width < 80 or height < 80:
+        if width < 100 or height < 55:
             return
-        left, right, top, bottom = 47, width - 10, 13, height - 25
-        peak = max((value for sample in self.samples for value in sample), default=0.0)
+        left, right, top, bottom = 44, width - 9, 18, height - 18
+        peak = max((sample[series] for sample in self.samples), default=0.0)
         ceiling = max(1.0, (int(peak / 5) + 1) * 5)
-        for row in range(5):
-            y = top + (bottom - top) * row / 4
+        chart.create_text(9, 7, text=title, anchor="nw", fill=MUTED,
+                          font=("Segoe UI", 7, "bold"))
+        for row in range(4):
+            y = top + (bottom - top) * row / 3
             chart.create_line(left, y, right, y, fill="#294051")
-            chart.create_text(left - 6, y, text=f"{ceiling * (4 - row) / 4:g}",
+            label = f"{ceiling * (3 - row) / 3:.1f}".rstrip("0").rstrip(".")
+            chart.create_text(left - 6, y, text=label,
                               anchor="e", fill=MUTED, font=("Segoe UI", 8))
-        for column in range(7):
-            x = left + (right - left) * column / 6
+        for column in range(8):
+            x = left + (right - left) * column / 7
             chart.create_line(x, top, x, bottom, fill="#243b4c")
-        chart.create_text(left, height - 9, text="Earlier", anchor="w", fill=MUTED,
-                          font=("Segoe UI", 8))
-        chart.create_text(right, height - 9, text="Now", anchor="e", fill=MUTED,
-                          font=("Segoe UI", 8))
         if len(self.samples) < 2:
             chart.create_text((left + right) / 2, (top + bottom) / 2,
                               text="Collecting live interface traffic…", fill=MUTED,
-                              font=("Segoe UI", 9))
+                              font=("Segoe UI", 8))
             return
-        for series, color in ((0, CYAN), (1, GREEN)):
-            points: list[float] = []
-            for index, sample in enumerate(self.samples):
-                points.extend((left + (right - left) * index / (self.samples.maxlen - 1),
-                               bottom - (bottom - top) * sample[series] / ceiling))
-            chart.create_line(*points, fill=color, width=2, smooth=True)
+        points: list[float] = []
+        denominator = max(1, len(self.samples) - 1)
+        for index, sample in enumerate(self.samples):
+            points.extend((left + (right - left) * index / denominator,
+                           bottom - (bottom - top) * sample[series] / ceiling))
+        area = [left, bottom, *points, points[-2], bottom]
+        chart.create_polygon(*area, fill="#164d81", outline="", smooth=True)
+        chart.create_line(*points, fill=color, width=2, smooth=True)
+        chart.create_oval(points[-2] - 3, points[-1] - 3, points[-2] + 3, points[-1] + 3,
+                          fill="#ffffff", outline=color)
