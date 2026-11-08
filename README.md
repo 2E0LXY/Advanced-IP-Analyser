@@ -163,8 +163,10 @@ the complete GUI with `sudo`.
 
 ## Scanning and service discovery
 
-1. Select an interface subnet, enter one address/range/CIDR, use the `/24`
-   shortcut, or press **IPv6 LAN** to discover local IPv6 neighbours.
+1. Select an interface subnet, enter one or several address/range/CIDR targets,
+   use **Scan all networks** for detected LAN/VPN/VLAN interfaces and online
+   Tailscale peers, use the `/24` shortcut, or press **IPv6 LAN** to discover
+   local IPv6 neighbours.
 2. Optionally enter excluded addresses/ranges/CIDRs and choose an in-app repeat
    interval for scheduled inventory refreshes.
 3. Choose Fast, Balanced, or Accurate, or set timeout/workers manually.
@@ -179,9 +181,10 @@ title, content type, redirects, authentication realm, TLS protocol/cipher, and
 safe protocol greetings. Discovery is unauthenticated and does not exploit or
 log in to a service.
 
-Supported targets are single IPv4/IPv6 addresses, CIDRs, and inclusive ranges.
-Each invocation is limited to 65,536 addresses. Full TCP-port scans should be
-restricted to a small number of authorized targets.
+Supported targets are IPv4/IPv6 addresses, CIDRs, and inclusive ranges, with
+commas, semicolons, or new lines accepted between multiple scopes. Overlaps are
+deduplicated and each invocation remains limited to 65,536 unique addresses.
+Full TCP-port scans should be restricted to a small number of authorized targets.
 
 Normal IPv6 LANs use `/64` prefixes and cannot be exhaustively enumerated. The
 **IPv6 LAN** action sends a bounded all-nodes multicast probe on active interfaces,

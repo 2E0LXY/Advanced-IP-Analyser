@@ -156,8 +156,11 @@ light-state objects.
 
 The Network Scan page is arranged from setup to action:
 
-- **Target:** an address, inclusive range, or CIDR.
+- **Target:** one or more addresses, inclusive ranges, or CIDRs separated by
+  commas, semicolons, or new lines.
 - **Interfaces:** refresh active IPv4 interface/subnet presets.
+- **Scan all networks:** combine every detected IPv4 interface subnet and exact
+  online Tailscale peer, show the proposed scope, then ask for confirmation.
 - **/24:** use the current host's class-C-style subnet.
 - **IPv6 LAN:** discover local IPv6 nodes through multicast and the NDP neighbour
   table, then scan only the bounded discovered set instead of enumerating a `/64`.
@@ -168,11 +171,20 @@ The Network Scan page is arranged from setup to action:
 - **Profile:** Fast, Balanced, Accurate, or pressure-sensitive Adaptive presets.
 - **Filter:** live result-table text search.
 - **Action row:** copy, favorites, Wake-on-LAN, Ping, Trace, and packet tools.
+
 - **Remote administration:** Shutdown, Reboot, and Abort shutdown.
 - **Scan results/Favorites:** inventory tables.
 - **Main tabs:** Dashboard, Network Scan, Smart Home, System, Disk Usage, DNS Benchmark, Connections, Intelligence, Diagnostics, Favorites, and Tools. Settings and Help remain available in the header.
 - **Footer:** status, centered green progress, version, and Update.
 - **Header:** application identity and status on the left, with Settings and Help on the right. Available updates appear in the footer without replacing a feature control.
+
+**Scan all networks** covers normal LAN, VLAN, and VPN adapters when the operating
+system exposes a usable IPv4 subnet. For Tailscale, the app reads the local
+Tailscale CLI and adds exact online peer IPv4 addresses instead of trying to
+enumerate the very large carrier-grade NAT range. Some corporate VPNs publish
+routes without assigning an enumerable interface subnet; enter those authorised
+CIDRs manually. Overlapping targets are scanned once, the aggregate scan remains
+limited to 65,536 unique addresses, and internet default routes are never expanded.
 
 ### System Monitor
 

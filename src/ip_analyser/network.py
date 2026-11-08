@@ -5,6 +5,7 @@ import ipaddress
 import json
 import os
 import re
+import shutil
 import socket
 import subprocess
 
@@ -66,7 +67,7 @@ def _windows_ipv4_networks() -> list[tuple[str, str, str]]:
                         f"{address.address}/{address.netmask}", strict=False)
                 except (ipaddress.AddressValueError, ipaddress.NetmaskValueError):
                     continue
-                if host.is_loopback or host.is_unspecified:
+                if host.is_loopback or host.is_unspecified or host.is_link_local:
                     continue
                 item = (interface, str(network), str(network.broadcast_address))
                 if item not in networks:
@@ -103,6 +104,8 @@ def _windows_ipv4_networks() -> list[tuple[str, str, str]]:
         except (KeyError, TypeError, ValueError):
             continue
         if network.version == 4:
+            if network.is_link_local:
+                continue
             networks.append((interface, str(network), str(network.broadcast_address)))
     return networks
 
@@ -123,6 +126,50 @@ def active_ipv4_networks() -> list[tuple[str, str, str]]:
             network = ipaddress.ip_network(match.group(2), strict=False)
             networks.append((match.group(1), str(network), str(network.broadcast_address)))
     return networks
+
+
+def parse_tailscale_status(payload: str) -> list[str]:
+    """Return unique online IPv4 peer addresses from ``tailscale status --json``."""
+    try:
+        document = json.loads(payload)
+    except json.JSONDecodeError as error:
+        raise RuntimeError("Tailscale returned invalid status data") from error
+    peers = document.get("Peer", {}) if isinstance(document, dict) else {}
+    records = peers.values() if isinstance(peers, dict) else peers if isinstance(peers, list) else []
+    addresses: list[str] = []
+    for peer in records:
+        if not isinstance(peer, dict) or peer.get("Online") is not True:
+            continue
+        for value in peer.get("TailscaleIPs", []):
+            try:
+                address = ipaddress.ip_address(str(value))
+            except ValueError:
+                continue
+            if address.version == 4:
+                addresses.append(str(address))
+    return list(dict.fromkeys(addresses))
+
+
+def tailscale_peer_ipv4_addresses() -> list[str]:
+    """Read exact online Tailscale peer addresses when its local CLI is available."""
+    executable = shutil.which("tailscale") or shutil.which("tailscale.exe")
+    if not executable and os.name == "nt":
+        candidate = os.path.join(os.environ.get("ProgramFiles", "C:\\Program Files"),
+                                 "Tailscale", "tailscale.exe")
+        if os.path.isfile(candidate):
+            executable = candidate
+    if not executable:
+        return []
+    try:
+        result = subprocess.run([executable, "status", "--json"], text=True,
+                                capture_output=True, timeout=5, check=False,
+                                creationflags=(CREATE_NO_WINDOW if os.name == "nt" else 0))
+    except (OSError, subprocess.SubprocessError):
+        return []
+    try:
+        return parse_tailscale_status(result.stdout)
+    except RuntimeError:
+        return []
 
 
 def _windows_ipv6_networks() -> list[tuple[str, str, str, int]]:

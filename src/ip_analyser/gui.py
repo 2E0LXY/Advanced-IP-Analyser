@@ -53,6 +53,7 @@ from .network import (
     current_ipv4_subnet,
     discover_local_ipv6_hosts,
     ipv4_24_target,
+    tailscale_peer_ipv4_addresses,
 )
 from .network_intelligence_gui import NetworkIntelligenceView
 from .packet_filters import (
@@ -81,7 +82,7 @@ from .storage import (
     save_favorites,
 )
 from .system_monitor import SystemMonitorView
-from .targets import parse_targets
+from .targets import parse_target_sets
 from .topology import export_topology
 from .updater import Update, check_for_update, download_update, launch_installer
 from .watch_gui import NetworkWatch
@@ -418,6 +419,8 @@ class Application(tk.Tk):
         self.subnets.pack(side="left", padx=(0, 8))
         self.subnets.bind("<<ComboboxSelected>>", self.use_selected_subnet)
         ttk.Button(header, text="Interfaces", command=self.refresh_subnets).pack(side="left", padx=(0, 8))
+        ttk.Button(header, text="Scan all networks", command=self.scan_all_networks).pack(
+            side="left", padx=(0, 8))
         ttk.Button(header, text="/24", command=self.use_24_subnet).pack(side="left", padx=(0, 8))
         self.ipv6_scan_button = ttk.Button(
             header, text="IPv6 LAN", command=self.start_ipv6_scan)
@@ -1521,9 +1524,10 @@ class Application(tk.Tk):
                 pass
             self.scheduled_scan_id = None
         try:
-            targets = list(targets_override) if targets_override is not None else parse_targets(self.target.get())
+            targets = (list(targets_override) if targets_override is not None else
+                       parse_target_sets(self.target.get()))
             if self.exclusions.get().strip():
-                excluded = set(parse_targets(self.exclusions.get()))
+                excluded = set(parse_target_sets(self.exclusions.get()))
                 targets = [target for target in targets if target not in excluded]
                 if not targets:
                     raise ValueError("all scan targets were excluded")
@@ -1878,6 +1882,30 @@ class Application(tk.Tk):
         self.target.insert(0, network)
         self.status.configure(text=f"Selected {network} on {interface}")
         self._refresh_dashboard()
+
+    def scan_all_networks(self) -> None:
+        self.refresh_subnets(show_errors=True)
+        targets = list(dict.fromkeys(network for _interface, network, _broadcast
+                                     in self.network_presets))
+        tailscale_peers = tailscale_peer_ipv4_addresses()
+        targets.extend(address for address in tailscale_peers if address not in targets)
+        if not targets:
+            messagebox.showinfo("No connected networks", "No active IPv4 scan targets were found.")
+            return
+        summary = "\n".join(
+            f"• {interface}: {network}" for interface, network, _broadcast in self.network_presets)
+        if tailscale_peers:
+            summary += f"\n• Tailscale: {len(tailscale_peers)} online peer(s)"
+        if not messagebox.askyesno(
+                "Scan all connected networks",
+                "Scan every detected local network and online Tailscale peer?\n\n"
+                f"{summary}\n\nOnly continue for networks you are authorised to scan."):
+            return
+        target_text = ", ".join(targets)
+        self.target.delete(0, "end")
+        self.target.insert(0, target_text)
+        self.start_scan(target_label=f"{len(self.network_presets)} network(s)"
+                        f" + {len(tailscale_peers)} Tailscale peer(s)")
 
     def selected_hosts(self) -> list[Host]:
         selected: list[Host] = []

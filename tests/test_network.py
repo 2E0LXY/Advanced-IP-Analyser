@@ -1,5 +1,6 @@
-import subprocess
+import json
 import socket
+import subprocess
 import unittest
 from unittest.mock import patch
 
@@ -11,10 +12,19 @@ from ip_analyser.network import (
     current_ipv4_subnet,
     discover_local_ipv6_hosts,
     ipv4_24_target,
+    parse_tailscale_status,
 )
 
 
 class NetworkTests(unittest.TestCase):
+    def test_tailscale_status_returns_only_online_ipv4_peers(self) -> None:
+        payload = json.dumps({"Peer": {
+            "one": {"Online": True, "TailscaleIPs": ["100.64.0.2", "fd7a:115c:a1e0::2"]},
+            "two": {"Online": False, "TailscaleIPs": ["100.64.0.3"]},
+            "three": {"Online": True, "TailscaleIPs": ["100.64.0.4", "invalid"]},
+        }})
+        self.assertEqual(parse_tailscale_status(payload), ["100.64.0.2", "100.64.0.4"])
+
     @patch("ip_analyser.network.subprocess.run")
     @patch("ip_analyser.network.os.name", "posix")
     def test_current_subnet(self, run):
@@ -61,7 +71,11 @@ class NetworkTests(unittest.TestCase):
             "Ethernet": [unittest.mock.Mock(
                 family=socket.AF_INET,
                 address="192.168.50.12",
-                netmask="255.255.255.0")]
+                netmask="255.255.255.0")],
+            "Disconnected VPN": [unittest.mock.Mock(
+                family=socket.AF_INET,
+                address="169.254.20.3",
+                netmask="255.255.0.0")],
         }
         self.assertEqual(active_ipv4_networks(), [
             ("Ethernet", "192.168.50.0/24", "192.168.50.255")])

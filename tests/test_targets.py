@@ -1,9 +1,17 @@
 import unittest
 
-from ip_analyser.targets import parse_targets
+from ip_analyser.targets import parse_target_sets, parse_targets
 
 
 class TargetTests(unittest.TestCase):
+    def test_multiple_target_sets_are_deduplicated_and_bounded(self) -> None:
+        self.assertEqual(
+            parse_target_sets("192.0.2.0/30, 192.0.2.2;\n198.51.100.8"),
+            ["192.0.2.1", "192.0.2.2", "198.51.100.8"],
+        )
+        with self.assertRaises(ValueError):
+            parse_target_sets("192.0.2.0/30,198.51.100.0/30", limit=3)
+
     def test_single_address(self):
         self.assertEqual(parse_targets("192.0.2.8"), ["192.0.2.8"])
 
