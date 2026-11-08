@@ -43,6 +43,7 @@ from .dns_benchmark_gui import DNSBenchmarkView
 from .system_monitor import SystemMonitorView
 from .diagnostics import run_diagnostic
 from .models import Host
+from .network_intelligence_gui import NetworkIntelligenceView
 from .network import (
     active_ipv4_networks,
     broadcasts_for_host,
@@ -383,6 +384,7 @@ class Application(tk.Tk):
         self.disk_usage_page = ttk.Frame(self.notebook)
         self.dns_benchmark_page = ttk.Frame(self.notebook)
         self.connections_page = ttk.Frame(self.notebook)
+        self.intelligence_page = ttk.Frame(self.notebook)
         self.diagnostic_page = ttk.Frame(self.notebook)
         self.favorites_page = ttk.Frame(self.notebook)
         self.tools_page = ttk.Frame(self.notebook)
@@ -393,6 +395,7 @@ class Application(tk.Tk):
         self.notebook.add(self.disk_usage_page, text="Disk Usage")
         self.notebook.add(self.dns_benchmark_page, text="DNS Benchmark")
         self.notebook.add(self.connections_page, text="Connections")
+        self.notebook.add(self.intelligence_page, text="Intelligence")
         self.notebook.add(self.diagnostic_page, text="Diagnostics")
         self.notebook.add(self.favorites_page, text="Favorites")
         self.notebook.add(self.tools_page, text="Tools")
@@ -577,6 +580,7 @@ class Application(tk.Tk):
         self._build_disk_usage()
         self._build_dns_benchmark()
         self._build_connections()
+        self._build_intelligence()
         self._build_diagnostics()
         self._build_tools()
 
@@ -657,6 +661,8 @@ class Application(tk.Tk):
                 target=self.active_scan_target or self.target.get().strip(),
                 favorites=self.favorite_hosts_by_item.values(),
             )
+        if hasattr(self, "network_intelligence"):
+            self.network_intelligence.refresh(self.results)
 
     def _build_smart_home(self) -> None:
         self.smart_home = SmartHomeView(self.smart_home_page)
@@ -677,6 +683,11 @@ class Application(tk.Tk):
     def _build_connections(self) -> None:
         self.connection_monitor = ConnectionMonitorView(self.connections_page)
         self.connection_monitor.pack(fill="both", expand=True)
+
+    def _build_intelligence(self) -> None:
+        self.network_intelligence = NetworkIntelligenceView(
+            self.intelligence_page, hosts=lambda: self.results)
+        self.network_intelligence.pack(fill="both", expand=True)
 
     def _build_tools(self) -> None:
         page = self.tools_page

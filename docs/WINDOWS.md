@@ -22,6 +22,8 @@ This also covers processes that remain active after the visible window closes.
 - API keys stored through Windows Credential Manager;
 - live inbound, outbound and listening connection inventory with process/PID,
   filtering, export and a movable/zoomable public-destination map;
+- local Network Intelligence with duplicate-device resolution, explainable
+  exposure scoring, zone classification, structured queries and GraphML/JSON export;
 - real UDP DNS resolver benchmarking with adjustable rounds, delay and timeout,
   average/jitter/reply ranking, partial stop, a copyable report and a post-test
   shortcut to the active adapter type's Windows DNS settings page;

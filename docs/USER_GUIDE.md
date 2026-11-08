@@ -170,7 +170,7 @@ The Network Scan page is arranged from setup to action:
 - **Action row:** copy, favorites, Wake-on-LAN, Ping, Trace, and packet tools.
 - **Remote administration:** Shutdown, Reboot, and Abort shutdown.
 - **Scan results/Favorites:** inventory tables.
-- **Main tabs:** Dashboard, Network Scan, Smart Home, System, Disk Usage, DNS Benchmark, Connections, Diagnostics, Favorites, and Tools. Settings and Help remain available in the header.
+- **Main tabs:** Dashboard, Network Scan, Smart Home, System, Disk Usage, DNS Benchmark, Connections, Intelligence, Diagnostics, Favorites, and Tools. Settings and Help remain available in the header.
 - **Footer:** status, centered green progress, version, and Update.
 - **Header:** application identity and status on the left, with Settings and Help on the right. Available updates appear in the footer without replacing a feature control.
 
@@ -219,6 +219,24 @@ geolocation. Process names, PIDs, local addresses and the full connection table
 are not sent to either service. Geolocation frequently identifies a provider or
 data centre rather than an end user, so the map is an investigation aid and not
 proof of malicious activity.
+
+### Network Intelligence
+
+Open **Intelligence** after a scan or inventory import. The page resolves repeated
+observations conservatively by exact hardware address, then shows an explainable
+exposure-priority score and a suggested zone for each device. The score is based
+only on locally observed service metadata. It is not a malware verdict and does
+not block traffic.
+
+Queries accept plain text and field terms such as `risk:>=20`, `zone:iot`,
+`port:445`, `service:ssh`, `vendor:ubiquiti`, or an IP/CIDR such as
+`ip:192.168.1.0/24`. Whitespace means AND, `OR` starts an alternative group, and
+`-term` or `not:term` excludes a match.
+
+**Export JSON** writes the filtered, versioned evidence and every score factor.
+**Export GraphML** writes device and service nodes with dependency edges for use
+in compatible graph-analysis tools. Both exports remain local and contain only
+the inventory currently displayed.
 
 ### DNS Benchmark
 
