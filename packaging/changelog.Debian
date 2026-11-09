@@ -1,3 +1,12 @@
+advanced-ip-analyser (2.9.8) stable; urgency=medium
+
+  * Keep expensive live monitoring inactive while its tab is hidden.
+  * Reduce process enumeration and table redraws from every second to every five seconds.
+  * Preserve one-second CPU, memory, disk and network graphs on the visible System tab.
+  * Improve responsiveness of all top-level navigation tabs.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Mon, 09 Nov 2026 20:00:00 +0000
+
 advanced-ip-analyser (2.9.7) stable; urgency=medium
 
   * Redesign the dashboard around live operational charts and activity.

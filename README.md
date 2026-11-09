@@ -15,13 +15,13 @@ Wireshark.
 ## Download
 
 [![Download Android APK](https://img.shields.io/badge/ANDROID-DOWNLOAD_APK_1.2.5-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.5/Advanced-IP-Analyser-Android-1.2.5.apk)
-[![Download Windows](https://img.shields.io/badge/WINDOWS-DOWNLOAD_2.9.7-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.7/Advanced-IP-Analyser-Setup-2.9.7.exe)
+[![Download Windows](https://img.shields.io/badge/WINDOWS-DOWNLOAD_2.9.8-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.8/Advanced-IP-Analyser-Setup-2.9.8.exe)
 
 | Platform | Current version | Download | Installation help |
 | --- | ---: | --- | --- |
 | **Android phone/tablet** | **1.2.5** | **[Download the signed APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.5/Advanced-IP-Analyser-Android-1.2.5.apk)** | **[Android installation instructions](docs/ANDROID-INSTALL.md)** |
-| Windows 10/11 | 2.9.7 | [Download the Windows installer](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.7/Advanced-IP-Analyser-Setup-2.9.7.exe) | Run the downloaded `.exe`; the installer closes and upgrades running copies |
-| Debian 13 | 2.9.7 | [Download the Debian package](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.7/advanced-ip-analyser_2.9.7_all.deb) | Install with `sudo apt install ./advanced-ip-analyser_2.9.7_all.deb` |
+| Windows 10/11 | 2.9.8 | [Download the Windows installer](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.8/Advanced-IP-Analyser-Setup-2.9.8.exe) | Run the downloaded `.exe`; the installer closes and upgrades running copies |
+| Debian 13 | 2.9.8 | [Download the Debian package](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.8/advanced-ip-analyser_2.9.8_all.deb) | Install with `sudo apt install ./advanced-ip-analyser_2.9.8_all.deb` |
 
 > **Looking for Android?** The signed Android APK is included on the main
 > **Latest** release page alongside Windows and Debian. Android also retains a
@@ -129,7 +129,7 @@ then run:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.9.7_all.deb
+sudo apt install ./advanced-ip-analyser_2.9.8_all.deb
 ```
 
 Launch it from the desktop application menu or run:

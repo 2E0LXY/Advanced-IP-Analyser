@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.9.8 - 2026-11-09
+
+- Stop hidden System Monitor work from blocking top-level tab navigation.
+- Refresh the expensive process inventory every five seconds while its tab is
+  visible, while retaining one-second live resource graphs.
+- Remove the eager all-process CPU priming pass during application startup.
+
 ## 2.9.7 - 2026-11-09
 
 - Rework the desktop dashboard into a denser operations view with separate live
