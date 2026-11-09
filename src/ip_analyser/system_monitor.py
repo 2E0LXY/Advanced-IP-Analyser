@@ -181,6 +181,8 @@ class SystemMonitorView(tk.Frame):
         self.previous_disk = None
         self.previous_net = None
         self.paused = False
+        self.active = False
+        self.last_process_refresh = 0.0
         self.after_id: str | None = None
         self.values: dict[str, tk.Label] = {}
         self.details: dict[str, tk.Label] = {}
@@ -188,14 +190,21 @@ class SystemMonitorView(tk.Frame):
         self.search_text.trace_add("write", lambda *_args: self._render_processes())
         self.sort_mode = tk.StringVar(value="CPU")
         self._build()
-        if psutil is not None:
-            psutil.cpu_percent(interval=None)
-            for process in psutil.process_iter():
-                try:
-                    process.cpu_percent(interval=None)
-                except (psutil.Error, OSError):
-                    pass
-        self.after_id = self.after(250, self._sample)
+
+    def set_active(self, active: bool) -> None:
+        """Collect live evidence only while the System tab is visible."""
+        active = bool(active)
+        if self.active == active:
+            return
+        self.active = active
+        if self.after_id is not None:
+            try:
+                self.after_cancel(self.after_id)
+            except tk.TclError:
+                pass
+            self.after_id = None
+        if active and self.winfo_exists():
+            self.after_id = self.after_idle(self._sample)
 
     @staticmethod
     def _panel(parent: tk.Misc) -> tk.Frame:
@@ -315,13 +324,18 @@ class SystemMonitorView(tk.Frame):
 
     def _sample(self) -> None:
         try:
-            if not self.paused:
+            self.after_id = None
+            if self.active and not self.paused:
                 sample = self._read_sample()
                 self.samples.append(sample)
-                self._read_processes()
-                self._render(sample)
+                now = time.monotonic()
+                refresh_processes = now - self.last_process_refresh >= 5.0
+                if refresh_processes:
+                    self._read_processes()
+                    self.last_process_refresh = now
+                self._render(sample, refresh_processes=refresh_processes)
         finally:
-            if self.winfo_exists():
+            if self.active and self.winfo_exists():
                 self.after_id = self.after(1000, self._sample)
 
     def _read_sample(self) -> SystemSample:
@@ -391,7 +405,7 @@ class SystemMonitorView(tk.Frame):
                 continue
         self.process_rows = rows
 
-    def _render(self, sample: SystemSample) -> None:
+    def _render(self, sample: SystemSample, *, refresh_processes: bool = True) -> None:
         self.values["cpu"].configure(text="Unavailable" if sample.cpu_percent is None else f"{sample.cpu_percent:.0f}%")
         self.details["cpu"].configure(text=f"{psutil.cpu_count(logical=True)} logical processors" if psutil else "Provider unavailable")
         self.values["memory"].configure(text="Unavailable" if sample.memory_percent is None else f"{sample.memory_percent:.0f}%")
@@ -418,7 +432,8 @@ class SystemMonitorView(tk.Frame):
         else:
             self.diagnosis_process.configure(text="Process attribution is unavailable on this system.")
         self.chart.set_samples(list(self.samples)[-120:])
-        self._render_processes()
+        if refresh_processes:
+            self._render_processes()
 
     def _render_processes(self) -> None:
         if not hasattr(self, "process_table"):

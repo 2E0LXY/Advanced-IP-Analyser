@@ -594,6 +594,8 @@ class Application(tk.Tk):
         self._build_endpoint_posture()
         self._build_diagnostics()
         self._build_tools()
+        self.notebook.bind("<<NotebookTabChanged>>", self._on_main_tab_changed, add="+")
+        self._on_main_tab_changed()
 
         self.links = ttk.Frame(self.scan_page, padding=(12, 8, 12, 0))
         self.links.pack(fill="x")
@@ -637,6 +639,13 @@ class Application(tk.Tk):
 
     def _navigate(self, page: ttk.Frame) -> None:
         self.notebook.select(page)
+
+    def _on_main_tab_changed(self, _event=None) -> None:
+        """Suspend expensive live views when their page is not visible."""
+        if not hasattr(self, "system_monitor"):
+            return
+        selected = self.notebook.select()
+        self.system_monitor.set_active(selected == str(self.system_monitor_page))
 
     def _build_dashboard(self) -> None:
         holder = tk.Frame(self.dashboard_page, bg="#0d1b29")
