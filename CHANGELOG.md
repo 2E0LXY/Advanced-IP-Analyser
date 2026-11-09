@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.9.7 - 2026-11-09
+
+- Rework the desktop dashboard into a denser operations view with separate live
+  download and upload area charts, recent tool activity, and coverage rings.
+- Derive host reachability and inventory completeness from actual scan results.
+- Improve chart scaling, responsive resizing, short-history display, and labels.
+- Refresh GitHub download links for the current Windows, Debian, and Android builds.
+
 ## 2.6.0 - 2026-10-20
 
 - Add a Smart Home page for local discovery and control of supported TP-Link Kasa
