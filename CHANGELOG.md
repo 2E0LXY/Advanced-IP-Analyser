@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.9.9 - 2026-11-10
+
+- Add scrollable Wi-Fi signal history with selectable 1–5 second sampling and
+  bounded two-hour retention on Windows, Debian and Android.
+- Add 2.4, 5 and 6 GHz channel-overlap graphs using measured RSSI and advertised
+  HT/VHT or Android channel-width metadata.
+- Show BSSID, channel, frequency and bandwidth in Wi-Fi inventories and exports,
+  while labelling unavailable bandwidth instead of estimating it.
+- Document Android radio-scan throttling and the new analysis views.
+
 ## 2.9.8 - 2026-11-09
 
 - Stop hidden System Monitor work from blocking top-level tab navigation.

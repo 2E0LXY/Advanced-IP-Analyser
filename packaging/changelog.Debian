@@ -1,3 +1,12 @@
+advanced-ip-analyser (2.9.9) stable; urgency=medium
+
+  * Add two-hour scrollable Wi-Fi signal history with 1-5 second analysis refresh.
+  * Add 2.4, 5 and 6 GHz channel and advertised-bandwidth graphs.
+  * Export measured BSSID, RSSI, frequency, channel and channel-width metadata.
+  * Keep unavailable radio metadata explicit instead of guessing values.
+
+ -- Daren Loxley <2e0lxy@users.noreply.github.com>  Tue, 10 Nov 2026 19:00:00 +0000
+
 advanced-ip-analyser (2.9.8) stable; urgency=medium
 
   * Keep expensive live monitoring inactive while its tab is hidden.
