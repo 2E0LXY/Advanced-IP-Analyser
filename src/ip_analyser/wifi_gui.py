@@ -4,7 +4,9 @@ import queue
 import shutil
 import subprocess
 import threading
+import time
 import tkinter as tk
+from collections import defaultdict
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
@@ -39,6 +41,7 @@ class WifiWatch(tk.Toplevel):
         self.data_dir = Path.home() / ".local" / "share" / "advanced-ip-analyser" / "wifi-captures"
         self.history_path = self.data_dir / "wifi-scan-history.jsonl"
         self.history_logged = False
+        self.signal_history: dict[str, list[tuple[float, int, str]]] = defaultdict(list)
         self._build()
         self._load_interfaces()
         self.after(200, self._drain_events)
@@ -53,7 +56,7 @@ class WifiWatch(tk.Toplevel):
         self.interface.pack(side="left")
         ttk.Label(header, text="Duration").pack(side="left", padx=(12, 4))
         self.duration = ttk.Combobox(header, width=12, state="readonly",
-                                     values=("5 minutes", "15 minutes", "1 hour"))
+                                     values=("5 minutes", "15 minutes", "1 hour", "2 hours"))
         self.duration.set("15 minutes")
         self.duration.pack(side="left")
         self.start_button = ttk.Button(header, text="Start passive watch",
@@ -62,6 +65,11 @@ class WifiWatch(tk.Toplevel):
         self.stop_button = ttk.Button(header, text="Stop", command=self.stop,
                                       state="disabled", style="Danger.TButton")
         self.stop_button.pack(side="left")
+        ttk.Label(header, text="Refresh").pack(side="left", padx=(12, 4))
+        self.refresh_seconds = tk.IntVar(value=3)
+        ttk.Combobox(header, width=3, state="readonly", textvariable=self.refresh_seconds,
+                     values=(1, 2, 3, 4, 5)).pack(side="left")
+        ttk.Label(header, text="sec").pack(side="left")
 
         options = ttk.Frame(self, padding=(12, 0, 12, 8))
         options.pack(fill="x")
@@ -77,17 +85,25 @@ class WifiWatch(tk.Toplevel):
                          text="Passive discovery only: this feature does not disconnect clients, inject packets, or attempt passwords.")
         note.pack(fill="x")
 
-        panes = ttk.Panedwindow(self, orient="horizontal")
-        panes.pack(fill="both", expand=True, padx=12)
+        tabs = ttk.Notebook(self)
+        tabs.pack(fill="both", expand=True, padx=12)
+        overview = ttk.Frame(tabs)
+        history_page = ttk.Frame(tabs, padding=8)
+        channels_page = ttk.Frame(tabs, padding=8)
+        tabs.add(overview, text="Observed networks")
+        tabs.add(history_page, text="Signal history")
+        tabs.add(channels_page, text="Channel graph")
+        panes = ttk.Panedwindow(overview, orient="horizontal")
+        panes.pack(fill="both", expand=True)
         ap_frame = ttk.Frame(panes)
         client_frame = ttk.Frame(panes)
         panes.add(ap_frame, weight=4)
         panes.add(client_frame, weight=2)
 
-        ap_columns = ("name", "bssid", "manufacturer", "channel", "signal", "security",
+        ap_columns = ("name", "bssid", "manufacturer", "channel", "bandwidth", "signal", "security",
                       "wps", "risk", "beacons", "data", "clients", "eapol", "findings")
         self.ap_table = ttk.Treeview(ap_frame, columns=ap_columns, show="headings", selectmode="browse")
-        ap_widths = (150, 140, 170, 55, 55, 90, 50, 80, 60, 60, 55, 70, 320)
+        ap_widths = (150, 140, 170, 55, 80, 55, 90, 50, 80, 60, 60, 55, 70, 320)
         for column, width in zip(ap_columns, ap_widths):
             self.ap_table.heading(column, text=column.title())
             self.ap_table.column(column, width=width, anchor="w", stretch=column == "name")
@@ -109,6 +125,7 @@ class WifiWatch(tk.Toplevel):
         self.client_table.configure(xscrollcommand=client_scroll.set)
         self.client_table.pack(fill="both", expand=True)
         client_scroll.pack(fill="x")
+        self._build_analysis_pages(history_page, channels_page)
 
         footer = ttk.Frame(self, padding=12)
         footer.pack(fill="x")
@@ -117,6 +134,33 @@ class WifiWatch(tk.Toplevel):
         self.progress = ttk.Progressbar(footer, mode="indeterminate", length=240,
                                         style="Green.Horizontal.TProgressbar")
         self.progress.pack(side="right")
+
+    def _build_analysis_pages(self, history_page: ttk.Frame, channels_page: ttk.Frame) -> None:
+        history_actions = ttk.Frame(history_page)
+        history_actions.pack(fill="x", pady=(0, 6))
+        ttk.Label(history_actions, text="Retains up to two hours; use the bottom scrollbar for earlier samples.").pack(side="left")
+        ttk.Button(history_actions, text="Clear", command=self._clear_signal_history).pack(side="right")
+        history_frame = ttk.Frame(history_page)
+        history_frame.pack(fill="both", expand=True)
+        self.history_canvas = tk.Canvas(history_frame, background="#08131f", highlightthickness=0)
+        history_x = ttk.Scrollbar(history_frame, orient="horizontal", command=self.history_canvas.xview)
+        self.history_canvas.configure(xscrollcommand=history_x.set)
+        self.history_canvas.pack(fill="both", expand=True)
+        history_x.pack(fill="x")
+        self.history_canvas.bind("<Configure>", lambda _event: self._draw_signal_history())
+
+        channel_actions = ttk.Frame(channels_page)
+        channel_actions.pack(fill="x", pady=(0, 6))
+        self.channel_band = tk.StringVar(value="2.4 GHz")
+        ttk.Label(channel_actions, text="Band").pack(side="left")
+        selector = ttk.Combobox(channel_actions, textvariable=self.channel_band,
+                                values=("2.4 GHz", "5 GHz", "6 GHz"), width=8, state="readonly")
+        selector.pack(side="left", padx=6)
+        selector.bind("<<ComboboxSelected>>", lambda _event: self._draw_channel_graph())
+        ttk.Label(channel_actions, text="Curve width uses advertised HT/VHT radio metadata.").pack(side="left")
+        self.channel_canvas = tk.Canvas(channels_page, background="#08131f", highlightthickness=0)
+        self.channel_canvas.pack(fill="both", expand=True)
+        self.channel_canvas.bind("<Configure>", lambda _event: self._draw_channel_graph())
 
     def _load_interfaces(self) -> None:
         interfaces = list_wireless_interfaces()
@@ -142,7 +186,8 @@ class WifiWatch(tk.Toplevel):
         return values
 
     def start(self) -> None:
-        seconds = {"5 minutes": 300, "15 minutes": 900, "1 hour": 3_600}[self.duration.get()]
+        seconds = {"5 minutes": 300, "15 minutes": 900, "1 hour": 3_600,
+                   "2 hours": 7_200}[self.duration.get()]
         try:
             channels = self._channel_plan()
         except ValueError as error:
@@ -185,7 +230,8 @@ class WifiWatch(tk.Toplevel):
             self.worker_active = True
             threading.Thread(target=self._worker, args=(self.capture_path,), daemon=True).start()
         if self.capture and self.capture.running:
-            self.after(3_000, self._schedule_refresh)
+            self.after(max(1, min(5, self.refresh_seconds.get())) * 1_000,
+                       self._schedule_refresh)
         else:
             self.after(200, self.stop)
 
@@ -228,7 +274,8 @@ class WifiWatch(tk.Toplevel):
         selected_item = ""
         for ap in self.access_points:
             item = self.ap_table.insert("", "end", values=(
-                ap.name or "<hidden>", ap.bssid, ap.manufacturer, ap.channel or "", ap.signal_dbm or "",
+                ap.name or "<hidden>", ap.bssid, ap.manufacturer, ap.channel or "",
+                f"{ap.channel_width_mhz} MHz" if ap.channel_width_mhz else "Unknown", ap.signal_dbm or "",
                 ap.security, "Yes" if ap.wps_advertised else "", ap.risk_level,
                 ap.beacons, ap.data_packets, len(ap.clients),
                 "Observed" if ap.handshake_seen else "", "; ".join(ap.risk_reasons + ap.indicators)))
@@ -241,7 +288,122 @@ class WifiWatch(tk.Toplevel):
         self.status.configure(text=f"Observed {len(self.access_points)} access points and "
                                    f"{sum(len(ap.clients) for ap in self.access_points) + len(self.unlinked_clients)} clients"
                                    + (f" · {indicator_count} rogue-infrastructure indicator(s)" if indicator_count else ""))
+        self._sample_signals()
+        self._draw_signal_history()
+        self._draw_channel_graph()
         self._show_clients()
+
+    def _sample_signals(self) -> None:
+        now = time.time()
+        cutoff = now - 7_200
+        for ap in self.access_points:
+            if ap.signal_dbm is not None:
+                self.signal_history[ap.bssid].append((now, ap.signal_dbm, ap.name or "<hidden>"))
+        for bssid in list(self.signal_history):
+            samples = self.signal_history[bssid]
+            first = 0
+            while first < len(samples) and samples[first][0] < cutoff:
+                first += 1
+            if first:
+                del samples[:first]
+            if not samples:
+                del self.signal_history[bssid]
+
+    def _clear_signal_history(self) -> None:
+        self.signal_history.clear()
+        self._draw_signal_history()
+        self.status.configure(text="Signal history cleared.")
+
+    def _draw_signal_history(self) -> None:
+        canvas = getattr(self, "history_canvas", None)
+        if canvas is None:
+            return
+        follow_latest = canvas.xview()[1] >= .98 if canvas.bbox("all") else True
+        canvas.delete("all")
+        view_width, height = max(640, canvas.winfo_width()), max(360, canvas.winfo_height())
+        samples = [sample for values in self.signal_history.values() for sample in values]
+        if not samples:
+            canvas.create_text(view_width / 2, height / 2, text="Start passive watch to collect signal history",
+                               fill="#9db3c8")
+            canvas.configure(scrollregion=(0, 0, view_width, height))
+            return
+        start, end = min(item[0] for item in samples), max(item[0] for item in samples)
+        scale = max(1.0, 6.0 / max(1, min(5, self.refresh_seconds.get())))
+        strongest = sorted(self.signal_history.items(), key=lambda item: item[1][-1][1], reverse=True)[:12]
+        legend_columns = max(2, int((view_width - 58) / 250))
+        legend_rows = (len(strongest) + legend_columns - 1) // legend_columns
+        left, top, bottom = 58, 24 + legend_rows * 18, height - 42
+        width = max(view_width, left + (end - start) * scale + 80)
+        for dbm in range(-100, -29, 10):
+            y = top + (-30 - dbm) / 70 * (bottom - top)
+            canvas.create_line(left, y, width - 20, y, fill="#284157")
+            canvas.create_text(left - 8, y, text=str(dbm), fill="#9db3c8", anchor="e")
+        colors = ("#22b8ff", "#56e05b", "#ffcc3d", "#ff6b6b", "#b884ff", "#31d6c4", "#ff8b3d")
+        for index, (_bssid, values) in enumerate(strongest):
+            color = colors[index % len(colors)]
+            points = []
+            for stamp, dbm, _name in values:
+                points.extend((left + (stamp - start) * scale,
+                               top + (-30 - max(-100, min(-30, dbm))) / 70 * (bottom - top)))
+            if len(points) >= 4:
+                canvas.create_line(*points, fill=color, width=2, smooth=True)
+            legend_x = left + (index % legend_columns) * 250
+            legend_y = 12 + (index // legend_columns) * 18
+            canvas.create_text(legend_x, legend_y, text=values[-1][2][:32], fill=color, anchor="w")
+        canvas.configure(scrollregion=(0, 0, width, height))
+        if follow_latest:
+            canvas.xview_moveto(1.0)
+
+    def _draw_channel_graph(self) -> None:
+        canvas = getattr(self, "channel_canvas", None)
+        if canvas is None:
+            return
+        canvas.delete("all")
+        width, height = max(640, canvas.winfo_width()), max(360, canvas.winfo_height())
+        band = self.channel_band.get()
+        if band == "2.4 GHz":
+            low, high = 2400, 2500
+        elif band == "5 GHz":
+            low, high = 5000, 5900
+        else:
+            low, high = 5925, 7125
+        left, right, top, bottom = 58, width - 24, 28, height - 38
+        colors = ("#22b8ff", "#56e05b", "#ffcc3d", "#ff6b6b", "#b884ff", "#31d6c4")
+        def frequency(ap: AccessPoint) -> int:
+            if ap.frequency_mhz:
+                return ap.frequency_mhz
+            channel = ap.channel or 0
+            if channel == 14:
+                return 2484
+            if channel <= 14:
+                return 2407 + channel * 5
+            return 5000 + channel * 5
+        def x(value: float) -> float:
+            return left + (value - low) / (high - low) * (right - left)
+        def y(value: int) -> float:
+            return top + (-30 - max(-100, min(-30, value))) / 70 * (bottom - top)
+        for dbm in range(-100, -29, 10):
+            canvas.create_line(left, y(dbm), right, y(dbm), fill="#284157")
+            canvas.create_text(left - 8, y(dbm), text=str(dbm), fill="#9db3c8", anchor="e")
+        shown = 0
+        for ap in self.access_points:
+            centre = frequency(ap)
+            if not low <= centre <= high or ap.signal_dbm is None:
+                continue
+            radio_width = ap.channel_width_mhz or 4
+            x1, peak, x2 = x(centre - radio_width / 2), x(centre), x(centre + radio_width / 2)
+            color = colors[shown % len(colors)]
+            canvas.create_polygon(x1, bottom, (x1 + peak) / 2, (bottom + y(ap.signal_dbm)) / 2,
+                                  peak, y(ap.signal_dbm), (peak + x2) / 2,
+                                  (bottom + y(ap.signal_dbm)) / 2, x2, bottom,
+                                  fill=color, outline=color, stipple="gray50")
+            detail = f"{ap.channel_width_mhz} MHz" if ap.channel_width_mhz else "width unavailable"
+            canvas.create_text(peak, max(top, y(ap.signal_dbm) - 8),
+                               text=f"{ap.name} · ch {ap.channel} · {detail}", fill=color, anchor="s")
+            shown += 1
+        if not shown:
+            canvas.create_text(width / 2, height / 2, text=f"No {band} access points observed yet",
+                               fill="#9db3c8")
 
     def _show_clients(self, _event=None) -> None:
         clients = list(self.unlinked_clients)

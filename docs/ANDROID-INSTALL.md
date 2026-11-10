@@ -47,6 +47,10 @@ file.
 - LAN discovery requires normal network access.
 - Nearby Wi-Fi scanning requires Android's nearby-device/location permission,
   depending on the Android version.
+- Wi-Fi analyser views include a network list, a horizontally scrollable signal
+  history retained for up to two hours, and 2.4/5/6 GHz channel/bandwidth graphs.
+  Refresh can be requested every 1–5 seconds; Android may throttle radio scans and
+  repeat its latest result.
 - Connecting to a selected Wi-Fi network always uses Android's system approval.
 - The live DNS monitor uses Android's local VPN interface. It does not connect
   to a commercial VPN or send DNS history to the desktop.

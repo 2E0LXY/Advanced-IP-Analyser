@@ -10,7 +10,8 @@ Native Android companion for Advanced IP Analyser, built with Kotlin and Jetpack
 - response-time measurement and common TCP service checks;
 - neighbour-table discovery for devices that do not answer ping or common ports;
 - tap-to-open access to the best web or remote service found on a LAN device;
-- nearby Wi-Fi names, BSSIDs, channels, signal levels and advertised security review;
+- nearby Wi-Fi names, BSSIDs, measured dBm, channels, advertised bandwidth and security review;
+- list, scrollable two-hour signal-history, and 2.4/5/6 GHz channel-overlap views with a 1–5 second requested refresh;
 - user-approved connection to a selected nearby Wi-Fi network;
 - ping/reachability, DNS, common-port and HTTP response diagnostics; and
 - real UDP latency benchmarking for 36 public DNS resolvers, with five-round
@@ -29,6 +30,10 @@ Android does not give ordinary applications access to other devices' MAC address
 saved Wi-Fi passwords, monitor-mode packet capture, raw ICMP sockets, or unrestricted
 background Wi-Fi scanning. The app explains these platform limits instead of showing
 invented values.
+
+Android can throttle active Wi-Fi scans. The analyser still samples on the selected
+1–5 second schedule, but may repeat Android's most recent radio result until the
+system permits another scan.
 
 Encrypted DNS-over-HTTPS traffic is not visible to the DNS monitor. App attribution can
 also be hidden by Android or by the app issuing the request. Public answer addresses are

@@ -601,7 +601,7 @@ encrypted application content remains encrypted.
 ## 13. Windows Wi-Fi Analyzer
 
 On Windows 10 or 11, select **Tools → Wi-Fi Analyzer**. The Nearby networks tab
-shows SSID, signal percentage, approximate dBm, security, saved-profile status,
+shows SSID, signal percentage, measured dBm, channel, advertised bandwidth, security, saved-profile status,
 connection state, and adapter. The Adapters tab reports Windows WLAN interface
 state. Refresh is read-only, and CSV export excludes credentials.
 
@@ -611,6 +611,11 @@ that key from Windows. The result remains in application memory until hidden or
 the window closes. Copy clears the same clipboard value after 30 seconds.
 Windows can refuse clear-text retrieval when the signed-in account lacks the
 required permission.
+
+Use **Signal history** to start a 1–5 second monitor and scroll through up to two
+hours of readings. Use **Channel graph** to compare overlap on 2.4, 5, and 6 GHz.
+Bandwidth comes from HT/VHT advertisements; the analyser labels missing metadata
+instead of estimating it.
 
 ## 14. Passive Wi-Fi Watch
 
@@ -628,7 +633,9 @@ On stop it removes only the reserved monitor interface after verifying its type.
 The window displays:
 
 - SSID/BSSID and hidden SSIDs;
-- channel and radiotap dBm signal where supplied;
+- channel, advertised HT/VHT bandwidth, and radiotap dBm signal where supplied;
+- 1–5 second analysis refresh, a scrollable two-hour signal timeline, and
+  2.4/5/6 GHz channel-overlap views;
 - advertised Open, WEP, WPA, WPA2/RSN, WPA3, and WPS information;
 - offline BSSID manufacturer and cautious security findings;
 - beacon/data counts;

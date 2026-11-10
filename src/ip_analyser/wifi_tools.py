@@ -41,6 +41,8 @@ class AccessPoint:
     bssid: str
     name: str = ""
     channel: int | None = None
+    channel_width_mhz: int | None = None
+    frequency_mhz: int | None = None
     signal_dbm: int | None = None
     security: str = "Open or unknown"
     beacons: int = 0
@@ -122,7 +124,7 @@ def _mac(value: bytes) -> str:
     return ":".join(f"{byte:02X}" for byte in value)
 
 
-def _radiotap(frame: bytes) -> tuple[int, int | None]:
+def _radiotap(frame: bytes) -> tuple[int, int | None, int | None]:
     if len(frame) < 8 or frame[0] != 0:
         raise ValueError("invalid radiotap header")
     length = struct.unpack("<H", frame[2:4])[0]
@@ -133,23 +135,26 @@ def _radiotap(frame: bytes) -> tuple[int, int | None]:
     offset = 8
     while present & 0x80000000:
         if offset + 4 > length:
-            return length, None
+            return length, None, None
         present = struct.unpack("<I", frame[offset:offset + 4])[0]
         offset += 4
     # Walk the standard fields that precede dBm antenna signal. Radiotap fields
     # are aligned relative to the beginning of the header, not packed.
     standard = ((0, 8, 8), (1, 1, 1), (2, 1, 1), (3, 2, 4), (4, 2, 2), (5, 1, 1))
     signal = None
+    frequency = None
     for bit, alignment, size in standard:
         if not first_present & (1 << bit):
             continue
         offset = (offset + alignment - 1) & ~(alignment - 1)
         if offset + size > length:
-            return length, None
+            return length, None, None
+        if bit == 3:
+            frequency = struct.unpack("<H", frame[offset:offset + 2])[0]
         if bit == 5:
             signal = struct.unpack("b", frame[offset:offset + 1])[0]
         offset += size
-    return length, signal
+    return length, signal, frequency
 
 
 def _tags(data: bytes) -> dict[int, list[bytes]]:
@@ -174,6 +179,21 @@ def _security(capabilities: int, tags: dict[int, list[bytes]]) -> str:
     if any(value.startswith(b"\x00\x50\xf2\x01") for value in tags.get(221, [])):
         return "WPA"
     return "WEP" if capabilities & 0x10 else "Open"
+
+
+def wifi_channel_width(tags: dict[int, list[bytes]]) -> int | None:
+    """Return the width advertised by HT/VHT operation tags, if present."""
+    width = None
+    ht = tags.get(61, [])
+    if ht and len(ht[0]) >= 2:
+        width = 40 if ht[0][1] & 0x03 in {1, 3} else 20
+    vht = tags.get(192, [])
+    if vht and vht[0]:
+        if vht[0][0] == 1:
+            width = 80
+        elif vht[0][0] in {2, 3}:
+            width = 160
+    return width
 
 
 def wifi_security_assessment(security: str, wps_advertised: bool = False) -> tuple[str, list[str]]:
@@ -226,7 +246,7 @@ def analyze_wifi_capture(path: Path) -> tuple[list[AccessPoint], list[WifiClient
     unlinked: dict[str, WifiClient] = {}
     for timestamp, raw, _original in _pcap_records(path.expanduser().resolve()):
         try:
-            offset, signal = _radiotap(raw)
+            offset, signal, frequency = _radiotap(raw)
         except ValueError:
             continue
         frame = raw[offset:]
@@ -246,6 +266,8 @@ def analyze_wifi_capture(path: Path) -> tuple[list[AccessPoint], list[WifiClient
                                                    last_seen=timestamp))
             ap.name = name or ap.name or "<hidden>"
             ap.channel = channel[0] if channel else ap.channel
+            ap.channel_width_mhz = wifi_channel_width(tags) or ap.channel_width_mhz
+            ap.frequency_mhz = frequency or ap.frequency_mhz
             ap.signal_dbm = signal if signal is not None else ap.signal_dbm
             ap.security = _security(capabilities, tags)
             ap.wps_advertised = any(value.startswith(b"\x00\x50\xf2\x04")
@@ -352,7 +374,8 @@ def save_wifi_report(path: Path, aps: list[AccessPoint], unlinked: list[WifiClie
                                    indent=2) + "\n", encoding="utf-8")
         return
     rows = [_ap_value(ap, include_clients=False) for ap in aps]
-    columns = ("name", "bssid", "manufacturer", "channel", "signal_dbm", "security",
+    columns = ("name", "bssid", "manufacturer", "channel", "channel_width_mhz",
+               "frequency_mhz", "signal_dbm", "security",
                "wps_advertised", "risk_level", "risk_reasons", "beacons", "data_packets",
                "client_count", "handshake_seen", "indicators")
     if suffix == ".csv":

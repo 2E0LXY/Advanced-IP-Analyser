@@ -36,6 +36,10 @@ class NearbyWifiNetwork:
     connected: bool
     risk_level: str = "No obvious issue"
     risk_reason: str = ""
+    bssid: str = ""
+    frequency_mhz: int = 0
+    channel: int = 0
+    channel_width_mhz: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,6 +107,36 @@ class _WLAN_AVAILABLE_NETWORK_LIST(ctypes.Structure):
                 ("Network", _WLAN_AVAILABLE_NETWORK * 1)]
 
 
+class _WLAN_RATE_SET(ctypes.Structure):
+    _fields_ = [("uRateSetLength", wintypes.ULONG),
+                ("usRateSet", wintypes.USHORT * 126)]
+
+
+class _WLAN_BSS_ENTRY(ctypes.Structure):
+    _fields_ = [("dot11Ssid", _DOT11_SSID),
+                ("uPhyId", wintypes.ULONG),
+                ("dot11Bssid", ctypes.c_ubyte * 6),
+                ("dot11BssType", wintypes.DWORD),
+                ("dot11BssPhyType", wintypes.DWORD),
+                ("lRssi", wintypes.LONG),
+                ("uLinkQuality", wintypes.ULONG),
+                ("bInRegDomain", wintypes.BOOL),
+                ("usBeaconPeriod", wintypes.USHORT),
+                ("ullTimestamp", ctypes.c_ulonglong),
+                ("ullHostTimestamp", ctypes.c_ulonglong),
+                ("usCapabilityInformation", wintypes.USHORT),
+                ("ulChCenterFrequency", wintypes.ULONG),
+                ("wlanRateSet", _WLAN_RATE_SET),
+                ("ulIeOffset", wintypes.ULONG),
+                ("ulIeSize", wintypes.ULONG)]
+
+
+class _WLAN_BSS_LIST(ctypes.Structure):
+    _fields_ = [("dwTotalSize", wintypes.DWORD),
+                ("dwNumberOfItems", wintypes.DWORD),
+                ("wlanBssEntries", _WLAN_BSS_ENTRY * 1)]
+
+
 class _WLAN_PROFILE_INFO(ctypes.Structure):
     _fields_ = [("strProfileName", wintypes.WCHAR * WLAN_MAX_NAME_LENGTH),
                 ("dwFlags", wintypes.DWORD)]
@@ -147,6 +181,11 @@ def _wlan_api():
                                                 wintypes.DWORD, wintypes.LPVOID,
                                                 ctypes.POINTER(ctypes.POINTER(_WLAN_AVAILABLE_NETWORK_LIST))]
     api.WlanGetAvailableNetworkList.restype = wintypes.DWORD
+    api.WlanGetNetworkBssList.argtypes = [wintypes.HANDLE, ctypes.POINTER(_GUID),
+                                          ctypes.POINTER(_DOT11_SSID), wintypes.DWORD,
+                                          wintypes.BOOL, wintypes.LPVOID,
+                                          ctypes.POINTER(ctypes.POINTER(_WLAN_BSS_LIST))]
+    api.WlanGetNetworkBssList.restype = wintypes.DWORD
     api.WlanGetProfileList.argtypes = [wintypes.HANDLE, ctypes.POINTER(_GUID), wintypes.LPVOID,
                                        ctypes.POINTER(ctypes.POINTER(_WLAN_PROFILE_INFO_LIST))]
     api.WlanGetProfileList.restype = wintypes.DWORD
@@ -215,10 +254,73 @@ def _security(auth: int, cipher: int, enabled: bool) -> str:
     return auth_name if cipher_name in {"None", "Use group"} else f"{auth_name} · {cipher_name}"
 
 
+def channel_for_frequency(frequency_mhz: int) -> int:
+    if frequency_mhz == 2484:
+        return 14
+    if 2412 <= frequency_mhz <= 2472:
+        return (frequency_mhz - 2407) // 5
+    if 5000 <= frequency_mhz <= 5895:
+        return (frequency_mhz - 5000) // 5
+    if 5955 <= frequency_mhz <= 7115:
+        return (frequency_mhz - 5950) // 5
+    return 0
+
+
+def channel_width_from_information_elements(data: bytes) -> int | None:
+    """Read advertised HT/VHT channel width without inventing unavailable data."""
+    width: int | None = None
+    position = 0
+    while position + 2 <= len(data):
+        element_id = data[position]
+        length = data[position + 1]
+        body = data[position + 2:position + 2 + length]
+        if len(body) != length:
+            break
+        if element_id == 61 and len(body) >= 2:  # HT Operation
+            width = 40 if body[1] & 0x03 in {1, 3} else 20
+        elif element_id == 192 and body:  # VHT Operation
+            if body[0] == 1:
+                width = 80
+            elif body[0] in {2, 3}:
+                width = 160
+        position += length + 2
+    return width
+
+
+def _bss_details(api, handle, guid: _GUID) -> dict[str, tuple[int, int, str, int | None]]:
+    pointer = ctypes.POINTER(_WLAN_BSS_LIST)()
+    result = api.WlanGetNetworkBssList(handle, ctypes.byref(guid), None, 3, False,
+                                       None, ctypes.byref(pointer))
+    if result != ERROR_SUCCESS:
+        return {}
+    details: dict[str, tuple[int, int, str, int | None]] = {}
+    try:
+        records = _variable_array(pointer, _WLAN_BSS_LIST, _WLAN_BSS_ENTRY,
+                                  "wlanBssEntries")
+        for record in records:
+            ssid = record.dot11Ssid.text() or "<hidden>"
+            frequency = int(record.ulChCenterFrequency) // 1000
+            bssid = ":".join(f"{value:02X}" for value in record.dot11Bssid)
+            ie_data = b""
+            if record.ulIeSize:
+                ie_data = ctypes.string_at(ctypes.addressof(record) + int(record.ulIeOffset),
+                                           int(record.ulIeSize))
+            candidate = (int(record.lRssi), frequency, bssid,
+                         channel_width_from_information_elements(ie_data))
+            previous = details.get(ssid.casefold())
+            if previous is None or candidate[0] > previous[0]:
+                details[ssid.casefold()] = candidate
+        return details
+    finally:
+        if pointer:
+            api.WlanFreeMemory(pointer)
+
+
 def list_nearby_wifi_networks() -> list[NearbyWifiNetwork]:
     networks: dict[tuple[str, str], NearbyWifiNetwork] = {}
     with _client() as (api, handle):
         for interface, guid in _interfaces(api, handle):
+            bss_by_ssid = _bss_details(api, handle, guid)
             pointer = ctypes.POINTER(_WLAN_AVAILABLE_NETWORK_LIST)()
             result = api.WlanGetAvailableNetworkList(handle, ctypes.byref(guid), 0, None,
                                                      ctypes.byref(pointer))
@@ -234,14 +336,20 @@ def list_nearby_wifi_networks() -> list[NearbyWifiNetwork]:
                                          int(record.dot11DefaultCipherAlgorithm),
                                          bool(record.bSecurityEnabled))
                     risk_level, risk_reasons = wifi_security_assessment(security)
+                    detail = bss_by_ssid.get(ssid.casefold())
+                    dbm = detail[0] if detail else (-100 if quality == 0 else -50 if quality == 100 else -100 + quality // 2)
+                    frequency = detail[1] if detail else 0
                     network = NearbyWifiNetwork(
                         ssid=ssid, signal_percent=quality,
-                        signal_dbm=-100 if quality == 0 else -50 if quality == 100 else -100 + quality // 2,
+                        signal_dbm=dbm,
                         security=security,
                         profile_name=record.strProfileName,
                         interface=interface.name,
                         connected=bool(int(record.dwFlags) & WLAN_AVAILABLE_NETWORK_CONNECTED),
-                        risk_level=risk_level, risk_reason="; ".join(risk_reasons))
+                        risk_level=risk_level, risk_reason="; ".join(risk_reasons),
+                        bssid=detail[2] if detail else "", frequency_mhz=frequency,
+                        channel=channel_for_frequency(frequency),
+                        channel_width_mhz=detail[3] if detail else None)
                     key = (ssid.casefold(), interface.guid)
                     previous = networks.get(key)
                     if previous is None or network.signal_percent > previous.signal_percent:

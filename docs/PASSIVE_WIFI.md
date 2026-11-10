@@ -9,6 +9,12 @@ transparent security review. Open and WEP advertisements are marked High; legacy
 WPA and advertised WPS are marked Medium. These labels use beacon advertisements
 only and should be confirmed against the authorized access-point configuration.
 
+Choose a 1–5 second analysis refresh and a capture duration up to two hours. The
+Signal history tab retains up to two hours of measured dBm samples and has a
+horizontal scrollbar. The Channel graph tab plots 2.4, 5, or 6 GHz access points
+using the HT/VHT bandwidth advertised in beacon metadata; unavailable bandwidth is
+shown as unavailable instead of being guessed.
+
 After explicit confirmation and PolicyKit authorization, the narrow helper creates
 a temporary interface named from the source adapter's Linux interface index. It
 does not stop NetworkManager, rename or reconfigure the managed adapter, or change

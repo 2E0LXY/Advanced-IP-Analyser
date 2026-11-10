@@ -4,6 +4,8 @@ import unittest
 from ip_analyser.windows_wifi import (
     _WLAN_PROFILE_INFO,
     _WLAN_PROFILE_INFO_LIST,
+    channel_for_frequency,
+    channel_width_from_information_elements,
     _security,
     _variable_array,
     _xml_text,
@@ -43,6 +45,15 @@ class WindowsWifiTests(unittest.TestCase):
         records = _variable_array(pointer, _WLAN_PROFILE_INFO_LIST,
                                   _WLAN_PROFILE_INFO, "ProfileInfo")
         self.assertEqual([record.strProfileName for record in records], ["First", "Second"])
+
+    def test_channel_metadata_uses_radio_information_elements(self):
+        self.assertEqual(channel_for_frequency(2412), 1)
+        self.assertEqual(channel_for_frequency(5180), 36)
+        self.assertEqual(channel_for_frequency(5975), 5)
+        self.assertEqual(channel_width_from_information_elements(bytes((61, 2, 1, 1))), 40)
+        self.assertEqual(channel_width_from_information_elements(bytes((192, 1, 1))), 80)
+        self.assertEqual(channel_width_from_information_elements(bytes((192, 1, 2))), 160)
+        self.assertIsNone(channel_width_from_information_elements(b""))
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,12 +24,20 @@ import uk.co.twoe0lxy.ipanalyser.data.PeerPairing
 import uk.co.twoe0lxy.ipanalyser.data.InventoryStore
 import uk.co.twoe0lxy.ipanalyser.data.WifiNetwork
 
+data class WifiSignalSnapshot(
+  val timestampMillis: Long,
+  val networks: List<WifiNetwork>,
+)
+
 data class MainScreenUiState(
   val network: NetworkInfo = NetworkInfo(),
   val hosts: List<HostResult> = emptyList(),
   val wifiNetworks: List<WifiNetwork> = emptyList(),
   val scanningLan: Boolean = false,
   val scanningWifi: Boolean = false,
+  val wifiMonitoring: Boolean = false,
+  val wifiRefreshSeconds: Int = 3,
+  val wifiHistory: List<WifiSignalSnapshot> = emptyList(),
   val completed: Int = 0,
   val total: Int = 0,
   val status: String = "Ready",
@@ -65,6 +74,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
   val uiState: StateFlow<MainScreenUiState> = mutableState.asStateFlow()
   private var scanJob: Job? = null
   private var dnsBenchmarkJob: Job? = null
+  private var wifiMonitorJob: Job? = null
 
   fun refreshNetwork() {
     mutableState.update { it.copy(network = scanner.networkInfo()) }
@@ -110,6 +120,46 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
         mutableState.update { it.copy(scanningWifi = false, status = error.message ?: "Wi-Fi scan failed") }
       }
     }
+  }
+
+  fun toggleWifiMonitor(refreshSeconds: Int) {
+    if (mutableState.value.wifiMonitoring) {
+      wifiMonitorJob?.cancel()
+      wifiMonitorJob = null
+      mutableState.update { it.copy(wifiMonitoring = false, scanningWifi = false, status = "Wi-Fi monitoring stopped") }
+      return
+    }
+    val interval = refreshSeconds.coerceIn(1, 5)
+    wifiMonitorJob = viewModelScope.launch {
+      mutableState.update { it.copy(wifiMonitoring = true, wifiRefreshSeconds = interval, status = "Wi-Fi signal monitoring started") }
+      try {
+        while (true) {
+          val started = System.currentTimeMillis()
+          mutableState.update { it.copy(scanningWifi = true) }
+          val networks = scanner.scanWifi()
+          val now = System.currentTimeMillis()
+          val cutoff = now - 2 * 60 * 60 * 1_000L
+          mutableState.update { state ->
+            state.copy(
+              wifiNetworks = networks,
+              wifiHistory = (state.wifiHistory + WifiSignalSnapshot(now, networks))
+                .dropWhile { it.timestampMillis < cutoff },
+              scanningWifi = false,
+              status = "Monitoring ${networks.size} Wi-Fi networks · every $interval s",
+            )
+          }
+          delay((interval * 1_000L - (System.currentTimeMillis() - started)).coerceAtLeast(0L))
+        }
+      } catch (_: CancellationException) {
+        mutableState.update { it.copy(wifiMonitoring = false, scanningWifi = false) }
+      } catch (error: Exception) {
+        mutableState.update { it.copy(wifiMonitoring = false, scanningWifi = false, status = error.message ?: "Wi-Fi monitoring failed") }
+      }
+    }
+  }
+
+  fun clearWifiHistory() {
+    mutableState.update { it.copy(wifiHistory = emptyList(), status = "Wi-Fi signal history cleared") }
   }
 
   fun connectWifi(network: WifiNetwork, password: String) {
@@ -262,6 +312,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
   }
 
   override fun onCleared() {
+    wifiMonitorJob?.cancel()
     dnsBenchmarkJob?.cancel()
     pairing.stopBridge()
     super.onCleared()

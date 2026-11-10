@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -68,6 +69,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -165,7 +167,8 @@ fun MainScreen(
       when (pages[selectedPage]) {
         AppPage.Dashboard -> DashboardPage(state)
         AppPage.Lan -> LanPage(state, viewModel::scanLan, viewModel::refreshNetwork, viewModel::toggleFavorite)
-        AppPage.Wifi -> WifiPage(state, viewModel::scanWifi, viewModel::connectWifi)
+        AppPage.Wifi -> WifiPage(state, viewModel::scanWifi, viewModel::toggleWifiMonitor,
+          viewModel::clearWifiHistory, viewModel::connectWifi)
         AppPage.DnsBench -> DnsBenchmarkPage(state, viewModel::toggleDnsBenchmark)
         AppPage.Tools -> ToolsPage(
           state,
@@ -429,6 +432,8 @@ private fun HostRow(host: HostResult, favorite: Boolean, onFavorite: (String) ->
 private fun WifiPage(
   state: MainScreenUiState,
   onScan: () -> Unit,
+  onToggleMonitor: (Int) -> Unit,
+  onClearHistory: () -> Unit,
   onConnect: (WifiNetwork, String) -> Unit,
 ) {
   val context = LocalContext.current
@@ -440,34 +445,182 @@ private fun WifiPage(
     }.toTypedArray()
   }
   var permissionDenied by rememberSaveable { mutableStateOf(false) }
+  var pendingMonitor by remember { mutableStateOf(false) }
+  var viewMode by rememberSaveable { mutableIntStateOf(0) }
+  var refreshSeconds by rememberSaveable { mutableIntStateOf(state.wifiRefreshSeconds) }
+  var band by rememberSaveable { mutableIntStateOf(0) }
   val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
     permissionDenied = grants.values.any { !it }
-    if (!permissionDenied) onScan()
+    if (!permissionDenied) {
+      if (pendingMonitor) onToggleMonitor(refreshSeconds) else onScan()
+    }
+    pendingMonitor = false
   }
-  fun requestOrScan() {
+  fun requestWifi(monitor: Boolean) {
     val missing = permissions.any { ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED }
-    if (missing) permissionLauncher.launch(permissions) else onScan()
+    if (missing) {
+      pendingMonitor = monitor
+      permissionLauncher.launch(permissions)
+    } else if (monitor) onToggleMonitor(refreshSeconds) else onScan()
   }
 
   Column(Modifier.fillMaxSize().padding(16.dp)) {
-    PageHeading("Wi-Fi analyzer", "Nearby channels, signal and security", Icons.Outlined.Wifi)
+    PageHeading("Wi-Fi analyzer", "Nearby channels, bandwidth and two-hour signal history", Icons.Outlined.Wifi)
     Spacer(Modifier.height(12.dp))
-    Button(onClick = ::requestOrScan, enabled = !state.scanningWifi, modifier = Modifier.fillMaxWidth()) {
-      Icon(Icons.Outlined.Wifi, null, modifier = Modifier.size(18.dp))
-      Text(if (state.scanningWifi) "  Scanning…" else "  Scan nearby Wi-Fi")
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+      listOf("Networks", "History", "Channels").forEachIndexed { index, label ->
+        if (viewMode == index) Button(onClick = { viewMode = index }, modifier = Modifier.weight(1f)) { Text(label, fontSize = 11.sp) }
+        else OutlinedButton(onClick = { viewMode = index }, modifier = Modifier.weight(1f)) { Text(label, fontSize = 11.sp) }
+      }
+    }
+    Spacer(Modifier.height(8.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+      Button(onClick = { requestWifi(false) }, enabled = !state.scanningWifi,
+        modifier = Modifier.weight(1f)) { Text(if (state.scanningWifi && !state.wifiMonitoring) "Scanning…" else "Scan now") }
+      Button(onClick = { if (state.wifiMonitoring) onToggleMonitor(refreshSeconds) else requestWifi(true) }, modifier = Modifier.weight(1f)) {
+        Text(if (state.wifiMonitoring) "Stop monitor" else "Start monitor")
+      }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Text("Refresh", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+      (1..5).forEach { seconds ->
+        TextButton(onClick = { refreshSeconds = seconds }, enabled = !state.wifiMonitoring) {
+          Text("${seconds}s", color = if (refreshSeconds == seconds) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+      }
     }
     Text(
       if (permissionDenied) "Wi-Fi scan permission was denied. Allow it in Android settings to scan nearby networks."
+      else if (state.wifiMonitoring) "Recording every ${state.wifiRefreshSeconds}s for up to 2 hours. Android may throttle scans and repeat its latest sample."
       else "Nearby-device and precise-location permission are required by Android.",
       fontSize = 11.sp,
       color = if (permissionDenied) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
       modifier = Modifier.padding(vertical = 9.dp),
     )
-    if (state.wifiNetworks.isEmpty()) {
-      EmptyPanel("No nearby Wi-Fi results yet.")
-    } else {
-      LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(state.wifiNetworks, key = WifiNetwork::bssid) { WifiRow(it, onConnect) }
+    when (viewMode) {
+      0 -> if (state.wifiNetworks.isEmpty()) EmptyPanel("No nearby Wi-Fi results yet.") else {
+        LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+          items(state.wifiNetworks, key = WifiNetwork::bssid) { WifiRow(it, onConnect) }
+        }
+      }
+      1 -> {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Text("${state.wifiHistory.size} samples · swipe sideways for history", fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+          TextButton(onClick = onClearHistory) { Text("Clear") }
+        }
+        WifiHistoryChart(state.wifiHistory, state.wifiRefreshSeconds, Modifier.weight(1f))
+      }
+      else -> {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+          listOf("2.4 GHz", "5 GHz", "6 GHz").forEachIndexed { index, label ->
+            if (band == index) Button(onClick = { band = index }, modifier = Modifier.weight(1f)) { Text(label, fontSize = 11.sp) }
+            else OutlinedButton(onClick = { band = index }, modifier = Modifier.weight(1f)) { Text(label, fontSize = 11.sp) }
+          }
+        }
+        WifiChannelChart(state.wifiNetworks, band, Modifier.weight(1f))
+      }
+    }
+  }
+}
+
+private val WifiChartColors = listOf(
+  Color(0xFF22B8FF), Green400, Color(0xFFFFCC3D), Color(0xFFFF6B6B),
+  Purple400, Color(0xFF31D6C4), Orange400, Color(0xFF8DC5FF),
+)
+
+@Composable
+private fun WifiHistoryChart(history: List<WifiSignalSnapshot>, refreshSeconds: Int, modifier: Modifier = Modifier) {
+  if (history.isEmpty()) {
+    Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("Start monitoring to collect signal history") }
+    return
+  }
+  val strongest = history.last().networks.sortedByDescending { it.signalDbm }.take(8)
+  val keys = strongest.map(WifiNetwork::bssid)
+  val scroll = rememberScrollState()
+  val chartWidth = maxOf(720, history.size * 7)
+  LaunchedEffect(history.size) { scroll.animateScrollTo(scroll.maxValue) }
+  Column(modifier) {
+    strongest.chunked(2).forEach { row ->
+      Row(Modifier.fillMaxWidth()) {
+        row.forEach { network ->
+          val color = WifiChartColors[keys.indexOf(network.bssid) % WifiChartColors.size]
+          Text("● ${network.name}", color = color, fontSize = 10.sp, maxLines = 1,
+            modifier = Modifier.weight(1f).padding(end = 6.dp))
+        }
+        if (row.size == 1) Spacer(Modifier.weight(1f))
+      }
+    }
+    Box(Modifier.fillMaxWidth().horizontalScroll(scroll)) {
+      Canvas(Modifier.width(chartWidth.dp).height(330.dp)) {
+        val left = 42f
+        val top = 14f
+        val bottom = size.height - 28f
+        for (dbm in -100..-30 step 10) {
+          val y = top + (-30 - dbm) / 70f * (bottom - top)
+          drawLine(Color(0xFF284157), Offset(left, y), Offset(size.width, y), 1f)
+        }
+        keys.forEachIndexed { colorIndex, bssid ->
+          val path = Path()
+          var started = false
+          history.forEachIndexed { index, snapshot ->
+            snapshot.networks.firstOrNull { it.bssid == bssid }?.let { network ->
+              val x = left + index * 7f
+              val y = top + (-30 - network.signalDbm.coerceIn(-100, -30)) / 70f * (bottom - top)
+              if (!started) { path.moveTo(x, y); started = true } else path.lineTo(x, y)
+            }
+          }
+          if (started) drawPath(path, WifiChartColors[colorIndex % WifiChartColors.size], style = androidx.compose.ui.graphics.drawscope.Stroke(3f))
+        }
+      }
+    }
+    Text("-30 dBm strong · -100 dBm weak · ${refreshSeconds}s requested interval",
+      fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+  }
+}
+
+@Composable
+private fun WifiChannelChart(networks: List<WifiNetwork>, band: Int, modifier: Modifier = Modifier) {
+  val low = if (band == 0) 2400f else if (band == 1) 5000f else 5925f
+  val high = if (band == 0) 2500f else if (band == 1) 5900f else 7125f
+  val visible = networks.filter { it.frequencyMhz.toFloat() in low..high }.take(16)
+  Column(modifier.padding(top = 8.dp)) {
+    Canvas(Modifier.fillMaxWidth().height(300.dp)) {
+      val left = 8f
+      val right = size.width - 8f
+      val top = 12f
+      val bottom = size.height - 12f
+      fun x(frequency: Float) = left + (frequency - low) / (high - low) * (right - left)
+      fun y(dbm: Int) = top + (-30 - dbm.coerceIn(-100, -30)) / 70f * (bottom - top)
+      for (dbm in -100..-30 step 10) drawLine(Color(0xFF284157), Offset(left, y(dbm)), Offset(right, y(dbm)), 1f)
+      visible.forEachIndexed { index, network ->
+        val halfWidth = network.channelWidthMhz.coerceAtLeast(1) / 2f
+        val startX = x(network.frequencyMhz - halfWidth)
+        val peakX = x(network.frequencyMhz.toFloat())
+        val endX = x(network.frequencyMhz + halfWidth)
+        val peakY = y(network.signalDbm)
+        val path = Path().apply {
+          moveTo(startX, bottom)
+          cubicTo(startX, (bottom + peakY) / 2, peakX - (peakX - startX) / 2, peakY, peakX, peakY)
+          cubicTo(peakX + (endX - peakX) / 2, peakY, endX, (bottom + peakY) / 2, endX, bottom)
+          close()
+        }
+        drawPath(path, WifiChartColors[index % WifiChartColors.size].copy(alpha = .28f))
+        drawPath(path, WifiChartColors[index % WifiChartColors.size], style = androidx.compose.ui.graphics.drawscope.Stroke(3f))
+      }
+    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+      val ticks = if (band == 0) listOf("ch 1", "6", "11", "14")
+      else if (band == 1) listOf("ch 36", "64", "100", "132", "165")
+      else listOf("ch 1", "65", "129", "193", "233")
+      ticks.forEach { Text(it, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    }
+    if (visible.isEmpty()) Text("No access points in this band in the latest scan.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    else LazyColumn(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+      items(visible, key = WifiNetwork::bssid) { network ->
+        val color = WifiChartColors[visible.indexOf(network) % WifiChartColors.size]
+        Text("● ${network.name} · channel ${network.channel} · ${network.channelWidthMhz} MHz · ${network.signalDbm} dBm",
+          color = color, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
       }
     }
   }
@@ -488,7 +641,7 @@ private fun WifiRow(network: WifiNetwork, onConnect: (WifiNetwork, String) -> Un
       Icon(Icons.Outlined.Wifi, null, tint = MaterialTheme.colorScheme.primary)
       Column(Modifier.padding(start = 11.dp).weight(1f)) {
         Text(network.name, fontWeight = FontWeight.Bold)
-        Text("Channel ${network.channel} · ${network.frequencyMhz} MHz · ${network.security}", fontSize = 12.sp)
+        Text("Channel ${network.channel} · ${network.channelWidthMhz} MHz wide · ${network.frequencyMhz} MHz · ${network.security}", fontSize = 12.sp)
         Text(network.review, color = reviewColor, fontSize = 12.sp)
       }
       Column(horizontalAlignment = Alignment.End) {
@@ -506,6 +659,7 @@ private fun WifiRow(network: WifiNetwork, onConnect: (WifiNetwork, String) -> Un
         }
         Text(bars, color = signalColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
         Text("${network.signalPercent}%", color = signalColor, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+        Text("${network.signalDbm} dBm", color = signalColor, fontSize = 10.sp)
         TextButton(onClick = {
           if (network.security !in setOf("WPA", "WPA2", "WPA3")) onConnect(network, "")
           else showPassword = true

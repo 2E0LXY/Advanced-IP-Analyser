@@ -8,7 +8,7 @@ from unittest.mock import patch
 from ip_analyser.wifi_tools import (AccessPoint, WifiClient, _pkexec_command,
                                     analyze_wifi_capture, append_wifi_history,
                                     compare_wifi_history, enrich_wifi_vendors, rogue_wifi_indicators,
-                                    save_wifi_report, wifi_security_assessment)
+                                    save_wifi_report, wifi_channel_width, wifi_security_assessment)
 
 
 AP = bytes.fromhex("001122334455")
@@ -91,6 +91,12 @@ class WifiToolTests(unittest.TestCase):
         self.assertEqual(level, "Medium")
         self.assertIn("WPS", reasons[0])
         self.assertEqual(wifi_security_assessment("WPA3"), ("No obvious issue", []))
+
+    def test_channel_width_uses_advertised_ht_and_vht_operations(self):
+        self.assertEqual(wifi_channel_width({61: [bytes((1, 1))]}), 40)
+        self.assertEqual(wifi_channel_width({192: [bytes((1,))]}), 80)
+        self.assertEqual(wifi_channel_width({192: [bytes((2,))]}), 160)
+        self.assertIsNone(wifi_channel_width({}))
 
     def test_wifi_history_reports_new_missing_and_security_changes(self):
         with tempfile.TemporaryDirectory() as directory:

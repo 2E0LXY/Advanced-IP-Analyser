@@ -72,8 +72,10 @@ data class WifiNetwork(
   val name: String,
   val bssid: String,
   val signalPercent: Int,
+  val signalDbm: Int,
   val frequencyMhz: Int,
   val channel: Int,
+  val channelWidthMhz: Int,
   val security: String,
   val review: String,
 )
@@ -111,6 +113,15 @@ object ScannerUtils {
     frequencyMhz in 2412..2472 -> (frequencyMhz - 2407) / 5
     frequencyMhz in 5000..5895 -> (frequencyMhz - 5000) / 5
     frequencyMhz in 5955..7115 -> (frequencyMhz - 5950) / 5
+    else -> 0
+  }
+
+  fun channelWidthMhz(channelWidth: Int): Int = when (channelWidth) {
+    0 -> 20
+    1 -> 40
+    2 -> 80
+    3, 4 -> 160
+    5 -> 320
     else -> 0
   }
 
@@ -299,15 +310,19 @@ class NetworkScanner(context: Context) {
   suspend fun scanWifi(): List<WifiNetwork> = withContext(Dispatchers.IO) {
     try {
       wifi.startScan()
-      delay(1_800)
+      // Android may throttle active scans; a short wait still lets us sample its latest
+      // system-owned results at the user's 1–5 second analysis interval.
+      delay(650)
       wifi.scanResults.map { result ->
         val (security, review) = ScannerUtils.wifiSecurity(result.capabilities.orEmpty())
         WifiNetwork(
           name = result.SSID.takeIf { it.isNotBlank() } ?: "Hidden network",
           bssid = result.BSSID ?: "Unavailable",
           signalPercent = WifiManager.calculateSignalLevel(result.level, 101),
+          signalDbm = result.level,
           frequencyMhz = result.frequency,
           channel = ScannerUtils.channelFor(result.frequency),
+          channelWidthMhz = ScannerUtils.channelWidthMhz(result.channelWidth),
           security = security,
           review = review,
         )

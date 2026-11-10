@@ -60,16 +60,16 @@ live progress, expandable service results, inventory exchange, and remote action
 | Network intelligence | Conservative duplicate-device resolution, explainable 0-100 exposure priority, automatic Infrastructure/Server/Admin/IoT/Workstation zones, field/CIDR/risk queries with AND/OR/NOT, device-to-service dependency GraphML and versioned JSON export |
 | Windows security posture | Read-only, explainable status for firewall profiles, antivirus provider, Defender real-time protection, SMB 1.0, UAC, active network categories and configured DNS resolvers; unknown results remain visibly unverified, with copy and local JSON export |
 | DNS benchmark | Real UDP DNS A-record queries to 36 public resolver endpoints, one to five rounds, adjustable inter-round delay and timeout, average/jitter/reply ranking, filtering, stoppable partial results, copyable report, and a post-test shortcut to Windows DNS settings |
-| Windows Wi-Fi Analyzer | Nearby SSIDs, signal quality, approximate dBm, security, active connection, adapter status, saved-profile inventory, selected-profile password reveal with confirmation, credential-free CSV export |
+| Windows Wi-Fi Analyzer | Nearby SSIDs/BSSIDs, measured dBm, channel and advertised bandwidth, scrollable two-hour signal history, 1–5 second refresh, channel-overlap graph, security, adapter status, saved profiles, confirmed password reveal, credential-free CSV export |
 | System Monitor | Local-only CPU, memory, storage and network history, cautious bottleneck diagnosis, top-process attribution, process identity tied to creation time, explicit unavailable states, pause and bounded JSON flight-recorder export |
 | Disk Usage | Read-only bounded folder analysis, largest folders and files, live progress, file-name filtering, proportional size map, cancellation and CSV export |
-| Passive Wi-Fi | Monitor-mode AP/client discovery, BSSID manufacturer, channel/signal/security/WPS review, beacons/data/probes, passive EAPOL observation, bounded history and comparison, PCAP/JSON/CSV/HTML reports |
+| Passive Wi-Fi | Monitor-mode AP/client discovery, BSSID manufacturer, channel/bandwidth graph, measured signal with scrollable two-hour history, 1–5 second analysis refresh, security/WPS review, beacons/data/probes, passive EAPOL observation, bounded comparison history, PCAP/JSON/CSV/HTML reports |
 | Web Security Audit | Same-host bounded crawler, path exclusions, extra allowed hosts, custom headers, page/form/technology inventory, TLS fingerprint, security-header, cookie, cleartext, mixed-content, directory-listing, CORS, and password-form observations, HTML/JSON reports |
 | AI intelligence | Separate OpenAI, Gemini, and OpenRouter keys in Debian Secret Service or Windows Credential Manager; supplier-native live model lists; exact outbound preview; redaction; explicit consent; evidence-backed advisory analysis |
 | Updates | Automatic GitHub release check, flashing button, platform-specific asset selection, trusted release URL, SHA-256 verification, package/installer checks, close/install/restart workflow |
 | Debian packaging | Reproducible `.deb`, Lintian/AppStream/desktop validation, install/GUI/remove smoke test, release checksum, optional signed GitHub Pages APT feed |
 | Windows packaging | Self-contained x64 application, per-user Inno Setup installer, native launcher adaptations, smoke test, checksum, and GitHub build-provenance attestation |
-| Android companion | Native Kotlin/Compose dashboard, bounded LAN discovery, common-service checks, nearby Wi-Fi security review, real UDP DNS resolver benchmark, ping/reachability, DNS, port and HTTP diagnostics |
+| Android companion | Native Kotlin/Compose dashboard, bounded LAN discovery, common-service checks, nearby Wi-Fi list plus channel-bandwidth graph and scrollable two-hour dBm history, real UDP DNS resolver benchmark, ping/reachability, DNS, port and HTTP diagnostics |
 
 Scan rows appear as each host finishes its bounded port checks. Hostnames, vendor names, and service fingerprints are added as discovery completes. The first vendor lookup downloads public IEEE MA-L/MA-M/MA-S assignment lists into the local cache; no device MAC address is sent to IEEE. A blank hostname or OS means the network did not provide enough evidence to identify it reliably.
 
@@ -347,9 +347,12 @@ See [Network Security Monitor documentation](docs/NETWORK_WATCH.md).
 ## Windows Wi-Fi Analyzer
 
 Open **Tools → Wi-Fi Analyzer** on Windows 10 or 11. The analyzer uses Windows'
-native WLAN service to list wireless adapters, nearby network names, signal
-quality, approximate dBm, advertised security, the active connection, and saved
-profiles. Nearby results can be exported to CSV; credentials are never included.
+native WLAN service to list wireless adapters, nearby network names, measured RSSI,
+channel and advertised HT/VHT bandwidth, security, the active connection, and saved
+profiles. **Signal history** records at a chosen 1–5 second interval for up to two
+hours and scrolls back in time. **Channel graph** shows 2.4, 5, or 6 GHz overlap;
+an unavailable width is labelled instead of guessed. Nearby results can be exported
+to CSV; credentials are never included.
 
 Saved passwords remain masked. To inspect one key already stored on the current
 computer, select its profile and confirm **Reveal selected password**. The app

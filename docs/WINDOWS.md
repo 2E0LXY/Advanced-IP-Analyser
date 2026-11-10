@@ -48,7 +48,11 @@ analysed on Windows.
 ## Wi-Fi Analyzer
 
 Open **Tools → Wi-Fi Analyzer**. Nearby-network scanning and adapter status are
-read-only and use the Windows WLAN service. CSV exports contain SSID, signal,
+read-only and use the Windows WLAN service. Signal history retains and horizontally
+scrolls through up to two hours of measured dBm samples at a selected 1–5 second
+interval. Channel graph shows access points by 2.4, 5, or 6 GHz channel and uses
+advertised HT/VHT bandwidth; missing bandwidth is labelled rather than inferred.
+CSV exports contain SSID, BSSID, frequency, channel, bandwidth, signal,
 security, cautious configuration review, connection, saved-profile, and adapter
 fields; they exclude passwords. Open and legacy security advertisements are
 highlighted for verification.

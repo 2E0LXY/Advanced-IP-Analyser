@@ -44,6 +44,15 @@ class ScannerUtilsTest {
   }
 
   @Test
+  fun wifiChannelWidthsUseAndroidScanMetadata() {
+    assertEquals(20, ScannerUtils.channelWidthMhz(0))
+    assertEquals(80, ScannerUtils.channelWidthMhz(2))
+    assertEquals(160, ScannerUtils.channelWidthMhz(4))
+    assertEquals(320, ScannerUtils.channelWidthMhz(5))
+    assertEquals(0, ScannerUtils.channelWidthMhz(99))
+  }
+
+  @Test
   fun arpTableIncludesOnlyCompletedNeighbours() {
     val table = """
       IP address       HW type     Flags       HW address            Mask     Device
