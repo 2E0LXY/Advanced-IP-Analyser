@@ -6,9 +6,9 @@ The main GitHub **Latest** release contains Android, Windows and Debian download
 together. Android also retains a separate version tag for its independent build
 and signing history.
 
-**[Download Advanced IP Analyser Android 1.2.6](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.6/Advanced-IP-Analyser-Android-1.2.6.apk)**
+**[Download Advanced IP Analyser Android 1.2.7](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.7/Advanced-IP-Analyser-Android-1.2.7.apk)**
 
-File name: `Advanced-IP-Analyser-Android-1.2.6.apk`
+File name: `Advanced-IP-Analyser-Android-1.2.7.apk`
 
 Main download page: [Advanced IP Analyser 2.9.9 — all platforms](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/tag/v2.9.9)
 
@@ -39,7 +39,7 @@ file is the signed release APK rather than a debug build.
 ## Verify the download
 
 The release includes the generated SHA-256 checksum in
-[`SHA256SUMS-ANDROID.txt`](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.6/SHA256SUMS-ANDROID.txt)
+[`SHA256SUMS-ANDROID.txt`](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.7/SHA256SUMS-ANDROID.txt)
 file.
 
 ## Permissions and privacy
@@ -49,6 +49,8 @@ file.
   depending on the Android version.
 - Wi-Fi analyser views include a network list, a horizontally scrollable signal
   history retained for up to two hours, and 2.4/5/6 GHz channel/bandwidth graphs.
+  Charts label the dBm scale, time or channel axis, strongest SSIDs, centre channel
+  and advertised bandwidth; the details below each graph remain scrollable.
   Refresh can be requested every 1–5 seconds; Android may throttle radio scans and
   repeat its latest result.
 - Connecting to a selected Wi-Fi network always uses Android's system approval.

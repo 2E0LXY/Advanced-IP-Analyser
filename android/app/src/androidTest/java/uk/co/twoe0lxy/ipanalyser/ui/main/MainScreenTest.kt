@@ -11,9 +11,9 @@ class MainScreenTest {
   @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
   @Test
-  fun dashboardAndPrimaryActionAreVisible() {
+  fun dashboardIsVisible() {
     composeTestRule.setContent { MainScreen() }
     composeTestRule.onNodeWithText("Network Dashboard").assertIsDisplayed()
-    composeTestRule.onNodeWithText("Scan").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Overview and quick actions").assertIsDisplayed()
   }
 }

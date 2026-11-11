@@ -2,6 +2,7 @@ package uk.co.twoe0lxy.ipanalyser.ui.main
 
 import android.Manifest
 import android.app.Activity
+import android.graphics.Paint as AndroidPaint
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -81,6 +83,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -92,6 +96,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import uk.co.twoe0lxy.ipanalyser.data.HostResult
 import uk.co.twoe0lxy.ipanalyser.data.ScannerUtils
 import uk.co.twoe0lxy.ipanalyser.data.SmartDevice
@@ -538,7 +545,8 @@ private fun WifiHistoryChart(history: List<WifiSignalSnapshot>, refreshSeconds: 
   val strongest = history.last().networks.sortedByDescending { it.signalDbm }.take(8)
   val keys = strongest.map(WifiNetwork::bssid)
   val scroll = rememberScrollState()
-  val chartWidth = maxOf(720, history.size * 7)
+  val chartWidth = maxOf(620, history.size * 7)
+  val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
   LaunchedEffect(history.size) { scroll.animateScrollTo(scroll.maxValue) }
   Column(modifier) {
     strongest.chunked(2).forEach { row ->
@@ -551,53 +559,120 @@ private fun WifiHistoryChart(history: List<WifiSignalSnapshot>, refreshSeconds: 
         if (row.size == 1) Spacer(Modifier.weight(1f))
       }
     }
-    Box(Modifier.fillMaxWidth().horizontalScroll(scroll)) {
-      Canvas(Modifier.width(chartWidth.dp).height(330.dp)) {
-        val left = 42f
-        val top = 14f
-        val bottom = size.height - 28f
+    Row(Modifier.fillMaxWidth().height(330.dp)) {
+      WifiDbmAxis(Modifier.width(48.dp).fillMaxHeight())
+      Box(Modifier.weight(1f).fillMaxHeight().horizontalScroll(scroll)) {
+        Canvas(Modifier.width(chartWidth.dp).fillMaxHeight()) {
+        val left = 4.dp.toPx()
+        val right = size.width - 8.dp.toPx()
+        val top = 18.dp.toPx()
+        val bottom = size.height - 30.dp.toPx()
+        val labelPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+          color = Color(0xFF9FB0C7).toArgb()
+          textSize = 10.sp.toPx()
+          textAlign = AndroidPaint.Align.CENTER
+        }
         for (dbm in -100..-30 step 10) {
           val y = top + (-30 - dbm) / 70f * (bottom - top)
-          drawLine(Color(0xFF284157), Offset(left, y), Offset(size.width, y), 1f)
+          drawLine(Color(0xFF284157), Offset(left, y), Offset(right, y), 1f)
+        }
+        drawLine(Color(0xFF60758B), Offset(left, bottom), Offset(right, bottom), 1.5f)
+        val tickStep = maxOf(1, history.lastIndex / 5)
+        history.indices.filter { it % tickStep == 0 || it == history.lastIndex }.forEach { index ->
+          val x = if (history.size == 1) left else left + index.toFloat() / history.lastIndex * (right - left)
+          drawLine(Color(0xFF20384E), Offset(x, top), Offset(x, bottom), 1f)
+          drawContext.canvas.nativeCanvas.drawText(
+            timeFormatter.format(Date(history[index].timestampMillis)), x, size.height - 8.dp.toPx(), labelPaint,
+          )
         }
         keys.forEachIndexed { colorIndex, bssid ->
           val path = Path()
           var started = false
           history.forEachIndexed { index, snapshot ->
             snapshot.networks.firstOrNull { it.bssid == bssid }?.let { network ->
-              val x = left + index * 7f
+              val x = if (history.size == 1) left else left + index.toFloat() / history.lastIndex * (right - left)
               val y = top + (-30 - network.signalDbm.coerceIn(-100, -30)) / 70f * (bottom - top)
               if (!started) { path.moveTo(x, y); started = true } else path.lineTo(x, y)
             }
           }
           if (started) drawPath(path, WifiChartColors[colorIndex % WifiChartColors.size], style = androidx.compose.ui.graphics.drawscope.Stroke(3f))
         }
+        }
       }
     }
-    Text("-30 dBm strong · -100 dBm weak · ${refreshSeconds}s requested interval",
+    Text("Signal history · ${refreshSeconds}s requested interval · drag sideways for up to 2 hours",
       fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
   }
 }
 
 @Composable
+private fun WifiDbmAxis(modifier: Modifier = Modifier) {
+  Canvas(modifier) {
+    val top = 18.dp.toPx()
+    val bottom = size.height - 30.dp.toPx()
+    val labelPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+      color = Color(0xFF9FB0C7).toArgb()
+      textSize = 10.sp.toPx()
+      textAlign = AndroidPaint.Align.RIGHT
+    }
+    drawContext.canvas.nativeCanvas.drawText("dBm", size.width - 5.dp.toPx(), 11.dp.toPx(), labelPaint)
+    for (dbm in -100..-30 step 10) {
+      val y = top + (-30 - dbm) / 70f * (bottom - top)
+      drawContext.canvas.nativeCanvas.drawText(dbm.toString(), size.width - 5.dp.toPx(), y + 3.dp.toPx(), labelPaint)
+    }
+  }
+}
+
+@Composable
 private fun WifiChannelChart(networks: List<WifiNetwork>, band: Int, modifier: Modifier = Modifier) {
-  val low = if (band == 0) 2400f else if (band == 1) 5000f else 5925f
-  val high = if (band == 0) 2500f else if (band == 1) 5900f else 7125f
-  val visible = networks.filter { it.frequencyMhz.toFloat() in low..high }.take(16)
-  Column(modifier.padding(top = 8.dp)) {
-    Canvas(Modifier.fillMaxWidth().height(300.dp)) {
-      val left = 8f
-      val right = size.width - 8f
-      val top = 12f
-      val bottom = size.height - 12f
+  val low = if (band == 0) 2402f else if (band == 1) 5150f else 5925f
+  val high = if (band == 0) 2494f else if (band == 1) 5900f else 7125f
+  val visible = networks.filter { it.frequencyMhz.toFloat() in low..high }
+    .sortedByDescending(WifiNetwork::signalDbm).take(16)
+  val channelTicks = when (band) {
+    0 -> (1..13).map { it to (2407 + it * 5).toFloat() } + (14 to 2484f)
+    1 -> listOf(36, 48, 64, 100, 116, 132, 149, 165).map { it to (5000 + it * 5).toFloat() }
+    else -> listOf(1, 33, 65, 97, 129, 161, 193, 225).map { it to (5950 + it * 5).toFloat() }
+  }
+  val detailScroll = rememberScrollState()
+  Column(modifier.padding(top = 8.dp).verticalScroll(detailScroll)) {
+    Canvas(Modifier.fillMaxWidth().height(330.dp)) {
+      val left = 45.dp.toPx()
+      val right = size.width - 7.dp.toPx()
+      val top = 26.dp.toPx()
+      val bottom = size.height - 31.dp.toPx()
+      val axisPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+        color = Color(0xFF9FB0C7).toArgb()
+        textSize = 9.sp.toPx()
+      }
+      val networkPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+        textSize = 9.sp.toPx()
+        textAlign = AndroidPaint.Align.CENTER
+      }
       fun x(frequency: Float) = left + (frequency - low) / (high - low) * (right - left)
       fun y(dbm: Int) = top + (-30 - dbm.coerceIn(-100, -30)) / 70f * (bottom - top)
-      for (dbm in -100..-30 step 10) drawLine(Color(0xFF284157), Offset(left, y(dbm)), Offset(right, y(dbm)), 1f)
-      visible.forEachIndexed { index, network ->
+      for (dbm in -100..-30 step 10) {
+        val lineY = y(dbm)
+        drawLine(Color(0xFF284157), Offset(left, lineY), Offset(right, lineY), 1f)
+        axisPaint.textAlign = AndroidPaint.Align.RIGHT
+        drawContext.canvas.nativeCanvas.drawText("$dbm", left - 6.dp.toPx(), lineY + 3.dp.toPx(), axisPaint)
+      }
+      axisPaint.textAlign = AndroidPaint.Align.LEFT
+      drawContext.canvas.nativeCanvas.drawText("dBm", 2.dp.toPx(), 14.dp.toPx(), axisPaint)
+      drawLine(Color(0xFF60758B), Offset(left, bottom), Offset(right, bottom), 1.5f)
+      channelTicks.filter { it.second in low..high }.forEach { (channel, frequency) ->
+        val tickX = x(frequency)
+        drawLine(Color(0xFF20384E), Offset(tickX, top), Offset(tickX, bottom), 1f)
+        axisPaint.textAlign = AndroidPaint.Align.CENTER
+        drawContext.canvas.nativeCanvas.drawText(channel.toString(), tickX, size.height - 9.dp.toPx(), axisPaint)
+      }
+      val colorByBssid = visible.mapIndexed { index, network -> network.bssid to WifiChartColors[index % WifiChartColors.size] }.toMap()
+      visible.sortedBy(WifiNetwork::signalDbm).forEach { network ->
+        val color = colorByBssid.getValue(network.bssid)
         val halfWidth = network.channelWidthMhz.coerceAtLeast(1) / 2f
-        val startX = x(network.frequencyMhz - halfWidth)
+        val startX = x(network.frequencyMhz - halfWidth).coerceAtLeast(left)
         val peakX = x(network.frequencyMhz.toFloat())
-        val endX = x(network.frequencyMhz + halfWidth)
+        val endX = x(network.frequencyMhz + halfWidth).coerceAtMost(right)
         val peakY = y(network.signalDbm)
         val path = Path().apply {
           moveTo(startX, bottom)
@@ -605,20 +680,28 @@ private fun WifiChannelChart(networks: List<WifiNetwork>, band: Int, modifier: M
           cubicTo(peakX + (endX - peakX) / 2, peakY, endX, (bottom + peakY) / 2, endX, bottom)
           close()
         }
-        drawPath(path, WifiChartColors[index % WifiChartColors.size].copy(alpha = .28f))
-        drawPath(path, WifiChartColors[index % WifiChartColors.size], style = androidx.compose.ui.graphics.drawscope.Stroke(3f))
+        drawPath(path, color.copy(alpha = .18f))
+        drawPath(path, color, style = androidx.compose.ui.graphics.drawscope.Stroke(2.5f))
+      }
+      visible.take(6).forEach { network ->
+        val color = colorByBssid.getValue(network.bssid)
+        val peakX = x(network.frequencyMhz.toFloat()).coerceIn(left + 28.dp.toPx(), right - 28.dp.toPx())
+        val peakY = y(network.signalDbm)
+        networkPaint.color = color.toArgb()
+        val shortName = if (network.name.length > 12) network.name.take(11) + "…" else network.name
+        drawContext.canvas.nativeCanvas.drawText(shortName, peakX, (peakY - 13.dp.toPx()).coerceAtLeast(13.dp.toPx()), networkPaint)
+        drawContext.canvas.nativeCanvas.drawText(
+          "ch ${network.channel} · ${network.channelWidthMhz} MHz", peakX,
+          (peakY - 3.dp.toPx()).coerceAtLeast(24.dp.toPx()), networkPaint,
+        )
       }
     }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-      val ticks = if (band == 0) listOf("ch 1", "6", "11", "14")
-      else if (band == 1) listOf("ch 36", "64", "100", "132", "165")
-      else listOf("ch 1", "65", "129", "193", "233")
-      ticks.forEach { Text(it, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-    }
+    Text("Channel number →  ·  curve width = advertised bandwidth  ·  higher dBm = stronger",
+      fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 5.dp))
     if (visible.isEmpty()) Text("No access points in this band in the latest scan.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-    else LazyColumn(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-      items(visible, key = WifiNetwork::bssid) { network ->
-        val color = WifiChartColors[visible.indexOf(network) % WifiChartColors.size]
+    else Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+      visible.forEachIndexed { index, network ->
+        val color = WifiChartColors[index % WifiChartColors.size]
         Text("● ${network.name} · channel ${network.channel} · ${network.channelWidthMhz} MHz · ${network.signalDbm} dBm",
           color = color, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
       }

@@ -1,5 +1,16 @@
 # Changelog
 
+## Android 1.2.7 - 2026-11-11
+
+- Put the `-30` to `-100 dBm` scale and channel-number ticks inside the Wi-Fi
+  channel graph so they remain visible on phone layouts.
+- Label the strongest curves with SSID, centre channel and advertised bandwidth,
+  with a vertically scrollable full details list below the graph.
+- Keep the signal-history dBm scale fixed while its two-hour timeline scrolls,
+  and add real clock labels to the history axis.
+- Remove an obsolete Android dashboard instrumentation assertion for a control
+  that now lives on the dedicated LAN scan page.
+
 ## 2.9.9 - 2026-11-10
 
 - Add scrollable Wi-Fi signal history with selectable 1–5 second sampling and
