@@ -348,13 +348,6 @@ class Application(tk.Tk):
         style.map("Dark.TNotebook.Tab",
                   background=[("selected", "#1d5d8f"), ("active", "#244764")],
                   foreground=[("selected", "#ffffff"), ("active", "#ffffff")])
-        style.configure("Tools.TNotebook", background="#0d1b29", borderwidth=0, tabmargins=(0, 8, 0, 0))
-        style.configure("Tools.TNotebook.Tab", background="#152b3e", foreground="#a9bfd4",
-                        padding=(16, 9), font=("Segoe UI", 9, "bold"))
-        style.map("Tools.TNotebook.Tab",
-                  background=[("selected", "#254f70"), ("active", "#203f58")],
-                  foreground=[("selected", "#ffffff"), ("active", "#ffffff")])
-
     def _build(self) -> None:
         shell = ttk.Frame(self)
         shell.pack(fill="both", expand=True)
@@ -394,7 +387,10 @@ class Application(tk.Tk):
         self.posture_page = ttk.Frame(self.notebook)
         self.diagnostic_page = ttk.Frame(self.notebook)
         self.favorites_page = ttk.Frame(self.notebook)
-        self.tools_page = ttk.Frame(self.notebook)
+        self.wifi_analyzer_page = ttk.Frame(self.notebook)
+        self.packet_analysis_page = ttk.Frame(self.notebook)
+        self.web_security_page = ttk.Frame(self.notebook)
+        self.local_ai_page = ttk.Frame(self.notebook)
         self.notebook.add(self.dashboard_page, text="Dashboard")
         self.notebook.add(self.scan_page, text="Network Scan")
         self.notebook.add(self.smart_home_page, text="Smart Home")
@@ -406,7 +402,10 @@ class Application(tk.Tk):
         self.notebook.add(self.posture_page, text="Security Posture")
         self.notebook.add(self.diagnostic_page, text="Diagnostics")
         self.notebook.add(self.favorites_page, text="Favorites")
-        self.notebook.add(self.tools_page, text="Tools")
+        self.notebook.add(self.wifi_analyzer_page, text="Wi-Fi Analyzer")
+        self.notebook.add(self.packet_analysis_page, text="Packet Analysis")
+        self.notebook.add(self.web_security_page, text="Web Security")
+        self.notebook.add(self.local_ai_page, text="Local AI")
         self._navigate(self.dashboard_page)
 
         header = ttk.Frame(self.scan_page, padding=12)
@@ -593,7 +592,7 @@ class Application(tk.Tk):
         self._build_intelligence()
         self._build_endpoint_posture()
         self._build_diagnostics()
-        self._build_tools()
+        self._build_specialist_tools()
         self.notebook.bind("<<NotebookTabChanged>>", self._on_main_tab_changed, add="+")
         self._on_main_tab_changed()
 
@@ -713,39 +712,42 @@ class Application(tk.Tk):
         self.endpoint_posture = EndpointPostureView(self.posture_page)
         self.endpoint_posture.pack(fill="both", expand=True)
 
-    def _build_tools(self) -> None:
-        page = self.tools_page
+    def _build_specialist_tool(self, page: ttk.Frame, title: str, description: str,
+                               action_label: str, command) -> None:
         heading = ttk.Frame(page, padding=(18, 18, 18, 8))
         heading.pack(fill="x")
-        ttk.Label(heading, text="Specialist tools", font=("Segoe UI", 22, "bold")).pack(anchor="w")
-        ttk.Label(heading, text="Choose a category, then open its dedicated workspace.",
+        ttk.Label(heading, text=title, font=("Segoe UI", 22, "bold")).pack(anchor="w")
+        ttk.Label(heading, text="Specialist network workspace",
                   foreground="#90abc4", font=("Segoe UI", 10)).pack(anchor="w", pady=(3, 0))
-        tools = ttk.Notebook(page, style="Tools.TNotebook")
-        tools.pack(fill="both", expand=True, padx=18, pady=(0, 18))
+        card = tk.Frame(page, bg="#152535", highlightbackground="#294155", highlightthickness=1,
+                        padx=30, pady=28)
+        card.pack(fill="x", padx=18, pady=(0, 18))
+        tk.Label(card, text=title, bg="#152535", fg="#eef6ff",
+                 font=("Segoe UI", 18, "bold")).pack(anchor="w")
+        tk.Label(card, text=description, bg="#152535", fg="#9fb4ca",
+                 font=("Segoe UI", 10), wraplength=680, justify="left").pack(anchor="w", pady=(8, 22))
+        tk.Button(card, text=action_label, command=command, relief="flat", bd=0,
+                  bg="#1688e7", fg="#ffffff", activebackground="#329cf0",
+                  activeforeground="#ffffff", font=("Segoe UI", 10, "bold"),
+                  padx=18, pady=10).pack(anchor="w")
+
+    def _build_specialist_tools(self) -> None:
         entries = (
-            ("Wi-Fi Analyzer", "Inspect Windows Wi-Fi adapters, nearby networks and saved profiles.",
+            (self.wifi_analyzer_page, "Wi-Fi Analyzer",
+             "Inspect Windows Wi-Fi adapters, nearby networks and saved profiles.",
              "Open Wi-Fi Analyzer", self.open_wifi_tools),
-            ("Packet Analysis", "Open a capture file for filtering, inspection and defensive analysis.",
+            (self.packet_analysis_page, "Packet Analysis",
+             "Open a capture file for filtering, inspection and defensive analysis.",
              "Open Packet Analysis", self.open_packet_capture),
-            ("Web Security", "Run a focused, read-only audit against a web address you control.",
+            (self.web_security_page, "Web Security",
+             "Run a focused, read-only audit against a web address you control.",
              "Open Web Security Audit", self.open_web_audit),
-            ("Local AI", "Configure local monitoring and review bounded network evidence.",
+            (self.local_ai_page, "Local AI",
+             "Configure local monitoring and review bounded network evidence.",
              "Open Local AI Control", self.show_local_ai_control),
         )
-        for tab_name, description, action_label, command in entries:
-            tab = ttk.Frame(tools, padding=26)
-            tools.add(tab, text=tab_name)
-            card = tk.Frame(tab, bg="#152535", highlightbackground="#294155", highlightthickness=1,
-                            padx=30, pady=28)
-            card.pack(fill="x", pady=10)
-            tk.Label(card, text=tab_name, bg="#152535", fg="#eef6ff",
-                     font=("Segoe UI", 18, "bold")).pack(anchor="w")
-            tk.Label(card, text=description, bg="#152535", fg="#9fb4ca",
-                     font=("Segoe UI", 10), wraplength=680, justify="left").pack(anchor="w", pady=(8, 22))
-            tk.Button(card, text=action_label, command=command, relief="flat", bd=0,
-                      bg="#1688e7", fg="#ffffff", activebackground="#329cf0",
-                      activeforeground="#ffffff", font=("Segoe UI", 10, "bold"),
-                      padx=18, pady=10).pack(anchor="w")
+        for page, title, description, action_label, command in entries:
+            self._build_specialist_tool(page, title, description, action_label, command)
 
     def _open_port_scan(self) -> None:
         self._navigate(self.scan_page)
@@ -1413,7 +1415,7 @@ class Application(tk.Tk):
                 "The adapter must support monitor mode. A temporary virtual monitor interface is created through PolicyKit and removed when the watch stops, leaving the normal interface unchanged where the driver supports concurrent interfaces. "
                 "The feature is passive: it does not send deauthentication frames, inject traffic, disconnect clients, or attempt password recovery.")
         add_tab("Windows Wi-Fi Analyzer",
-                "Tools → Wi-Fi Analyzer opens a read-only Windows analyzer showing adapters, the current connection, nearby network names, signal quality, approximate dBm, security, and saved-profile status. Nearby results can be exported to CSV without credentials.\n\n"
+                "The top-level Wi-Fi Analyzer tab opens a read-only Windows analyzer showing adapters, the current connection, nearby network names, signal quality, approximate dBm, channel bandwidth, security, and saved-profile status. Nearby results can be exported to CSV without credentials.\n\n"
                 "The Saved profiles tab lists profiles already stored by Windows. Passwords remain masked until one profile is selected and its Reveal action is confirmed. A revealed password stays only in application memory, is excluded from exports, and can be hidden immediately. Copy clears the matching clipboard value after 30 seconds. Windows controls whether the signed-in account may retrieve a clear-text key and may require administrator permission.")
         add_tab("System Monitor",
                 "System Monitor measures CPU, memory, storage throughput, network throughput, and the processes using the machine. It identifies the strongest current pressure signal without converting missing sensors into zeroes. Per-process CPU is normalized across logical processors, and PID plus process creation time is used as the row identity so a recycled PID cannot silently refer to a different process.\n\n"

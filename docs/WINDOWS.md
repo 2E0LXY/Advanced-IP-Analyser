@@ -47,7 +47,8 @@ analysed on Windows.
 
 ## Wi-Fi Analyzer
 
-Open **Tools → Wi-Fi Analyzer**. Nearby-network scanning and adapter status are
+Open the top-level **Wi-Fi Analyzer** tab, then select **Open Wi-Fi Analyzer**.
+Nearby-network scanning and adapter status are
 read-only and use the Windows WLAN service. Signal history retains and horizontally
 scrolls through up to two hours of measured dBm samples at a selected 1–5 second
 interval. Channel graph shows access points by 2.4, 5, or 6 GHz channel and uses

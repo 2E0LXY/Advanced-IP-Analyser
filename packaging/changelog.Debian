@@ -1,3 +1,10 @@
+advanced-ip-analyser (2.9.10) stable; urgency=medium
+
+  * Promote the four specialist tool launchers to the main application tab bar.
+  * Remove the redundant nested Tools notebook.
+
+ -- 2E0LXY <2e0lxy@users.noreply.github.com>  Thu, 12 Nov 2026 00:00:00 +0000
+
 advanced-ip-analyser (2.9.9) stable; urgency=medium
 
   * Add two-hour scrollable Wi-Fi signal history with 1-5 second analysis refresh.

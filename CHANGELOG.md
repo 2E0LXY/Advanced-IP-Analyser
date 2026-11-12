@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.9.10 - 2026-11-12
+
+- Remove the redundant top-level Tools wrapper from the Windows interface.
+- Promote Wi-Fi Analyzer, Packet Analysis, Web Security and Local AI to the main
+  top tab bar while preserving their existing specialist workspaces.
+- Update Windows navigation instructions and in-app help for the promoted tabs.
+
 ## Android 1.2.7 - 2026-11-11
 
 - Put the `-30` to `-100 dBm` scale and channel-number ticks inside the Wi-Fi
