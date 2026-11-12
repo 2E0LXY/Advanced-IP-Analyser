@@ -10,6 +10,7 @@ import time
 import tkinter as tk
 import urllib.request
 from dataclasses import dataclass
+from collections.abc import Callable
 
 from . import __version__
 
@@ -28,6 +29,7 @@ class MapMarker:
     label: str
     address: str
     colour: str = "#31b8ff"
+    payload: tuple[object, ...] = ()
 
 
 def world_pixel(latitude: float, longitude: float, zoom: int) -> tuple[float, float]:
@@ -53,13 +55,15 @@ def pixel_location(x: float, y: float, zoom: int) -> tuple[float, float]:
 class SlippyMap(tk.Canvas):
     """Interactive tiled map with clustered destination markers."""
 
-    def __init__(self, parent, **kwargs):
+    def __init__(self, parent, *, on_marker_click: Callable[[list[MapMarker]], None] | None = None,
+                 **kwargs):
         super().__init__(parent, bg="#07131f", highlightthickness=1,
                          highlightbackground="#2c4860", **kwargs)
         self.zoom = 2
         self.center_latitude = 25.0
         self.center_longitude = 0.0
         self.markers: list[MapMarker] = []
+        self.on_marker_click = on_marker_click
         self._tile_bytes: dict[tuple[int, int, int], bytes] = {}
         self._tile_images: dict[tuple[int, int, int], tk.PhotoImage] = {}
         self._pending_tiles: set[tuple[int, int, int]] = set()
@@ -69,6 +73,7 @@ class SlippyMap(tk.Canvas):
         self._drag_origin: tuple[int, int] | None = None
         self._drag_center: tuple[float, float] | None = None
         self._did_auto_fit = False
+        self._drag_moved = False
 
         self.bind("<Configure>", lambda _event: self.redraw())
         self.bind("<ButtonPress-1>", self._start_drag)
@@ -186,28 +191,38 @@ class SlippyMap(tk.Canvas):
                 key = (round(screen_x / 42), round(screen_y / 34))
                 clusters.setdefault(key, []).append((marker, screen_x, screen_y))
 
-        for members in clusters.values():
+        for marker_index, members in enumerate(clusters.values()):
             marker, x, y = members[0]
             count = len(members)
             radius = 9 if count == 1 else min(16, 9 + count)
+            tag = f"destination-marker-{marker_index}"
             self.create_oval(x - radius - 5, y - radius - 5, x + radius + 5, y + radius + 5,
-                             fill="#183a55", outline="", stipple="gray50")
+                             fill="#183a55", outline="", stipple="gray50", tags=(tag,))
             self.create_oval(x - radius, y - radius, x + radius, y + radius,
-                             fill=marker.colour, outline="#ffffff", width=2)
+                             fill=marker.colour, outline="#ffffff", width=2, tags=(tag,))
             if count > 1:
                 self.create_text(x, y, text=str(count), fill="#06111b",
-                                 font=("Segoe UI", 9, "bold"))
+                                 font=("Segoe UI", 9, "bold"), tags=(tag,))
                 label = f"{marker.label} · {count} endpoints"
             else:
                 label = marker.label or marker.address
             label_item = self.create_text(x + radius + 5, y, text=label, fill="#ffffff", anchor="w",
-                                          font=("Segoe UI", 9, "bold"))
+                                          font=("Segoe UI", 9, "bold"), tags=(tag,))
             bounds = self.bbox(label_item)
             if bounds:
                 background = self.create_rectangle(
                     bounds[0] - 3, bounds[1] - 2, bounds[2] + 3, bounds[3] + 2,
-                    fill="#07131f", outline="#36536a")
+                    fill="#07131f", outline="#36536a", tags=(tag,))
                 self.tag_lower(background, label_item)
+            cluster_markers = [member[0] for member in members]
+            self.tag_bind(tag, "<ButtonRelease-1>",
+                          lambda _event, selected=cluster_markers: self._activate_marker(selected))
+            self.tag_bind(tag, "<Enter>", lambda _event: self.configure(cursor="hand2"))
+            self.tag_bind(tag, "<Leave>", lambda _event: self.configure(cursor=""))
+
+    def _activate_marker(self, markers: list[MapMarker]) -> None:
+        if not self._drag_moved and self.on_marker_click is not None:
+            self.after_idle(lambda: self.on_marker_click(markers))
 
     def _request_tile(self, key: tuple[int, int, int]) -> None:
         if key in self._pending_tiles:
@@ -280,12 +295,15 @@ class SlippyMap(tk.Canvas):
     def _start_drag(self, event) -> None:
         self._drag_origin = (event.x, event.y)
         self._drag_center = world_pixel(self.center_latitude, self.center_longitude, self.zoom)
+        self._drag_moved = False
         self.configure(cursor="fleur")
 
     def _drag(self, event) -> None:
         if self._drag_origin is None or self._drag_center is None:
             return
         start_x, start_y = self._drag_origin
+        if abs(event.x - start_x) > 3 or abs(event.y - start_y) > 3:
+            self._drag_moved = True
         center_x, center_y = self._drag_center
         self.center_latitude, self.center_longitude = pixel_location(
             center_x - (event.x - start_x), center_y - (event.y - start_y), self.zoom)

@@ -4,7 +4,8 @@
 
 Advanced IP Analyser is an original Windows 10/11, Debian 13, and Android
 network diagnostics application. The desktop editions provide network inventory,
-bounded web security auditing, and packet-file analysis. Debian additionally provides native live packet capture, long-term
+bounded web security auditing, and packet-file analysis. Windows uses built-in Microsoft Packet Monitor for live capture;
+Debian additionally provides native live packet capture, long-term
 Network Security Monitor sessions, and passive Wi-Fi observation. It is designed for home labs, support teams, system
 administrators, and authorized network troubleshooting without requiring
 Wireshark.
@@ -15,13 +16,13 @@ Wireshark.
 ## Download
 
 [![Download Android APK](https://img.shields.io/badge/ANDROID-DOWNLOAD_APK_1.2.7-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.7/Advanced-IP-Analyser-Android-1.2.7.apk)
-[![Download Windows](https://img.shields.io/badge/WINDOWS-DOWNLOAD_2.9.13-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.13/Advanced-IP-Analyser-Setup-2.9.13.exe)
+[![Download Windows](https://img.shields.io/badge/WINDOWS-DOWNLOAD_3.0.0-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v3.0.0/Advanced-IP-Analyser-Setup-3.0.0.exe)
 
 | Platform | Current version | Download | Installation help |
 | --- | ---: | --- | --- |
 | **Android phone/tablet** | **1.2.7** | **[Download the signed APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.7/Advanced-IP-Analyser-Android-1.2.7.apk)** | **[Android installation instructions](docs/ANDROID-INSTALL.md)** |
-| Windows 10/11 | 2.9.13 | [Download the Windows installer](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.13/Advanced-IP-Analyser-Setup-2.9.13.exe) | Run the downloaded `.exe`; the installer closes and upgrades running copies |
-| Debian 13 | 2.9.13 | [Download the Debian package](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.13/advanced-ip-analyser_2.9.13_all.deb) | Install with `sudo apt install ./advanced-ip-analyser_2.9.13_all.deb` |
+| Windows 10/11 | 3.0.0 | [Download the Windows installer](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v3.0.0/Advanced-IP-Analyser-Setup-3.0.0.exe) | Run the downloaded `.exe`; the installer closes and upgrades running copies |
+| Debian 13 | 3.0.0 | [Download the Debian package](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v3.0.0/advanced-ip-analyser_3.0.0_all.deb) | Install with `sudo apt install ./advanced-ip-analyser_3.0.0_all.deb` |
 
 > **Looking for Android?** The signed Android APK is included on the main
 > **Latest** release page alongside Windows and Debian. Android also retains a
@@ -53,11 +54,12 @@ live progress, expandable service results, inventory exchange, and remote action
 | Inventory | CSV/JSON/XML/escaped-HTML export, bounded JSON/XML import, spreadsheet-formula protection, atomic favorites updates |
 | Device access | HTTP, HTTPS, FTP, SMB, SSH, RDP and Telnet launchers; Ping, Tracepath, Wake-on-LAN; confirmed delayed SSH shutdown/reboot and abort |
 | Smart home | Direct local control for TP-Link Kasa/Tapo with secure desktop credential storage, Smart Life/Tuya, Shelly Gen1/Gen2+, Tasmota, WLED, and Philips Hue; local Home Assistant connection for lights, switches, fans, locks, covers, climate, media, vacuums, scenes and other controllable entities; generic local action runner; secure VPN-routed remote use |
-| Packet engine | Native Linux `AF_PACKET` capture, selected-host/service scope, interface discovery, Ethernet PCAP/PCAPNG/gzip reading, endpoint/port/protocol summaries, byte preview |
+| Packet engine | Native Linux `AF_PACKET` capture, built-in Windows `pktmon` live capture with optional Npcap/Wireshark fallback, selected-host/service scope, immediate scope reduction, Ethernet PCAP/PCAPNG/gzip reading, protocol summaries and byte preview |
 | Display filters | IP/CIDR, TCP/UDP ports, DNS, HTTP, TLS, ICMP, ARP, TCP flags, lengths, comparisons, text/regex matching, boolean expressions, 20 quick filters, saved named filters |
 | Network Security Monitor | Up to 24-hour sessions across all observed ports and both directions, minute timeline, conversations, devices, DNS, TCP diagnostics, behavioural baselines, colour-coded findings, alerts, bookmarks, reports, retention, history |
-| Live connections | Windows/Debian inbound, outbound and listening endpoint table, owning process/PID, protocol and state, approximate public destination organisation/location, movable and zoomable OpenStreetMap view with clustered markers, filtering, CSV/JSON export and in-app `?` help |
+| Live connections | Windows/Debian inbound, outbound and listening endpoint table, owning process/PID, protocol and state, approximate public destination organisation/location, movable and zoomable OpenStreetMap view with clickable clustered application-detail pins, filtering, CSV/JSON export and in-app `?` help |
 | Network intelligence | Conservative duplicate-device resolution, explainable 0-100 exposure priority, automatic Infrastructure/Server/Admin/IoT/Workstation zones, field/CIDR/risk queries with AND/OR/NOT, device-to-service dependency GraphML and versioned JSON export |
+| Network Operations | Continuous scan-baseline comparison, ARP/NDP conflict review, native SNMPv2c system queries, authenticated SNMPv3 LLDP/CDP table walks, DNS/mDNS and SSDP discovery, top-talkers evidence, capture-provider detection, TCP loss/p95/jitter, iPerf3, CISA KEV review, scheduled scans, quiet hours, local reports and optional HTTPS webhooks |
 | Windows security posture | Read-only, explainable status for firewall profiles, antivirus provider, Defender real-time protection, SMB 1.0, UAC, active network categories and configured DNS resolvers; unknown results remain visibly unverified, with copy and local JSON export |
 | DNS benchmark | Real UDP DNS A-record queries to 36 public resolver endpoints, one to five rounds, adjustable inter-round delay and timeout, average/jitter/reply ranking, filtering, stoppable partial results, copyable report, and a post-test shortcut to Windows DNS settings |
 | Windows Wi-Fi Analyzer | Nearby SSIDs/BSSIDs, measured dBm, channel and advertised bandwidth, scrollable two-hour signal history, 1–5 second refresh, channel-overlap graph, security, adapter status, saved profiles, confirmed password reveal, credential-free CSV export |
@@ -83,11 +85,11 @@ require administrator rights. It adds Start-menu and optional desktop shortcuts.
 
 Windows supports scanning, inventory, fingerprinting, Wake-on-LAN, web auditing,
 AI analysis, TP-Link Kasa/Tapo smart-home control, saved PCAP/PCAPNG inspection,
-display filters, reports, and Windows-native
+selected-host live capture through built-in Microsoft Packet Monitor, display filters, reports, and Windows-native
 Ping, Traceroute, SMB, SSH, and Remote Desktop launchers. Linux `AF_PACKET` live
-capture, Network Security Monitor live capture, and monitor-mode Passive Wi-Fi are
-shown as Debian 13-only because the Windows build does not bundle a third-party
-packet-capture driver. See [Windows edition details](docs/WINDOWS.md).
+Network Security Monitor sessions and monitor-mode Passive Wi-Fi remain Debian
+13-only. No third-party Windows capture driver is required for normal capture.
+See [Windows edition details](docs/WINDOWS.md).
 
 ## Android installation
 
@@ -112,7 +114,9 @@ state and approximate public destination. The OpenStreetMap view is fully
 interactive: drag to move, use the mouse wheel or `+`/`−` controls to zoom, and
 select **Fit destinations** to bring every current marker into view. Blue
 markers are outbound, orange markers are inbound, and numbered markers combine
-overlapping destinations. The table filter also filters the map.
+overlapping destinations. Click a marker or cluster for all available process,
+executable, PID, protocol, endpoint, state, organisation and location detail.
+The table filter also filters the map.
 
 Select the map's `?` button for built-in help covering what the feature does,
 how to use it, how it works, why it is useful, and its privacy limitations.
@@ -130,7 +134,7 @@ then run:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.9.13_all.deb
+sudo apt install ./advanced-ip-analyser_3.0.0_all.deb
 ```
 
 Launch it from the desktop application menu or run:
@@ -276,7 +280,8 @@ commercial scanner parity. See the [feature comparison](docs/FEATURE_PARITY.md).
 ![Packet display filters](docs/images/packet-display-filters.png)
 
 Wireshark, tshark, tcpdump, libpcap, and third-party packet Python libraries are
-not required. **Packets → Capture selected host/service** records only the selected
+not required. Windows uses built-in `pktmon`; Debian uses native `AF_PACKET`.
+**Packets → Capture selected host/service** retains only the selected
 IP scope and optional selected port for 1-300 seconds and no more than 100,000
 packets. **Open capture file for selection** reads bounded Ethernet PCAP, PCAPNG,
 and gzip-compressed captures.

@@ -7,7 +7,7 @@ class HelpContentTests(unittest.TestCase):
     def test_every_main_tab_has_a_contextual_guide(self):
         expected_tabs = {
             "dashboard", "network_scan", "smart_home", "system", "disk_usage",
-            "dns_benchmark", "connections", "intelligence", "security_posture",
+            "dns_benchmark", "connections", "intelligence", "operations", "security_posture",
             "diagnostics", "favorites", "wifi_analyzer", "packet_analysis",
             "web_security", "local_ai",
         }

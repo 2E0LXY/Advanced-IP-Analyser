@@ -1,5 +1,18 @@
 # Changelog
 
+## 3.0.0 - 2026-11-12
+
+- Added a unified Network Operations workspace for changes, infrastructure, traffic, performance, lifecycle review and automation.
+- Added persistent inventory-baseline comparison, new/missing/changed device evidence and ARP/NDP duplicate-address review.
+- Added native bounded SNMPv2c system queries plus Net-SNMP-backed authenticated SNMPv3 LLDP/CDP table inspection.
+- Added reverse-DNS/mDNS and bounded SSDP/UPnP discovery for stronger local naming evidence.
+- Added top-talker evidence, capture-provider inventory and native Windows selected-host capture through built-in Microsoft Packet Monitor, with Npcap/Wireshark as an optional fallback.
+- Added clickable destination-map pins with grouped application, executable, PID, direction, protocol, local/remote endpoint, state, organisation and approximate-location details.
+- Added TCP loss, minimum/average/p95 latency and jitter measurement plus authorized TCP/UDP iPerf3 tests.
+- Added on-demand CISA Known Exploited Vulnerabilities catalogue search with explicit version-verification warnings.
+- Added persistent monitoring intervals, quiet hours, selected change rules, bounded local reports and optional HTTPS webhooks.
+- Added a versioned operations JSON report and comprehensive contextual help for all new controls and limitations.
+
 ## 2.9.13 - 2026-11-12
 
 - Added a comprehensive, searchable Help Centre covering every desktop workspace.

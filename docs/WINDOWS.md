@@ -35,6 +35,12 @@ This also covers processes that remain active after the visible window closes.
 - bounded read-only disk-usage analysis with largest-file/folder views, a
   proportional size map, cancellation and CSV export;
 - bounded PCAP, PCAPNG, and compressed capture-file analysis and display filters;
+- live selected-host/service capture through built-in Microsoft Packet Monitor,
+  with installed Npcap plus Wireshark/dumpcap or TShark as an optional fallback;
+- a Network Operations workspace with inventory change detection, neighbour-cache
+  conflict review, SNMPv2c/SNMPv3, LLDP/CDP evidence, local service discovery,
+  top talkers, capture-provider status, TCP quality, iPerf3, CISA KEV review and
+  persistent scan/report/webhook policy;
 - platform-specific verified update download, silent replacement, and relaunch.
 
 ## Contextual Help Centre
@@ -49,18 +55,21 @@ Each guide explains the feature's purpose, the local or remote data it uses, how
 to operate every major control, why and when the tool is useful, how to interpret
 its results, and the important accuracy, permission, privacy and safety limits.
 The guides cover Dashboard, Network Scan, Smart Home, System, Disk Usage, DNS
-Benchmark, Connections, Intelligence, Security Posture, Diagnostics, Favorites,
+Benchmark, Connections, Intelligence, Network Operations, Security Posture, Diagnostics, Favorites,
 Wi-Fi Analyzer, Packet Analysis, Web Security, Local AI, and settings/updates.
 Help is available without an internet connection.
 
 ## Deliberately Debian-only
 
-Live packet capture, Network Security Monitor live capture, and passive
-monitor-mode Wi-Fi use Linux kernel `AF_PACKET`, PolicyKit, `iw`, and related
-interfaces. Their menu entries are visibly disabled on Windows. The application
-does not bundle Npcap, WinPcap, Wireshark, a kernel driver, or any software with a
-separate capture-driver licence. Existing capture files can still be opened and
-analysed on Windows.
+Network Security Monitor long sessions and passive monitor-mode Wi-Fi use Linux
+kernel `AF_PACKET`, PolicyKit, `iw`, and related interfaces. Their menu entries
+remain disabled on Windows. Selected-host/service live capture uses Windows'
+built-in Microsoft Packet Monitor (`pktmon`) and immediately rewrites its bounded
+temporary result to contain only the selected host/port records. Some Windows
+configurations require running the capture with administrator rights. Installed
+Npcap with Wireshark/dumpcap or TShark is an optional per-interface fallback. The
+application does not bundle a kernel driver or separately licensed capture
+software. Existing capture files can always be opened and analysed on Windows.
 
 ## Wi-Fi Analyzer
 
@@ -94,6 +103,8 @@ The map uses OpenStreetMap tiles and displays only public remote endpoints:
 
 - blue markers are outbound and orange markers are inbound;
 - a numbered marker clusters destinations that overlap at the current zoom;
+- click a marker or cluster for all available application, executable, PID,
+  direction, protocol, endpoint, state, organisation and location details;
 - drag with the left mouse button to move the map;
 - use the mouse wheel or the `+` and `−` buttons to zoom;
 - select **Fit destinations** to return every current marker to view; and

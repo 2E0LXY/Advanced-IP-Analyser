@@ -1,11 +1,11 @@
 # Built-in packet analysis
 
-Advanced IP Analyser includes a small Debian-native packet engine. Wireshark,
+Advanced IP Analyser includes a small cross-platform packet engine. Wireshark,
 tcpdump, tshark, libpcap, and third-party Python packet libraries are not required.
 
 ## Live capture
 
-Live capture uses Linux `AF_PACKET` raw sockets. The application always limits a
+On Debian, live capture uses Linux `AF_PACKET` raw sockets. The application always limits a
 capture to explicitly selected IP addresses, an optional selected service port,
 1–300 seconds, and at most 100,000 packets. It writes standard Ethernet PCAP.
 
@@ -14,6 +14,15 @@ raw-socket access, an installed, root-owned, non-writable helper is started thro
 PolicyKit. The helper accepts only fixed validated options and verifies that its
 output is a single-link regular file owned by the requesting user before writing.
 The main application is never relaunched as root.
+
+On Windows, live capture uses Microsoft Packet Monitor (`pktmon`), included with
+supported Windows 10/11 installations. The temporary 64-MiB-bounded all-adapter
+ETL capture is converted locally, filtered to the explicitly selected host and
+optional port, and rewritten as a bounded PCAP before the viewer can display or
+save it. Temporary unfiltered ETL/PCAPNG files are deleted. Windows may require
+administrator rights to start Packet Monitor. If separately installed,
+Npcap/Wireshark `dumpcap` or TShark can be selected as an optional per-interface
+fallback; the application does not bundle them or a custom kernel driver.
 
 ## Saved captures
 

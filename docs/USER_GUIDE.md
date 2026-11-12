@@ -1,4 +1,4 @@
-# Advanced IP Analyser 2.9.13 Instruction Book
+# Advanced IP Analyser 3.0.0 Instruction Book
 
 Windows 10/11 and Debian 13 edition
 
@@ -64,22 +64,22 @@ service, disconnect Wi-Fi clients, inject frames, or recover passwords.
 
 ### Install on Windows
 
-Download `Advanced-IP-Analyser-Setup-2.9.13.exe` from the project release page
+Download `Advanced-IP-Analyser-Setup-3.0.0.exe` from the project release page
 and run it. The per-user installer normally needs no administrator rights and
 offers Start-menu and desktop shortcuts. Windows supports network scanning,
 inventory, Wi-Fi adapter/nearby-network scanning, selected saved-profile key
-inspection, web auditing, AI analysis, and saved capture-file inspection. Linux
-live capture, the Network Security Monitor, and passive monitor-mode Wi-Fi are
-visibly disabled because the project does not bundle a Windows capture driver.
+inspection, web auditing, AI analysis, saved capture-file inspection and bounded
+live capture through built-in Microsoft Packet Monitor. Network Security Monitor
+long sessions and passive monitor-mode Wi-Fi remain Debian-only.
 
 ### Install on Debian 13
 
-Download `advanced-ip-analyser_2.9.13_all.deb` from the project release page.
+Download `advanced-ip-analyser_3.0.0_all.deb` from the project release page.
 In a terminal:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.9.13_all.deb
+sudo apt install ./advanced-ip-analyser_3.0.0_all.deb
 ```
 
 Use `apt install ./file.deb`, not `dpkg -i`, because APT resolves dependencies.
@@ -176,7 +176,7 @@ The Network Scan page is arranged from setup to action:
 - **Remote administration:** Shutdown, Reboot, and Abort shutdown.
 - **Scan results/Favorites:** inventory tables.
 - **Main tabs:** Dashboard, Network Scan, Smart Home, System, Disk Usage, DNS Benchmark,
-  Connections, Intelligence, Security Posture, Diagnostics, Favorites, Wi-Fi Analyzer,
+  Connections, Intelligence, Operations, Security Posture, Diagnostics, Favorites, Wi-Fi Analyzer,
   Packet Analysis, Web Security, and Local AI. Settings and Help remain in the header.
 - **Footer:** status, centered green progress, version, and Update.
 - **Header:** application identity and status on the left, with Settings and Help on the right. Available updates appear in the footer without replacing a feature control.
@@ -193,7 +193,7 @@ an incident note, support message or offline checklist.
 The guides do more than name the controls. They explain what the feature does,
 how it obtains and processes its information, why and when to use it, what each
 result means, and which permissions, platform constraints, uncertainty, privacy
-and safety limits apply. All 15 workspaces plus settings and updates are covered,
+and safety limits apply. All 16 workspaces plus settings and updates are covered,
 and the reference is packaged with the app so it works without internet access.
 
 **Scan all networks** covers normal LAN, VLAN, and VPN adapters when the operating
@@ -236,6 +236,9 @@ The destination map is interactive:
 - blue markers represent outbound connections and orange markers represent
   inbound connections;
 - a numbered marker clusters endpoints that overlap at the current zoom;
+- click a pin or cluster to see every available application, executable path,
+  PID, direction, protocol, local/remote endpoint, state, organisation and
+  approximate-location detail represented there;
 - drag with the left mouse button to pan;
 - use the mouse wheel or the `+` and `−` buttons to zoom;
 - select **Fit destinations** to place every current marker in view; and
@@ -313,6 +316,39 @@ a resolver's privacy policy, filtering accuracy, encrypted DNS support, cache
 quality or security, and a firewall may block third-party DNS. The fastest result
 is therefore useful evidence, not an automatic recommendation. Select the `?`
 inside the tab for the same operating and interpretation guidance.
+
+### Network Operations
+
+The top-level **Operations** tab consolidates continuous monitoring and
+infrastructure work into six focused pages:
+
+- **Changes & conflicts** compares the latest two completed inventories using
+  MAC-first identity. It reports new, missing and changed devices and separately
+  reviews the current ARP/NDP cache for duplicate-address evidence. Cache entries
+  can be stale and are not DHCP leases, so confirm conflicts at the DHCP server.
+- **SNMP & topology** reads bounded standard SNMPv2c system objects without an
+  external library. LLDP/CDP table walks support SNMPv2c and authenticated,
+  encrypted SNMPv3 through an installed Net-SNMP `snmpwalk` command. Credentials
+  remain in memory and are never saved. Prefer SNMPv3 on managed networks.
+- **Traffic attribution** displays top talkers from the latest Network Security
+  Monitor session and shows which local capture providers are available. Accurate
+  attribution requires a capture point that can see the relevant traffic.
+- **Quality & throughput** measures successful TCP connection setup, loss,
+  minimum/average/p95 latency and mean absolute jitter. Optional iPerf3 tests run
+  against an authorised server and can measure forward/reverse TCP or bounded UDP.
+- **Vulnerability lifecycle** downloads the current CISA Known Exploited
+  Vulnerabilities catalogue only when requested. Search with vendor and product
+  terms. A name match is a review lead; verify the exact model and version before
+  treating any CVE as applicable.
+- **Schedules & alerts** persists a monitoring interval, quiet hours, selected
+  change categories, report folder and optional HTTPS webhook. While the desktop
+  app is running it schedules inventory scans, writes bounded local change reports
+  and sends configured notifications outside quiet hours.
+
+The infrastructure page also gathers reverse-DNS/mDNS evidence for one selected
+address and bounded SSDP/UPnP replies from the local broadcast domain. The
+**Export operations report** action writes current changes, neighbour conflicts,
+top talkers and capture capability evidence to local JSON.
 
 ### AI settings and analysis
 

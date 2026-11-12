@@ -11,6 +11,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -71,9 +72,31 @@ def validate_interface(interface: str) -> str:
 
 
 def list_capture_interfaces() -> list[tuple[str, str]]:
-    """List Linux interfaces without depending on Wireshark or another program."""
+    """List native Linux interfaces or installed Windows dumpcap interfaces."""
+    if sys.platform == "win32":
+        executable = shutil.which("dumpcap") or shutil.which("tshark")
+        interfaces: list[tuple[str, str]] = []
+        if shutil.which("pktmon"):
+            interfaces.append(("pktmon", "Microsoft Packet Monitor · all active Windows adapters"))
+        if not executable:
+            if interfaces:
+                return interfaces
+            raise RuntimeError("Windows Packet Monitor (pktmon) is unavailable on this Windows installation")
+        result = subprocess.run([executable, "-D"], capture_output=True, text=True,
+                                timeout=15, check=False)
+        if result.returncode:
+            if interfaces:
+                return interfaces
+            raise RuntimeError((result.stderr or result.stdout or "could not list capture interfaces").strip())
+        for line in result.stdout.splitlines()[:512]:
+            match = re.match(r"\s*(\d+)\.\s+(.+)", line)
+            if match:
+                interfaces.append((match.group(1), match.group(2).strip()[:512]))
+        if not interfaces:
+            raise RuntimeError("No Windows capture interfaces were reported")
+        return interfaces
     if not sys.platform.startswith("linux"):
-        raise RuntimeError("live packet capture is available in the Debian 13 edition only")
+        raise RuntimeError("live packet capture is supported on Windows 10/11 and Debian 13")
     interfaces = [("any", "All Linux interfaces")]
     try:
         for _index, name in socket.if_nameindex():
@@ -108,9 +131,7 @@ def _capture_command(output: Path, interface: str, hosts: list[str], port: int |
 def capture_live(hosts: list[str], interface: str = "any", port: int | None = None,
                  duration: int = 10, max_packets: int = 5_000,
                  cache_dir: Path | None = None) -> Path:
-    """Capture bounded Linux traffic, requesting PolicyKit only when required."""
-    if not sys.platform.startswith("linux"):
-        raise RuntimeError("live packet capture is available in the Debian 13 edition only")
+    """Capture bounded traffic through Linux AF_PACKET or Windows Npcap/dumpcap."""
     addresses = _addresses(hosts)
     if not addresses:
         raise ValueError("select at least one host for live capture")
@@ -122,10 +143,65 @@ def capture_live(hosts: list[str], interface: str = "any", port: int | None = No
         raise ValueError("capture packet limit must be from 1 to 100,000")
     directory = cache_dir or Path.home() / ".cache" / "advanced-ip-analyser" / "captures"
     directory.mkdir(parents=True, exist_ok=True)
-    descriptor, name = tempfile.mkstemp(prefix="capture-", suffix=".pcap", dir=directory)
+    suffix = ".pcapng" if sys.platform == "win32" else ".pcap"
+    descriptor, name = tempfile.mkstemp(prefix="capture-", suffix=suffix, dir=directory)
     os.close(descriptor)
     output = Path(name)
     try:
+        if sys.platform == "win32":
+            pktmon = shutil.which("pktmon")
+            if pktmon and interface in {"pktmon", "any"}:
+                etl = output.with_suffix(".etl")
+                output.unlink(missing_ok=True)
+                etl.unlink(missing_ok=True)
+                start = subprocess.run(
+                    [pktmon, "start", "--capture", "--comp", "nics", "--pkt-size", "512",
+                     "--file-name", str(etl), "--file-size", "64"],
+                    capture_output=True, text=True, timeout=20, check=False)
+                if start.returncode:
+                    detail = (start.stderr or start.stdout).strip()
+                    raise RuntimeError(detail or "Microsoft Packet Monitor could not start; try running as administrator")
+                try:
+                    time.sleep(duration)
+                finally:
+                    subprocess.run([pktmon, "stop"], capture_output=True, text=True,
+                                   timeout=20, check=False)
+                converted = subprocess.run(
+                    [pktmon, "etl2pcap", str(etl), "--out", str(output)],
+                    capture_output=True, text=True, timeout=60, check=False)
+                etl.unlink(missing_ok=True)
+                if converted.returncode:
+                    detail = (converted.stderr or converted.stdout).strip()
+                    raise RuntimeError(detail or "Microsoft Packet Monitor could not convert the capture")
+                if not output.exists() or output.stat().st_size < 28:
+                    raise RuntimeError("Microsoft Packet Monitor did not produce a valid PCAPNG file")
+                # pktmon observes all local adapters. Immediately reduce its converted
+                # output to the explicitly selected host/port before returning it to
+                # the viewer or allowing the user to save a copy.
+                filtered_records = read_capture(output, addresses, port, max_packets)
+                filtered = output.with_suffix(".pcap")
+                _write_packet_records(filtered, filtered_records)
+                output.unlink(missing_ok=True)
+                return filtered
+            executable = shutil.which("dumpcap") or shutil.which("tshark")
+            if not executable:
+                raise RuntimeError("Microsoft Packet Monitor is unavailable; Npcap/Wireshark is the optional fallback")
+            capture_filter = " or ".join(f"host {address}" for address in addresses)
+            if port is not None:
+                capture_filter = f"({capture_filter}) and tcp port {port}"
+            command = [executable, "-i", interface, "-a", f"duration:{duration}",
+                       "-c", str(max_packets), "-s", "65535", "-w", str(output),
+                       "-f", capture_filter]
+            captured = subprocess.run(command, capture_output=True, text=True,
+                                      timeout=duration + 20, check=False)
+            if captured.returncode:
+                detail = (captured.stderr or captured.stdout).strip()
+                raise RuntimeError(detail or f"Windows capture exited {captured.returncode}")
+            if output.stat().st_size < 28:
+                raise RuntimeError("Windows capture did not produce a valid PCAPNG file")
+            return output
+        if not sys.platform.startswith("linux"):
+            raise RuntimeError("live packet capture is supported on Windows 10/11 and Debian 13")
         direct = subprocess.run(
             _capture_command(output, interface, addresses, port, duration, max_packets),
             capture_output=True, text=True, timeout=duration + 15, check=False)
@@ -154,7 +230,22 @@ def capture_live(hosts: list[str], interface: str = "any", port: int | None = No
         return output
     except Exception:
         output.unlink(missing_ok=True)
+        if sys.platform == "win32":
+            output.with_suffix(".etl").unlink(missing_ok=True)
+            output.with_suffix(".pcap").unlink(missing_ok=True)
         raise
+
+
+def _write_packet_records(path: Path, records: list[PacketRecord]) -> None:
+    """Write bounded parsed records as an Ethernet PCAP without unrelated packets."""
+    with path.open("wb") as stream:
+        stream.write(struct.pack("<IHHIIII", 0xA1B2C3D4, 2, 4, 0, 0, 512, 1))
+        for record in records[:MAX_CAPTURE_PACKETS]:
+            seconds = int(record.timestamp)
+            microseconds = max(0, min(999_999, int((record.timestamp - seconds) * 1_000_000)))
+            payload = record.preview[:512]
+            stream.write(struct.pack("<IIII", seconds, microseconds, len(payload), record.length))
+            stream.write(payload)
 
 
 @dataclass(slots=True)

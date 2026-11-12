@@ -19,6 +19,7 @@ an independent GPL implementation and is not affiliated with Famatech.
 | Automatic updates | Detects newer GitHub tags, flashes the Update button, requires the GitHub SHA-256 digest, validates package identity, requests PolicyKit authorization, and restarts |
 | Packet capture and analysis | Built-in Linux interface discovery, bounded selected-host/service capture, PCAP/PCAPNG reading, Wireshark-style display filters, protocol summaries, and byte previews; no Wireshark dependency |
 | Monitoring over time | Network Security Monitor timelines, all observed ports and directions, conversations, devices, DNS, TCP health estimates, baselines, colour-coded findings, alert rules, reports, bookmarks, retention, and local history |
+| Infrastructure operations | Scan-baseline change detection, neighbour conflict review, SNMPv2c/SNMPv3, LLDP/CDP evidence, DNS/mDNS/SSDP discovery, top talkers, TCP quality, iPerf3, CISA KEV review and bounded schedule/report/webhook policy |
 | Live operating-system connections | Inbound, outbound and listening endpoint table with owning process/PID, filtering, export, approximate public destination and an interactive OpenStreetMap with clustered markers, pan, zoom, fit controls and in-app help |
 | Passive wireless discovery | Compatible monitor-mode adapters can observe access points, security advertisements, clients, probe requests, signal, and EAPOL presence; disruptive and password-attack functions are deliberately excluded |
 
@@ -39,10 +40,11 @@ custom scope/frequency controls, open-port discovery, and a lightweight app.
 | Open ports and risk visibility | TCP-port inventory plus service detail and selected-host Web Security Audit |
 | Lightweight Linux installation | One Debian `all` package with no Wireshark requirement; narrow PolicyKit helpers are used only for capture/monitor mode |
 
-Lansweeper's separate paid platform advertises credentialed hardware/software
-inventory, NIST vulnerability correlation, lifecycle intelligence, topology,
-enterprise dashboards, report libraries, and managed integrations. Those are
-not features of its free IP-scanner executable and are not claimed as parity.
+Lansweeper's separate paid platform advertises deep credentialed hardware and
+software inventory, NIST correlation, lifecycle intelligence, enterprise
+topology, dashboards, report libraries and managed integrations. Advanced IP
+Analyser 3.0 adds bounded SNMP/LLDP/CDP and CISA KEV evidence but does not claim
+parity with that commercial asset-management and vulnerability-research service.
 
 ## Acunetix/Invicti comparison and safety boundary
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import getpass
 import ipaddress
+import json
 import queue
 import shutil
 import sys
@@ -9,6 +10,7 @@ import threading
 import tkinter as tk
 import webbrowser
 from dataclasses import replace
+from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
@@ -57,6 +59,16 @@ from .network import (
     tailscale_peer_ipv4_addresses,
 )
 from .network_intelligence_gui import NetworkIntelligenceView
+from .operations_gui import NetworkOperationsView
+from .network_operations import (
+    MonitorPolicy,
+    dispatch_policy_webhook,
+    export_operations_report,
+    load_monitor_policy,
+    policy_in_quiet_hours,
+    scan_change_summary,
+    selected_policy_changes,
+)
 from .packet_filters import (
     QUICK_FILTERS,
     FilterSyntaxError,
@@ -314,6 +326,7 @@ class Application(tk.Tk):
         self.discovery_active = False
         self.discovery_flash_on = False
         self.scheduled_scan_id: str | None = None
+        self.operations_schedule_id: str | None = None
         self.repeat_scan_callback = self.start_scan
         self.active_scan_target = ""
         self.scan_scanned_count = 0
@@ -422,6 +435,7 @@ class Application(tk.Tk):
         self.dns_benchmark_page = ttk.Frame(self.notebook)
         self.connections_page = ttk.Frame(self.notebook)
         self.intelligence_page = ttk.Frame(self.notebook)
+        self.operations_page = ttk.Frame(self.notebook)
         self.posture_page = ttk.Frame(self.notebook)
         self.diagnostic_page = ttk.Frame(self.notebook)
         self.favorites_page = ttk.Frame(self.notebook)
@@ -437,6 +451,7 @@ class Application(tk.Tk):
         self.notebook.add(self.dns_benchmark_page, text="DNS Benchmark")
         self.notebook.add(self.connections_page, text="Connections")
         self.notebook.add(self.intelligence_page, text="Intelligence")
+        self.notebook.add(self.operations_page, text="Operations")
         self.notebook.add(self.posture_page, text="Security Posture")
         self.notebook.add(self.diagnostic_page, text="Diagnostics")
         self.notebook.add(self.favorites_page, text="Favorites")
@@ -534,6 +549,7 @@ class Application(tk.Tk):
         packet_button.pack(side="left", padx=(8, 0))
         packet_menu = tk.Menu(packet_button, tearoff=False)
         linux_capture = sys.platform.startswith("linux")
+        live_capture = linux_capture or sys.platform == "win32"
         packet_menu.add_command(
             label=("Network Security Monitor…" if linux_capture else
                    "Network Security Monitor — Debian 13 only"),
@@ -544,14 +560,14 @@ class Application(tk.Tk):
             command=self.open_wifi_watch, state=("normal" if linux_capture else "disabled"))
         packet_menu.add_separator()
         packet_menu.add_command(
-            label=("Capture selected host/service" if linux_capture else
-                   "Live packet capture — Debian 13 only"),
+            label=("Capture selected host/service" if live_capture else
+                   "Live packet capture — Windows/Debian only"),
             command=self.capture_selected_packets,
-            state=("normal" if linux_capture else "disabled"))
+            state=("normal" if live_capture else "disabled"))
         packet_menu.add_command(label="Open capture file for selection…",
                                 command=self.open_packet_capture)
         packet_menu.add_command(label="Show capture interfaces", command=self.show_capture_interfaces,
-                                state=("normal" if linux_capture else "disabled"))
+                                state=("normal" if live_capture else "disabled"))
         packet_button.configure(menu=packet_menu)
         ttk.Label(actions, text="Export uses selected rows when any are selected.").pack(side="right")
 
@@ -629,6 +645,7 @@ class Application(tk.Tk):
         self._build_dns_benchmark()
         self._build_connections()
         self._build_intelligence()
+        self._build_operations()
         self._build_endpoint_posture()
         self._build_diagnostics()
         self._build_specialist_tools()
@@ -675,6 +692,7 @@ class Application(tk.Tk):
         self.refresh_subnets(show_errors=False)
         self._refresh_dashboard()
         self.after(1500, self.check_updates)
+        self.after(2000, self._load_operations_policy)
 
     def _navigate(self, page: ttk.Frame) -> None:
         self.notebook.select(page)
@@ -747,6 +765,16 @@ class Application(tk.Tk):
         self.network_intelligence = NetworkIntelligenceView(
             self.intelligence_page, hosts=lambda: self.results)
         self.network_intelligence.pack(fill="both", expand=True)
+
+    def _build_operations(self) -> None:
+        self.operations = NetworkOperationsView(
+            self.operations_page,
+            target_getter=lambda: self.target.get(),
+            start_scan=self.start_scan,
+            open_network_watch=self.open_network_watch,
+            policy_changed=self._apply_operations_policy,
+        )
+        self.operations.pack(fill="both", expand=True)
 
     def _build_endpoint_posture(self) -> None:
         self.endpoint_posture = EndpointPostureView(self.posture_page)
@@ -867,6 +895,7 @@ class Application(tk.Tk):
             (self.dns_benchmark_page, "dns_benchmark", "DNS Benchmark"),
             (self.connections_page, "connections", "Connections"),
             (self.intelligence_page, "intelligence", "Intelligence"),
+            (self.operations_page, "operations", "Network Operations"),
             (self.posture_page, "security_posture", "Security Posture"),
             (self.diagnostic_page, "diagnostics", "Diagnostics"),
             (self.favorites_page, "favorites", "Favorites"),
@@ -2078,6 +2107,8 @@ class Application(tk.Tk):
                     self.status.configure(text="Packet operation failed")
                     messagebox.showerror("Packet operation failed", str(event[1]))
                     return
+                elif event[0] == "policy_notice":
+                    self.status.configure(text=str(event[1]))
                 else:
                     self._stop_discovery_indicator()
                     self.scan_button.configure(state="normal")
@@ -2089,13 +2120,33 @@ class Application(tk.Tk):
         except queue.Empty:
             self.after(50, self._drain_events)
 
-    @staticmethod
-    def _save_scan_history(hosts: list[Host], target: str) -> None:
+    def _save_scan_history(self, hosts: list[Host], target: str) -> None:
         try:
             record_scan(hosts, target)
         except (OSError, ValueError):
             # Optional history must never turn a successful network scan into a failure.
             return
+        try:
+            policy = load_monitor_policy()
+            if not policy.enabled:
+                return
+            changes = selected_policy_changes(policy, scan_change_summary())
+            if not changes:
+                return
+            report_note = ""
+            if policy.report_directory:
+                timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+                destination = Path(policy.report_directory).expanduser() / f"network-change-{timestamp}.json"
+                export_operations_report(destination)
+                report_note = f" · report {destination.name}"
+            webhook_note = ""
+            if policy.webhook_url and not policy_in_quiet_hours(policy):
+                dispatch_policy_webhook(policy, changes)
+                webhook_note = " · webhook sent"
+            total = sum(len(value) for value in changes.values() if isinstance(value, list))
+            self.events.put(("policy_notice", f"Network monitoring detected {total} selected change(s){report_note}{webhook_note}"))
+        except (OSError, ValueError, TypeError, json.JSONDecodeError) as error:
+            self.events.put(("policy_notice", f"Scan saved; monitoring notification failed: {error}"))
 
     @staticmethod
     def _unique_reachable(hosts: list[Host]) -> list[Host]:
@@ -2117,6 +2168,37 @@ class Application(tk.Tk):
         if self.scheduled_scan_id is not None:
             self.after_cancel(self.scheduled_scan_id)
         self.scheduled_scan_id = self.after(minutes * 60_000, self.repeat_scan_callback)
+
+    def _load_operations_policy(self) -> None:
+        try:
+            self._apply_operations_policy(load_monitor_policy())
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            self.status.configure(text=f"Monitoring policy could not be loaded: {error}")
+
+    def _apply_operations_policy(self, policy: MonitorPolicy) -> None:
+        if self.operations_schedule_id is not None:
+            try:
+                self.after_cancel(self.operations_schedule_id)
+            except tk.TclError:
+                pass
+            self.operations_schedule_id = None
+        if policy.enabled:
+            milliseconds = policy.interval_minutes * 60_000
+            self.operations_schedule_id = self.after(milliseconds, self._run_operations_scheduled_scan)
+            self.status.configure(text=f"Continuous inventory enabled · next scan in {policy.interval_minutes} minutes")
+
+    def _run_operations_scheduled_scan(self) -> None:
+        self.operations_schedule_id = None
+        try:
+            policy = load_monitor_policy()
+        except (OSError, ValueError, json.JSONDecodeError):
+            return
+        if not policy.enabled:
+            return
+        if not self.scan_active:
+            self.start_scan()
+        self.operations_schedule_id = self.after(
+            policy.interval_minutes * 60_000, self._run_operations_scheduled_scan)
 
     def _start_discovery_indicator(self, total: int) -> None:
         self.discovery_active = True
@@ -2317,8 +2399,10 @@ class Application(tk.Tk):
             return
         interface = simpledialog.askstring(
             "Capture interface",
-            "Capture interface (use 'any' for all Linux interfaces):",
-            initialvalue=self._capture_interface_hint(), parent=self)
+            ("Capture interface number from Show capture interfaces:"
+             if sys.platform == "win32" else
+             "Capture interface (use 'any' for all Linux interfaces):"),
+            initialvalue=("pktmon" if sys.platform == "win32" else self._capture_interface_hint()), parent=self)
         if interface is None:
             return
         try:
@@ -2335,8 +2419,10 @@ class Application(tk.Tk):
         scope = f"{len(addresses)} selected host(s)" + (f" on TCP port {port}" if port else "")
         if not messagebox.askyesno(
                 "Start packet capture",
-                f"Capture {scope} on {interface} for up to {duration} seconds?\n\n"
-                "Debian may request administrator authorization. Capture only traffic you are authorized to inspect."):
+                f"Capture {scope} on {interface} for up to {duration} seconds?\n\n" +
+                ("Windows uses built-in Microsoft Packet Monitor by default; Npcap/Wireshark is an optional fallback. " if sys.platform == "win32" else
+                 "Debian may request administrator authorization. ") +
+                "Capture only traffic you are authorized to inspect."):
             return
         self.status.configure(text=f"Capturing {scope}…")
         threading.Thread(target=self._capture_packets_worker,

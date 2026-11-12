@@ -1,3 +1,12 @@
+advanced-ip-analyser (3.0.0) stable; urgency=medium
+
+  * Add integrated Network Operations monitoring and infrastructure workspace.
+  * Add SNMP, LLDP/CDP, local discovery, top talkers and conflict review.
+  * Add TCP quality, iPerf3, CISA KEV review and persistent alert policy.
+  * Support optional Npcap/Wireshark live capture on Windows.
+
+ -- Advanced IP Analyser Maintainers <maintainers@example.invalid>  Thu, 12 Nov 2026 22:00:00 +0000
+
 advanced-ip-analyser (2.9.13) stable; urgency=medium
 
   * Add searchable, contextual help for every main desktop workspace.

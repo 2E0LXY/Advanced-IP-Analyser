@@ -123,7 +123,7 @@ HOW IT WORKS
 The table refreshes from local socket ownership data. Direction is inferred from listener and endpoint state. Public addresses are enriched through ipwho.is for approximate city, country and provider coordinates. Map tiles come from OpenStreetMap. Blue markers are outbound, orange markers are inbound and numbered markers cluster nearby points.
 
 HOW TO USE IT
-Start monitoring to refresh every two seconds. Filter by application, PID, protocol, address, state or destination. Select Fit destinations to frame current markers. Drag to pan; use the wheel or +/− to zoom. Stop freezes collection. Export preserves the visible evidence.
+Start monitoring to refresh every two seconds. Filter by application, PID, protocol, address, state or destination. Select Fit destinations to frame current markers. Drag to pan; use the wheel or +/− to zoom. Click a marker or numbered cluster to open every represented application's name, executable path, PID, direction, protocol, local/remote endpoint, state, organisation and approximate location. Stop freezes collection. Export preserves the visible evidence.
 
 WHAT IT MEANS
 Listening means a local program is ready to receive traffic; it does not prove the port is reachable through a firewall. Established means a transport session exists, not that it is trustworthy. A public location usually identifies a provider or data centre, not a person or precise device. Frequent endpoints can be normal CDNs, updates, DNS or cloud APIs.
@@ -213,7 +213,7 @@ Nearby scanning is passive/read-only. Password reveal requests one locally store
 """),
     _section("packet_analysis", "Packet Analysis", "Open, filter and inspect authorised packet captures in the main workspace.", """
 WHAT IT DOES
-Packet Analysis reads bounded PCAP, PCAPNG, CAP and supported gzip captures. It shows time, endpoints, ports, protocol, length, summary and the first 512 bytes of the selected packet. On supported Debian systems the app can also create bounded captures for selected hosts/services.
+Packet Analysis reads bounded PCAP, PCAPNG, CAP and supported gzip captures. It shows time, endpoints, ports, protocol, length, summary and the first 512 bytes of the selected packet. Debian uses native AF_PACKET capture. Windows uses built-in Microsoft Packet Monitor by default, with Npcap/Wireshark or TShark as an optional per-interface fallback.
 
 HOW IT WORKS
 The parser decodes supported Ethernet, VLAN, IPv4/IPv6, ARP, TCP, UDP, DNS, ICMP and common metadata without requiring Wireshark. Selecting a host scopes capture to that IP; selecting a service also scopes the port. Display filters compile into local predicates and never modify the capture. Quick filters and saved named filters accelerate repeated analysis.
@@ -225,7 +225,7 @@ WHAT IT MEANS
 Source/destination describe the packet direction, not necessarily client/server intent. Retransmission, reset or unanswered traffic can result from loss, filtering or normal application behaviour. Payload bytes may contain sensitive data. TLS and other encryption remain encrypted.
 
 SAFETY AND LIMITS
-Capture only traffic you are authorised to inspect. Debian raw capture uses a narrow privileged helper while the GUI remains unprivileged. The bounded parser does not decrypt traffic, bypass authentication or prove malicious intent. Correlate packets with Connections, DNS and host logs.
+Capture only traffic you are authorised to inspect. Debian raw capture uses a narrow privileged helper while the GUI remains unprivileged. Windows Packet Monitor may require administrator rights; its temporary all-adapter capture is immediately reduced to selected host/port records before the viewer can save it. The bounded parser does not decrypt traffic, bypass authentication or prove malicious intent. Correlate packets with Connections, DNS and host logs.
 """),
     _section("web_security", "Web Security", "Run a bounded read-only review of a web property you control.", """
 WHAT IT DOES
@@ -259,6 +259,22 @@ Disabled means no listener is running. Active means the local service is accepti
 PRIVACY AND SAFETY
 No public tunnel, VPN or automatic cloud upload is created. Anyone with the token and LAN reachability may use authorised endpoints, so do not share it. Closing the app stops the listener; persistent pairing remains until revoked. Use trusted private networks, local firewalls and device lock screens.
 """),
+    _section("operations", "Network Operations", "Monitor change, infrastructure, traffic, performance, exposure and automation.", """
+WHAT IT DOES
+Network Operations turns individual scans into an operational workflow. Changes & conflicts compares completed inventories and checks the current ARP/NDP neighbour cache. SNMP & topology reads standard device identity and LLDP/CDP neighbour evidence from authorised infrastructure. Traffic attribution surfaces top talkers from Network Security Monitor history and detects available capture providers. Quality & throughput measures TCP setup quality and runs optional iPerf3 tests. Vulnerability lifecycle searches the current CISA Known Exploited Vulnerabilities catalogue. Schedules & alerts stores a bounded monitoring policy.
+
+HOW IT WORKS
+Baseline changes come from the latest two locally stored scan snapshots using stable MAC-first identity. Conflict review parses the operating system's neighbour cache; it is not a DHCP lease database. Native SNMPv2c reads four bounded standard objects. LLDP/CDP tables use an installed Net-SNMP snmpwalk client so authenticated SNMPv3 is available without storing credentials. DNS/mDNS and SSDP perform short, bounded discovery requests. Top talkers use locally captured Network Watch evidence. CISA KEV is downloaded directly from CISA only when requested.
+
+HOW TO USE IT
+Run at least two comparable Network Scans, then refresh baseline comparison. Inspect conflicts and confirm suspicious entries on the router or DHCP server. In SNMP & topology enter one authorised management IP and temporary credentials; prefer SNMPv3. Use DNS/mDNS or SSDP when normal hostnames are missing. Start Network Security Monitor at a suitable observation point before expecting top-talkers data. For quality tests enter a reachable TCP service. Run iPerf3 only against a server you operate. Search KEV using a vendor and product, then verify exact model, firmware and version independently.
+
+WHAT RESULTS MEAN
+New, missing and changed describe the difference between two observations, not necessarily an incident. Duplicate IP means multiple MACs were observed for one cached address and requires confirmation because caches can be stale. LLDP/CDP links are device-reported physical/logical neighbour evidence. Loss in TCP quality means the selected port did not accept a connection within the bound; it may be closed or filtered. p95 represents a slow-end latency estimate and jitter is variation between successful samples. A KEV match is a review lead, never proof that a host is vulnerable.
+
+AUTOMATION, PRIVACY AND LIMITS
+The saved policy controls interval, quiet hours, change categories, an optional HTTPS webhook and report folder. It never stores SNMP credentials. External communication occurs only when you explicitly refresh CISA KEV, configure a webhook, use public name resolution, or target a remote service. Accurate per-device traffic requires a capture point that can observe traffic; switched networks normally hide traffic between other clients. Windows uses built-in pktmon, with Npcap/Wireshark or TShark only as optional fallbacks. Scan and monitor only systems you own or are authorised to administer.
+"""),
     _section("settings_updates", "Settings, Updates and Shortcuts", "Configure AI providers, understand updates and use keyboard navigation.", """
 SETTINGS
 AI Settings supports OpenAI, Gemini and OpenRouter. Each provider has separate credentials. Refresh models asks that provider for models available to the supplied key. Non-secret preferences are stored locally; API keys use Windows Credential Manager or Debian Secret Service. Delete saved key removes the selected provider secret. AI analysis always shows the exact bounded outbound preview and requires explicit approval before transmission.
@@ -286,6 +302,7 @@ TAB_HELP = {
     "dns_benchmark": "dns_benchmark",
     "connections": "connections",
     "intelligence": "intelligence",
+    "operations": "operations",
     "security_posture": "security_posture",
     "diagnostics": "diagnostics",
     "favorites": "favorites",

@@ -147,9 +147,17 @@ class PacketToolTests(unittest.TestCase):
             capture_live(["192.0.2.5"], max_packets=100_001)
 
     @patch("ip_analyser.packet_tools.sys.platform", "win32")
-    def test_windows_live_capture_is_explicitly_unavailable(self):
-        with self.assertRaisesRegex(RuntimeError, "Debian 13"):
+    @patch("ip_analyser.packet_tools.shutil.which", return_value=None)
+    def test_windows_live_capture_explains_missing_native_provider(self, _which):
+        with self.assertRaisesRegex(RuntimeError, "pktmon"):
             list_capture_interfaces()
+
+    @patch("ip_analyser.packet_tools.sys.platform", "win32")
+    @patch("ip_analyser.packet_tools.shutil.which")
+    def test_windows_builtin_packet_monitor_is_an_interface(self, which):
+        which.side_effect = lambda name: "C:/Windows/System32/pktmon.exe" if name == "pktmon" else None
+        self.assertEqual(list_capture_interfaces(), [
+            ("pktmon", "Microsoft Packet Monitor · all active Windows adapters")])
 
     def test_unscoped_network_watch_keeps_non_ip_frames(self):
         arp_frame = bytes.fromhex("ffffffffffff0011223344550806") + b"\x00" * 28
