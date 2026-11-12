@@ -1,3 +1,11 @@
+advanced-ip-analyser (2.9.12) stable; urgency=medium
+
+  * Scan entered IPv4 targets and local IPv6 neighbours concurrently.
+  * Share progress, cancellation and service discovery across both families.
+  * Continue IPv4 scanning when no usable IPv6 interface is available.
+
+ -- Advanced IP Analyser Maintainers <maintainers@example.invalid>  Thu, 12 Nov 2026 20:00:00 +0000
+
 advanced-ip-analyser (2.9.11) stable; urgency=medium
 
   * Embed Wi-Fi, packet, web-security and Local AI workspaces in the main window.

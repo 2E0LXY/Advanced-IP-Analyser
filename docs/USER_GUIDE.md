@@ -1,4 +1,4 @@
-# Advanced IP Analyser 2.9.11 Instruction Book
+# Advanced IP Analyser 2.9.12 Instruction Book
 
 Windows 10/11 and Debian 13 edition
 
@@ -64,7 +64,7 @@ service, disconnect Wi-Fi clients, inject frames, or recover passwords.
 
 ### Install on Windows
 
-Download `Advanced-IP-Analyser-Setup-2.9.11.exe` from the project release page
+Download `Advanced-IP-Analyser-Setup-2.9.12.exe` from the project release page
 and run it. The per-user installer normally needs no administrator rights and
 offers Start-menu and desktop shortcuts. Windows supports network scanning,
 inventory, Wi-Fi adapter/nearby-network scanning, selected saved-profile key
@@ -74,12 +74,12 @@ visibly disabled because the project does not bundle a Windows capture driver.
 
 ### Install on Debian 13
 
-Download `advanced-ip-analyser_2.9.11_all.deb` from the project release page.
+Download `advanced-ip-analyser_2.9.12_all.deb` from the project release page.
 In a terminal:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.9.11_all.deb
+sudo apt install ./advanced-ip-analyser_2.9.12_all.deb
 ```
 
 Use `apt install ./file.deb`, not `dpkg -i`, because APT resolves dependencies.
@@ -162,8 +162,9 @@ The Network Scan page is arranged from setup to action:
 - **Scan all networks:** combine every detected IPv4 interface subnet and exact
   online Tailscale peer, show the proposed scope, then ask for confirmation.
 - **/24:** use the current host's class-C-style subnet.
-- **IPv6 LAN:** discover local IPv6 nodes through multicast and the NDP neighbour
-  table, then scan only the bounded discovered set instead of enumerating a `/64`.
+- **Include local IPv6:** enabled by default. It discovers local IPv6 nodes through
+  multicast and the NDP neighbour table, then combines that bounded set with the
+  entered IPv4 targets in the same concurrent scan. Disable it for IPv4-only work.
 - **TCP ports:** comma-separated ports and ranges.
 - **Exclude:** optional addresses, ranges, or CIDRs removed from the target scope.
 - **Repeat:** rescan every 5, 15, 30, or 60 minutes while the app remains open.
@@ -174,7 +175,9 @@ The Network Scan page is arranged from setup to action:
 
 - **Remote administration:** Shutdown, Reboot, and Abort shutdown.
 - **Scan results/Favorites:** inventory tables.
-- **Main tabs:** Dashboard, Network Scan, Smart Home, System, Disk Usage, DNS Benchmark, Connections, Intelligence, Diagnostics, Favorites, and Tools. Settings and Help remain available in the header.
+- **Main tabs:** Dashboard, Network Scan, Smart Home, System, Disk Usage, DNS Benchmark,
+  Connections, Intelligence, Security Posture, Diagnostics, Favorites, Wi-Fi Analyzer,
+  Packet Analysis, Web Security, and Local AI. Settings and Help remain in the header.
 - **Footer:** status, centered green progress, version, and Update.
 - **Header:** application identity and status on the left, with Settings and Help on the right. Available updates appear in the footer without replacing a feature control.
 
@@ -185,6 +188,9 @@ enumerate the very large carrier-grade NAT range. Some corporate VPNs publish
 routes without assigning an enumerable interface subnet; enter those authorised
 CIDRs manually. Overlapping targets are scanned once, the aggregate scan remains
 limited to 65,536 unique addresses, and internet default routes are never expanded.
+When **Include local IPv6** is enabled, local NDP neighbours are merged into that
+same bounded target list. IPv4 and IPv6 probes share progress, Stop, discovery,
+history and export. A missing IPv6 interface does not prevent the IPv4 scan.
 
 ### System Monitor
 

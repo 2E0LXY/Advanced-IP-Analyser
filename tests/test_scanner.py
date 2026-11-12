@@ -15,6 +15,17 @@ class ScannerPortDetailTests(unittest.TestCase):
         self.assertEqual([host.address for host in results], ["192.0.2.1", "192.0.2.2"])
         self.assertEqual(inspect.call_count, 2)
 
+    @patch.object(Scanner, "inspect")
+    def test_scan_runs_ipv4_and_ipv6_in_one_worker_pool(self, inspect):
+        inspect.side_effect = lambda address: Host(address, reachable=True)
+        results = Scanner(workers=4).scan(
+            ["192.0.2.20", "2001:db8::20", "fe80::20%18"], discover_services=False)
+        self.assertEqual(
+            [host.address for host in results],
+            ["192.0.2.20", "2001:db8::20", "fe80::20%18"],
+        )
+        self.assertEqual(inspect.call_count, 3)
+
     @patch.object(Scanner, "_neighbour_mac", return_value="AA:BB:CC:DD:EE:FF")
     @patch.object(Scanner, "_ping", return_value=None)
     @patch.object(Scanner, "_port_open", return_value=False)

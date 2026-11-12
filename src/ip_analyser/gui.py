@@ -96,6 +96,19 @@ WEB_APP_PORTS = "80,443,3000,5000,8000,8080,8081,8443,8888,9000,9090"
 GUI_PACKET_LIMIT = 20_000
 
 
+def merge_scan_targets(*groups: list[str]) -> list[str]:
+    """Merge IPv4/IPv6 target groups while preserving order and scope identifiers."""
+    merged: list[str] = []
+    seen: set[str] = set()
+    for group in groups:
+        for address in group:
+            key = address.casefold()
+            if key not in seen:
+                seen.add(key)
+                merged.append(address)
+    return merged
+
+
 class PacketViewer(ttk.Frame):
     """Packet analysis workspace embedded in the main application."""
 
@@ -441,9 +454,10 @@ class Application(tk.Tk):
         ttk.Button(header, text="Scan all networks", command=self.scan_all_networks).pack(
             side="left", padx=(0, 8))
         ttk.Button(header, text="/24", command=self.use_24_subnet).pack(side="left", padx=(0, 8))
-        self.ipv6_scan_button = ttk.Button(
-            header, text="IPv6 LAN", command=self.start_ipv6_scan)
-        self.ipv6_scan_button.pack(side="left", padx=(0, 8))
+        self.include_local_ipv6 = tk.BooleanVar(value=True)
+        self.ipv6_scan_option = ttk.Checkbutton(
+            header, text="Include local IPv6", variable=self.include_local_ipv6)
+        self.ipv6_scan_option.pack(side="left", padx=(0, 8))
         self.scan_button = ttk.Button(header, text="Scan", command=self.start_scan, style="Accent.TButton")
         self.scan_button.pack(side="left")
         self.cancel_button = ttk.Button(header, text="Cancel", command=self.cancel_current_scan, state="disabled")
@@ -1477,6 +1491,7 @@ class Application(tk.Tk):
 
         add_tab("Getting started",
                 "1. Choose an active interface preset or enter one IP, an inclusive range, or a CIDR.\n"
+                "   Leave Include local IPv6 enabled to scan bounded NDP-discovered IPv6 neighbours at the same time as the entered IPv4 targets.\n"
                 "2. Set the TCP ports, timeout, and worker count. The defaults cover common network services.\n"
                 "   Fast, Balanced, Accurate, and Adaptive profiles provide useful timeout/concurrency presets.\n"
                 "3. Press Scan (F5). Reachable devices appear as they are found; press Escape to cancel safely.\n"
@@ -1649,11 +1664,27 @@ class Application(tk.Tk):
         try:
             targets = (list(targets_override) if targets_override is not None else
                        parse_target_sets(self.target.get()))
+            ipv6_targets: list[str] = []
+            ipv6_warning = ""
+            if targets_override is None and self.include_local_ipv6.get():
+                self.status.configure(text="Discovering local IPv6 neighbours before the combined scan…")
+                self.update_idletasks()
+                try:
+                    ipv6_targets = discover_local_ipv6_hosts(self._capture_interface_hint())
+                except (RuntimeError, ValueError):
+                    try:
+                        ipv6_targets = discover_local_ipv6_hosts()
+                    except (RuntimeError, ValueError) as error:
+                        # IPv4 remains useful when the computer or LAN has no usable IPv6 interface.
+                        ipv6_warning = str(error)
+                targets = merge_scan_targets(targets, ipv6_targets)
             if self.exclusions.get().strip():
                 excluded = set(parse_target_sets(self.exclusions.get()))
                 targets = [target for target in targets if target not in excluded]
                 if not targets:
                     raise ValueError("all scan targets were excluded")
+            if len(targets) > 65_536:
+                raise ValueError("combined IPv4/IPv6 scan exceeds the 65,536-address limit")
             ports = parse_ports(self.ports.get(), limit=65_535)
             timeout = float(self.timeout.get())
             workers = int(self.workers.get())
@@ -1674,16 +1705,25 @@ class Application(tk.Tk):
         self.table.delete(*self.table.get_children())
         self._stop_discovery_indicator()
         self.scan_button.configure(state="disabled")
-        self.ipv6_scan_button.configure(state="disabled")
+        self.ipv6_scan_option.configure(state="disabled")
         self.cancel_button.configure(state="normal")
         self.cancel_scan = threading.Event()
         self.scan_active = True
         self.active_scan_target = target_label or self.target.get().strip()
+        if targets_override is None and self.include_local_ipv6.get():
+            self.active_scan_target += f" + local IPv6 ({len(ipv6_targets)} discovered)"
+            if ipv6_warning:
+                self.active_scan_target += " · IPv6 unavailable"
         self.repeat_scan_callback = self.start_ipv6_scan if targets_override is not None else self.start_scan
         self.scan_scanned_count = 0
         self.dashboard.record_activity(f"Scan started · {self.active_scan_target}")
         self._refresh_dashboard()
         self.progress.configure(maximum=len(targets), value=0)
+        family_counts = {4: 0, 6: 0}
+        for address in targets:
+            family_counts[ipaddress.ip_address(address.split("%", 1)[0]).version] += 1
+        self.status.configure(
+            text=f"Scanning {family_counts[4]} IPv4 and {family_counts[6]} IPv6 target(s) concurrently…")
         adaptive = self.profile.get() == "Adaptive"
         threading.Thread(target=self._scan_worker,
                          args=(targets, ports, timeout, workers, adaptive), daemon=True).start()
@@ -1803,7 +1843,7 @@ class Application(tk.Tk):
                     self._refresh_dashboard()
                     self._stop_discovery_indicator()
                     self.scan_button.configure(state="normal")
-                    self.ipv6_scan_button.configure(state="normal")
+                    self.ipv6_scan_option.configure(state="normal")
                     self.cancel_button.configure(state="disabled")
                     self.scan_active = False
                     prefix = "Cancelled" if cancelled else "Finished"
@@ -1835,7 +1875,7 @@ class Application(tk.Tk):
                 else:
                     self._stop_discovery_indicator()
                     self.scan_button.configure(state="normal")
-                    self.ipv6_scan_button.configure(state="normal")
+                    self.ipv6_scan_option.configure(state="normal")
                     self.cancel_button.configure(state="disabled")
                     self.scan_active = False
                     messagebox.showerror("Scan failed", str(event[1]))

@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from ip_analyser.gui import Application
+from ip_analyser.gui import Application, merge_scan_targets
 from ip_analyser.models import Host
 
 
@@ -76,6 +76,17 @@ class HostAddressColourTests(unittest.TestCase):
 
     def test_ipv6_host_row_uses_dark_green_colour_tag(self):
         self.assertEqual(self._insert_host("fe80::20%18"), ("ipv6_even",))
+
+
+class CombinedAddressFamilyTests(unittest.TestCase):
+    def test_ipv4_and_scoped_ipv6_targets_are_merged_and_deduplicated(self):
+        self.assertEqual(
+            merge_scan_targets(
+                ["192.0.2.10", "192.0.2.11"],
+                ["fe80::10%18", "192.0.2.10", "FE80::10%18"],
+            ),
+            ["192.0.2.10", "192.0.2.11", "fe80::10%18"],
+        )
 
 
 if __name__ == "__main__":

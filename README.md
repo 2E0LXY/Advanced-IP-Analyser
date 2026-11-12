@@ -15,13 +15,13 @@ Wireshark.
 ## Download
 
 [![Download Android APK](https://img.shields.io/badge/ANDROID-DOWNLOAD_APK_1.2.7-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.7/Advanced-IP-Analyser-Android-1.2.7.apk)
-[![Download Windows](https://img.shields.io/badge/WINDOWS-DOWNLOAD_2.9.11-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.11/Advanced-IP-Analyser-Setup-2.9.11.exe)
+[![Download Windows](https://img.shields.io/badge/WINDOWS-DOWNLOAD_2.9.12-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.12/Advanced-IP-Analyser-Setup-2.9.12.exe)
 
 | Platform | Current version | Download | Installation help |
 | --- | ---: | --- | --- |
 | **Android phone/tablet** | **1.2.7** | **[Download the signed APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.7/Advanced-IP-Analyser-Android-1.2.7.apk)** | **[Android installation instructions](docs/ANDROID-INSTALL.md)** |
-| Windows 10/11 | 2.9.11 | [Download the Windows installer](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.11/Advanced-IP-Analyser-Setup-2.9.11.exe) | Run the downloaded `.exe`; the installer closes and upgrades running copies |
-| Debian 13 | 2.9.11 | [Download the Debian package](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.11/advanced-ip-analyser_2.9.11_all.deb) | Install with `sudo apt install ./advanced-ip-analyser_2.9.11_all.deb` |
+| Windows 10/11 | 2.9.12 | [Download the Windows installer](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.12/Advanced-IP-Analyser-Setup-2.9.12.exe) | Run the downloaded `.exe`; the installer closes and upgrades running copies |
+| Debian 13 | 2.9.12 | [Download the Debian package](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.12/advanced-ip-analyser_2.9.12_all.deb) | Install with `sudo apt install ./advanced-ip-analyser_2.9.12_all.deb` |
 
 > **Looking for Android?** The signed Android APK is included on the main
 > **Latest** release page alongside Windows and Debian. Android also retains a
@@ -129,7 +129,7 @@ then run:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.9.11_all.deb
+sudo apt install ./advanced-ip-analyser_2.9.12_all.deb
 ```
 
 Launch it from the desktop application menu or run:
@@ -165,8 +165,8 @@ the complete GUI with `sudo`.
 
 1. Select an interface subnet, enter one or several address/range/CIDR targets,
    use **Scan all networks** for detected LAN/VPN/VLAN interfaces and online
-   Tailscale peers, use the `/24` shortcut, or press **IPv6 LAN** to discover
-   local IPv6 neighbours.
+   Tailscale peers, or use the `/24` shortcut. Leave **Include local IPv6**
+   enabled to add bounded NDP-discovered IPv6 neighbours to the same scan.
 2. Optionally enter excluded addresses/ranges/CIDRs and choose an in-app repeat
    interval for scheduled inventory refreshes.
 3. Choose Fast, Balanced, or Accurate, or set timeout/workers manually.
@@ -186,11 +186,14 @@ commas, semicolons, or new lines accepted between multiple scopes. Overlaps are
 deduplicated and each invocation remains limited to 65,536 unique addresses.
 Full TCP-port scans should be restricted to a small number of authorized targets.
 
-Normal IPv6 LANs use `/64` prefixes and cannot be exhaustively enumerated. The
-**IPv6 LAN** action sends a bounded all-nodes multicast probe on active interfaces,
-reads the operating system's NDP neighbour table, adds the machine's own usable
-IPv6 addresses, and scans only that discovered set. Link-local addresses retain
-their interface scope.
+Normal IPv6 LANs use `/64` prefixes and cannot be exhaustively enumerated. When
+**Include local IPv6** is enabled, the Scan action sends a bounded all-nodes
+multicast probe on active interfaces, reads the operating system's NDP neighbour
+table, adds the machine's own usable IPv6 addresses, and submits that discovered
+set alongside the entered IPv4 targets to one concurrent worker pool. Progress,
+cancellation, service discovery and exports cover both families together.
+Link-local addresses retain their interface scope. If IPv6 is unavailable, the
+IPv4 portion continues instead of failing the complete scan.
 
 ## Favorites, inventories, and device actions
 

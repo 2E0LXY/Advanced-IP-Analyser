@@ -11,7 +11,8 @@ This also covers processes that remain active after the visible window closes.
 
 ## Available on Windows
 
-- IPv4 and IPv6 target, range, and CIDR scanning;
+- simultaneous IPv4 target and bounded local IPv6-neighbour scanning, plus explicit
+  IPv4/IPv6 address, range, and CIDR targets;
 - Windows interface/subnet presets through `Get-NetIPAddress`;
 - TCP service discovery, safe banners, device profiles, inventory, and favourites;
 - Wake-on-LAN, web audit, reports, imports, and exports;

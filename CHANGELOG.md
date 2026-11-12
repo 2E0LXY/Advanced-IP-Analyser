@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.9.12 - 2026-11-12
+
+- Added a default-enabled **Include local IPv6** option to the normal network scan.
+- Entered IPv4 targets and NDP-discovered IPv6 neighbours now run through one concurrent worker pool.
+- Combined scans share live progress, cancellation, service discovery, history, filtering and export.
+- IPv6 discovery failure no longer blocks the IPv4 portion of a combined scan.
+- Combined targets remain deduplicated and bounded to 65,536 addresses.
+
 ## 2.9.11 - 2026-11-12
 
 - Embedded Wi-Fi Analyzer, Packet Analysis, Web Security and Local AI directly in their top-level workspaces.
