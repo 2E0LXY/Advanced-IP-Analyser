@@ -9,17 +9,21 @@ from tkinter import filedialog, messagebox, ttk
 from .web_audit import WebAuditReport, audit_site, export_web_audit
 
 
-class WebSecurityAudit(tk.Toplevel):
+class WebSecurityAudit(ttk.Frame):
+    """Embeddable, read-only web security audit workspace."""
+
     def __init__(self, parent: tk.Misc, initial_url: str = ""):
         super().__init__(parent)
-        self.title("Web Security Audit")
-        self.geometry("1180x760")
-        self.minsize(860, 580)
         self.report: WebAuditReport | None = None
         self.events: queue.Queue = queue.Queue()
         self._build(initial_url)
 
     def _build(self, initial_url: str) -> None:
+        heading = ttk.Frame(self, padding=(12, 12, 12, 4))
+        heading.pack(fill="x")
+        ttk.Label(heading, text="Web Security", font=("Segoe UI", 20, "bold")).pack(anchor="w")
+        ttk.Label(heading, text="Bounded, read-only inspection for websites you are authorized to test",
+                  foreground="#90abc4").pack(anchor="w", pady=(2, 0))
         target = ttk.Frame(self, padding=12)
         target.pack(fill="x")
         ttk.Label(target, text="Authorized URL").grid(row=0, column=0, sticky="w")
@@ -94,6 +98,14 @@ class WebSecurityAudit(tk.Toplevel):
         self.details.pack(fill="both", expand=True)
         self.status = ttk.Label(self, text="Read-only audit ready. No exploit payloads are sent.", padding=12)
         self.status.pack(fill="x")
+
+    def set_initial_url(self, value: str) -> None:
+        """Update the target when the audit is opened from a discovered service."""
+        if not value:
+            return
+        self.url.delete(0, "end")
+        self.url.insert(0, value)
+        self.url.focus_set()
 
     @staticmethod
     def _table(parent: ttk.Frame, columns: tuple[str, ...], widths: tuple[int, ...]) -> ttk.Treeview:

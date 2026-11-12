@@ -96,24 +96,29 @@ WEB_APP_PORTS = "80,443,3000,5000,8000,8080,8081,8443,8888,9000,9090"
 GUI_PACKET_LIMIT = 20_000
 
 
-class PacketViewer(tk.Toplevel):
-    def __init__(self, parent: Application, capture: Path, records: list[PacketRecord]):
+class PacketViewer(ttk.Frame):
+    """Packet analysis workspace embedded in the main application."""
+
+    def __init__(self, parent: tk.Misc, capture: Path, records: list[PacketRecord],
+                 on_open_capture=None):
         super().__init__(parent)
         self.capture = capture
         self.records = records
         self.records_by_item: dict[str, PacketRecord] = {}
-        self.title(f"Packet analysis · {capture.name}")
-        self.geometry("1180x700")
-        self.minsize(760, 480)
 
         header = ttk.Frame(self, padding=12)
         header.pack(fill="x")
-        ttk.Label(header, text="Built-in packet analysis",
-                  font=("TkDefaultFont", 14, "bold")).pack(side="left")
-        self.match_count = ttk.Label(header, text=f"{len(records):,} displayed packet(s)")
-        self.match_count.pack(side="left", padx=16)
+        title = ttk.Frame(header)
+        title.pack(side="left", fill="x", expand=True)
+        ttk.Label(title, text="Packet Analysis",
+                  font=("Segoe UI", 20, "bold")).pack(anchor="w")
+        self.match_count = ttk.Label(
+            title, text=f"{capture.name} · {len(records):,} displayed packet(s)", foreground="#90abc4")
+        self.match_count.pack(anchor="w", pady=(2, 0))
+        if on_open_capture is not None:
+            ttk.Button(header, text="Open another capture…",
+                       command=on_open_capture).pack(side="right", padx=(8, 0))
         ttk.Button(header, text="Save capture as…", command=self.save_capture).pack(side="right")
-        ttk.Button(header, text="Close", command=self.destroy).pack(side="right", padx=(0, 8))
 
         filter_bar = ttk.Frame(self, padding=(12, 0, 12, 8))
         filter_bar.pack(fill="x")
@@ -304,6 +309,7 @@ class Application(tk.Tk):
         self.network_presets = []
         self.favorites_path = Path.home() / ".config" / "advanced-ip-analyser" / "favorites.json"
         self.local_control_server = None
+        self.local_control_state = None
         try:
             self.app_icon = tk.PhotoImage(file=Path(__file__).with_name("assets") / "advanced-ip-analyser.png")
             self.iconphoto(True, self.app_icon)
@@ -318,6 +324,13 @@ class Application(tk.Tk):
             style.theme_use("clam")
         style.configure("TFrame", background="#0f1c2a")
         style.configure("TLabel", background="#0f1c2a", foreground="#d8e5f3")
+        style.configure("TLabelframe", background="#142438", bordercolor="#294155",
+                        lightcolor="#294155", darkcolor="#294155", relief="solid")
+        style.configure("TLabelframe.Label", background="#142438", foreground="#b9cde0",
+                        font=("Segoe UI", 9, "bold"))
+        style.configure("TCheckbutton", background="#0f1c2a", foreground="#d8e5f3")
+        style.map("TCheckbutton", background=[("active", "#0f1c2a")],
+                  foreground=[("disabled", "#708397")])
         style.configure("TButton", padding=(10, 7), background="#1b3045", foreground="#d8e5f3",
                         bordercolor="#34495e", font=("Segoe UI", 9))
         style.map("TButton", background=[("active", "#254663")], foreground=[("disabled", "#708397")])
@@ -340,6 +353,13 @@ class Application(tk.Tk):
         style.configure("Treeview.Heading", background="#1c3147", foreground="#a9c6e4",
                         font=("Segoe UI", 9, "bold"), relief="flat")
         style.map("Treeview", background=[("selected", "#246398")], foreground=[("selected", "#ffffff")])
+        style.configure("TNotebook", background="#0f1c2a", borderwidth=0,
+                        bordercolor="#0f1c2a", lightcolor="#0f1c2a", darkcolor="#0f1c2a")
+        style.configure("TNotebook.Tab", background="#172b3e", foreground="#a9bfd3",
+                        padding=(10, 7), font=("Segoe UI", 9), borderwidth=0)
+        style.map("TNotebook.Tab",
+                  background=[("selected", "#245f8e"), ("active", "#244764")],
+                  foreground=[("selected", "#ffffff"), ("active", "#ffffff")])
         style.configure("Dark.TNotebook", background="#0d1b29", borderwidth=0, tabmargins=0,
                         bordercolor="#0d1b29", lightcolor="#0d1b29", darkcolor="#0d1b29")
         style.layout("Dark.TNotebook.Tab", style.layout("TNotebook.Tab"))
@@ -712,42 +732,109 @@ class Application(tk.Tk):
         self.endpoint_posture = EndpointPostureView(self.posture_page)
         self.endpoint_posture.pack(fill="both", expand=True)
 
-    def _build_specialist_tool(self, page: ttk.Frame, title: str, description: str,
-                               action_label: str, command) -> None:
+    def _build_specialist_tools(self) -> None:
+        if sys.platform == "win32":
+            self.wifi_analyzer = WindowsWifiAnalyzer(self.wifi_analyzer_page)
+            self.wifi_analyzer.pack(fill="both", expand=True)
+        else:
+            self._build_unavailable_workspace(
+                self.wifi_analyzer_page, "Wi-Fi Analyzer",
+                "The integrated Wi-Fi analyzer currently requires Windows 10 or 11.")
+
+        self._build_packet_workspace()
+        self.web_security = WebSecurityAudit(self.web_security_page)
+        self.web_security.pack(fill="both", expand=True)
+        self._build_local_ai_workspace()
+
+    @staticmethod
+    def _build_unavailable_workspace(page: ttk.Frame, title: str, message: str) -> None:
+        heading = ttk.Frame(page, padding=18)
+        heading.pack(fill="x")
+        ttk.Label(heading, text=title, font=("Segoe UI", 20, "bold")).pack(anchor="w")
+        ttk.Label(heading, text=message, foreground="#90abc4").pack(anchor="w", pady=(5, 0))
+
+    def _build_packet_workspace(self) -> None:
+        page = self.packet_analysis_page
+        self.packet_workspace = ttk.Frame(page)
+        self.packet_workspace.pack(fill="both", expand=True)
+        heading = ttk.Frame(self.packet_workspace, padding=(18, 18, 18, 8))
+        heading.pack(fill="x")
+        ttk.Label(heading, text="Packet Analysis", font=("Segoe UI", 20, "bold")).pack(anchor="w")
+        ttk.Label(heading, text="Filter and inspect packet captures without leaving the main workspace",
+                  foreground="#90abc4").pack(anchor="w", pady=(2, 0))
+        empty = tk.Frame(self.packet_workspace, bg="#152535", highlightbackground="#294155",
+                         highlightthickness=1, padx=30, pady=26)
+        empty.pack(fill="x", padx=18, pady=(8, 18))
+        tk.Label(empty, text="No capture loaded", bg="#152535", fg="#eef6ff",
+                 font=("Segoe UI", 15, "bold")).pack(anchor="w")
+        tk.Label(empty, text="Open a PCAP, PCAPNG or CAP file. The packet table, filters and byte view "
+                             "will appear here in this tab.", bg="#152535", fg="#9fb4ca",
+                 font=("Segoe UI", 10), wraplength=720, justify="left").pack(anchor="w", pady=(7, 16))
+        ttk.Button(empty, text="Choose capture file…", command=self.open_packet_capture,
+                   style="Accent.TButton").pack(anchor="w")
+
+    def _show_packet_workspace(self, path: Path, records: list[PacketRecord]) -> None:
+        for child in self.packet_workspace.winfo_children():
+            child.destroy()
+        viewer = PacketViewer(self.packet_workspace, path, records, self.open_packet_capture)
+        viewer.pack(fill="both", expand=True)
+        self.packet_viewer = viewer
+        self._navigate(self.packet_analysis_page)
+
+    def _build_local_ai_workspace(self) -> None:
+        page = self.local_ai_page
         heading = ttk.Frame(page, padding=(18, 18, 18, 8))
         heading.pack(fill="x")
-        ttk.Label(heading, text=title, font=("Segoe UI", 22, "bold")).pack(anchor="w")
-        ttk.Label(heading, text="Specialist network workspace",
-                  foreground="#90abc4", font=("Segoe UI", 10)).pack(anchor="w", pady=(3, 0))
-        card = tk.Frame(page, bg="#152535", highlightbackground="#294155", highlightthickness=1,
-                        padx=30, pady=28)
-        card.pack(fill="x", padx=18, pady=(0, 18))
-        tk.Label(card, text=title, bg="#152535", fg="#eef6ff",
-                 font=("Segoe UI", 18, "bold")).pack(anchor="w")
-        tk.Label(card, text=description, bg="#152535", fg="#9fb4ca",
-                 font=("Segoe UI", 10), wraplength=680, justify="left").pack(anchor="w", pady=(8, 22))
-        tk.Button(card, text=action_label, command=command, relief="flat", bd=0,
-                  bg="#1688e7", fg="#ffffff", activebackground="#329cf0",
-                  activeforeground="#ffffff", font=("Segoe UI", 10, "bold"),
-                  padx=18, pady=10).pack(anchor="w")
+        ttk.Label(heading, text="Local AI Control", font=("Segoe UI", 20, "bold")).pack(anchor="w")
+        ttk.Label(heading, text="Private, revocable access for this computer and a paired Android device",
+                  foreground="#90abc4").pack(anchor="w", pady=(2, 0))
 
-    def _build_specialist_tools(self) -> None:
-        entries = (
-            (self.wifi_analyzer_page, "Wi-Fi Analyzer",
-             "Inspect Windows Wi-Fi adapters, nearby networks and saved profiles.",
-             "Open Wi-Fi Analyzer", self.open_wifi_tools),
-            (self.packet_analysis_page, "Packet Analysis",
-             "Open a capture file for filtering, inspection and defensive analysis.",
-             "Open Packet Analysis", self.open_packet_capture),
-            (self.web_security_page, "Web Security",
-             "Run a focused, read-only audit against a web address you control.",
-             "Open Web Security Audit", self.open_web_audit),
-            (self.local_ai_page, "Local AI",
-             "Configure local monitoring and review bounded network evidence.",
-             "Open Local AI Control", self.show_local_ai_control),
-        )
-        for page, title, description, action_label, command in entries:
-            self._build_specialist_tool(page, title, description, action_label, command)
+        card = ttk.LabelFrame(page, text="Authorised local session", padding=18)
+        card.pack(fill="x", padx=18, pady=(6, 12))
+        self.local_ai_state_text = tk.StringVar(value="Disabled · no local listener is running")
+        ttk.Label(card, textvariable=self.local_ai_state_text,
+                  font=("Segoe UI", 11, "bold")).grid(row=0, column=0, columnspan=4, sticky="w")
+        ttk.Label(card, text="Desktop address").grid(row=1, column=0, sticky="w", pady=(14, 4))
+        self.local_ai_address = ttk.Entry(card, state="readonly")
+        self.local_ai_address.grid(row=1, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=(14, 4))
+        ttk.Label(card, text="Private session token").grid(row=2, column=0, sticky="w", pady=4)
+        self.local_ai_token = ttk.Entry(card, show="•", state="readonly")
+        self.local_ai_token.grid(row=2, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4)
+        card.columnconfigure(1, weight=1)
+        controls = ttk.Frame(card)
+        controls.grid(row=3, column=0, columnspan=4, sticky="w", pady=(14, 0))
+        self.local_ai_enable = ttk.Button(controls, text="Enable local access",
+                                          command=self.show_local_ai_control, style="Accent.TButton")
+        self.local_ai_enable.pack(side="left")
+        self.local_ai_reveal = ttk.Button(controls, text="Show token", command=self._toggle_local_ai_token,
+                                          state="disabled")
+        self.local_ai_reveal.pack(side="left", padx=(8, 0))
+        self.local_ai_copy = ttk.Button(controls, text="Copy token", command=self._copy_local_ai_token,
+                                        state="disabled")
+        self.local_ai_copy.pack(side="left", padx=(8, 0))
+        self.local_ai_dashboard = ttk.Button(controls, text="Open dashboard", command=self._open_local_dashboard,
+                                             state="disabled")
+        self.local_ai_dashboard.pack(side="left", padx=(8, 0))
+        self.local_ai_scan = ttk.Button(controls, text="Scan from Android", command=self._scan_from_android,
+                                        state="disabled")
+        self.local_ai_scan.pack(side="left", padx=(8, 0))
+        self.local_ai_revoke = ttk.Button(controls, text="Revoke access", command=self._revoke_local_ai,
+                                          state="disabled", style="Danger.TButton")
+        self.local_ai_revoke.pack(side="left", padx=(8, 0))
+
+        privacy = ttk.LabelFrame(page, text="Privacy and pairing", padding=18)
+        privacy.pack(fill="x", padx=18)
+        ttk.Label(privacy, wraplength=940, justify="left", text=(
+            "The listener runs only on your private LAN. The session token is stored in the operating-system "
+            "credential store and can be revoked at any time. Router changes always require separate approval. "
+            "No cloud service, public tunnel or VPN is created.")).pack(anchor="w")
+
+    @staticmethod
+    def _set_readonly_entry(entry: ttk.Entry, value: str) -> None:
+        entry.configure(state="normal")
+        entry.delete(0, "end")
+        entry.insert(0, value)
+        entry.configure(state="readonly")
 
     def _open_port_scan(self) -> None:
         self._navigate(self.scan_page)
@@ -831,7 +918,7 @@ class Application(tk.Tk):
         self.diagnostic_output.configure(state="disabled")
 
     def show_local_ai_control(self) -> None:
-        """Create a user-authorised loopback session from the packaged Windows GUI."""
+        """Create a user-authorised LAN session and show it in the Local AI tab."""
         from http.server import ThreadingHTTPServer
 
         from .local_control import PORT, ControlState, make_handler, private_lan_address
@@ -854,58 +941,83 @@ class Application(tk.Tk):
             self.local_control_state = state
             self.local_control_server = server
             threading.Thread(target=server.serve_forever, kwargs={"poll_interval": .2}, daemon=True).start()
+        self._refresh_local_ai_workspace()
+        self._navigate(self.local_ai_page)
 
-        panel = tk.Toplevel(self)
-        panel.title("Local AI Control - authorised session")
-        panel.geometry("700x300")
-        panel.transient(self)
-        frame = ttk.Frame(panel, padding=16)
-        frame.pack(fill="both", expand=True)
-        ttk.Label(frame, text="Private session token (do not share)").pack(anchor="w")
-        token_box = ttk.Entry(frame, width=76)
-        token_box.insert(0, self.local_control_state.token)
-        token_box.configure(state="readonly")
-        token_box.pack(fill="x", pady=8)
+    def _refresh_local_ai_workspace(self) -> None:
+        if self.local_control_server is None or self.local_control_state is None:
+            self.local_ai_state_text.set("Disabled · no local listener is running")
+            self._set_readonly_entry(self.local_ai_address, "")
+            self._set_readonly_entry(self.local_ai_token, "")
+            self.local_ai_enable.configure(state="normal", text="Enable local access")
+            for button in (self.local_ai_reveal, self.local_ai_copy, self.local_ai_dashboard,
+                           self.local_ai_scan, self.local_ai_revoke):
+                button.configure(state="disabled")
+            return
         lan_address = self.local_control_server.server_address[0]
-        ttk.Label(frame, text=f"Desktop address for Android: http://{lan_address}:{PORT}/").pack(anchor="w")
+        port = self.local_control_server.server_address[1]
         peer_text = (f"Paired Android: {self.local_control_state.peer_address}"
                      if self.local_control_state.device_id else "No Android device paired yet")
-        ttk.Label(frame, text=peer_text).pack(anchor="w", pady=(4, 0))
-        buttons = ttk.Frame(frame)
-        buttons.pack(anchor="w", pady=10)
+        self.local_ai_state_text.set(f"Active · {peer_text}")
+        self._set_readonly_entry(self.local_ai_address, f"http://{lan_address}:{port}/")
+        self._set_readonly_entry(self.local_ai_token, self.local_control_state.token)
+        self.local_ai_enable.configure(state="disabled", text="Local access enabled")
+        for button in (self.local_ai_reveal, self.local_ai_copy, self.local_ai_dashboard,
+                       self.local_ai_scan, self.local_ai_revoke):
+            button.configure(state="normal")
 
-        def copy_token():
-            self.clipboard_clear()
-            self.clipboard_append(self.local_control_state.token)
+    def _toggle_local_ai_token(self) -> None:
+        hidden = bool(self.local_ai_token.cget("show"))
+        self.local_ai_token.configure(show="" if hidden else "•")
+        self.local_ai_reveal.configure(text="Hide token" if hidden else "Show token")
 
-        def stop_control():
-            self.local_control_state.revoke()
-            self.local_control_state.stop()
-            self.local_control_server.shutdown()
-            self.local_control_server.server_close()
-            self.local_control_server = None
-            panel.destroy()
+    def _copy_local_ai_token(self) -> None:
+        if self.local_control_state is None:
+            return
+        self.clipboard_clear()
+        self.clipboard_append(self.local_control_state.token)
+        self.status.configure(text="Private Local AI token copied to the clipboard.")
 
-        ttk.Button(buttons, text="Copy token", command=copy_token).pack(side="left")
-        ttk.Button(buttons, text="Open local dashboard", command=lambda: webbrowser.open(
-            f"http://{lan_address}:{PORT}/")).pack(side="left", padx=8)
-        ttk.Button(buttons, text="Revoke access", command=stop_control).pack(side="left")
-        def scan_android():
-            def worker():
-                try:
-                    result = self.local_control_state.scan_android_peer()
-                    count = len(result.get("hosts", [])) if isinstance(result, dict) else 0
-                    self.after(0, lambda: messagebox.showinfo(
-                        "Android peer scan", f"Android found {count} device(s) on its LAN view.", parent=panel))
-                except Exception as exc:
-                    self.after(0, lambda error=str(exc): messagebox.showerror(
-                        "Android peer scan", error, parent=panel))
-            threading.Thread(target=worker, daemon=True).start()
+    def _open_local_dashboard(self) -> None:
+        if self.local_control_server is None:
+            return
+        address, port = self.local_control_server.server_address
+        webbrowser.open(f"http://{address}:{port}/")
 
-        ttk.Button(buttons, text="Scan from Android", command=scan_android).pack(side="left", padx=8)
-        ttk.Label(frame, text=(
-            "The token persists in the OS credential store. Closing this panel or app stops the listener but keeps pairing. "
-            "Revoke access rotates the token and removes the paired Android identity."), wraplength=660).pack(anchor="w")
+    def _revoke_local_ai(self) -> None:
+        if self.local_control_server is None or self.local_control_state is None:
+            return
+        if not messagebox.askyesno(
+                "Revoke Local AI access?",
+                "This rotates the private token, removes Android pairing and stops the local listener.",
+                parent=self):
+            return
+        self.local_control_state.revoke()
+        self.local_control_state.stop()
+        self.local_control_server.shutdown()
+        self.local_control_server.server_close()
+        self.local_control_server = None
+        self.local_control_state = None
+        self.local_ai_token.configure(show="•")
+        self.local_ai_reveal.configure(text="Show token")
+        self._refresh_local_ai_workspace()
+
+    def _scan_from_android(self) -> None:
+        if self.local_control_state is None:
+            return
+        self.local_ai_state_text.set("Requesting a LAN scan from the paired Android device…")
+
+        def worker() -> None:
+            try:
+                result = self.local_control_state.scan_android_peer()
+                count = len(result.get("hosts", [])) if isinstance(result, dict) else 0
+                self.after(0, lambda: self.local_ai_state_text.set(
+                    f"Android scan complete · {count} device(s) found"))
+            except Exception as exc:
+                self.after(0, lambda error=str(exc): self.local_ai_state_text.set(
+                    f"Android scan failed · {error}"))
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def show_local_ai_monitor(self) -> None:
         """Optional foreground-session monitor; all observations remain local."""
@@ -1415,7 +1527,7 @@ class Application(tk.Tk):
                 "The adapter must support monitor mode. A temporary virtual monitor interface is created through PolicyKit and removed when the watch stops, leaving the normal interface unchanged where the driver supports concurrent interfaces. "
                 "The feature is passive: it does not send deauthentication frames, inject traffic, disconnect clients, or attempt password recovery.")
         add_tab("Windows Wi-Fi Analyzer",
-                "The top-level Wi-Fi Analyzer tab opens a read-only Windows analyzer showing adapters, the current connection, nearby network names, signal quality, approximate dBm, channel bandwidth, security, and saved-profile status. Nearby results can be exported to CSV without credentials.\n\n"
+                "The top-level Wi-Fi Analyzer tab is the complete read-only Windows workspace; it does not launch a second window. It shows adapters, the current connection, nearby network names, signal quality, approximate dBm, channel bandwidth, security, and saved-profile status. Nearby results can be exported to CSV without credentials.\n\n"
                 "The Saved profiles tab lists profiles already stored by Windows. Passwords remain masked until one profile is selected and its Reveal action is confirmed. A revealed password stays only in application memory, is excluded from exports, and can be hidden immediately. Copy clears the matching clipboard value after 30 seconds. Windows controls whether the signed-in account may retrieve a clear-text key and may require administrator permission.")
         add_tab("System Monitor",
                 "System Monitor measures CPU, memory, storage throughput, network throughput, and the processes using the machine. It identifies the strongest current pressure signal without converting missing sensors into zeroes. Per-process CPU is normalized across logical processors, and PID plus process creation time is used as the row identity so a recycled PID cannot silently refer to a different process.\n\n"
@@ -1714,7 +1826,7 @@ class Application(tk.Tk):
                 elif event[0] == "packet_done":
                     _, path, records = event
                     self.status.configure(text=f"Packet analysis ready: {len(records):,} matching packet(s)")
-                    PacketViewer(self, path, records)
+                    self._show_packet_workspace(path, records)
                     return
                 elif event[0] == "packet_error":
                     self.status.configure(text="Packet operation failed")
@@ -2003,7 +2115,8 @@ class Application(tk.Tk):
 
     def open_wifi_tools(self) -> None:
         if sys.platform == "win32":
-            WindowsWifiAnalyzer(self)
+            self._navigate(self.wifi_analyzer_page)
+            self.wifi_analyzer.refresh()
         elif sys.platform.startswith("linux"):
             WifiWatch(self)
         else:
@@ -2017,7 +2130,9 @@ class Application(tk.Tk):
             if preferred:
                 index = selected[0].services.index(preferred)
                 initial = service_url(preferred, selected[0].address, selected[0].ports[index])
-        WebSecurityAudit(self, initial)
+        if initial:
+            self.web_security.set_initial_url(initial)
+        self._navigate(self.web_security_page)
 
     def open_packet_capture(self) -> None:
         name = filedialog.askopenfilename(filetypes=[

@@ -1,3 +1,11 @@
+advanced-ip-analyser (2.9.11) stable; urgency=medium
+
+  * Embed Wi-Fi, packet, web-security and Local AI workspaces in the main window.
+  * Remove redundant launcher cards and separate specialist-tool windows.
+  * Apply the dark visual system to nested tabs and grouped controls.
+
+ -- Advanced IP Analyser Maintainers <maintainers@example.invalid>  Thu, 12 Nov 2026 19:00:00 +0000
+
 advanced-ip-analyser (2.9.10) stable; urgency=medium
 
   * Promote the four specialist tool launchers to the main application tab bar.

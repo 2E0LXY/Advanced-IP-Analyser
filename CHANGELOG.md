@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.9.11 - 2026-11-12
+
+- Embedded Wi-Fi Analyzer, Packet Analysis, Web Security and Local AI directly in their top-level workspaces.
+- Removed the redundant launcher-card-to-secondary-window interaction.
+- Packet captures now replace the in-tab empty state with the full filter and byte-inspection workspace.
+- Local AI session address, token visibility, pairing, Android scan and revocation controls now stay in the main window.
+- Applied the dark interface styling to nested tabs, grouped panels and authorization controls.
+
 ## 2.9.10 - 2026-11-12
 
 - Remove the redundant top-level Tools wrapper from the Windows interface.

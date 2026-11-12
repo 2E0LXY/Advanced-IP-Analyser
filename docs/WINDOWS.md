@@ -47,7 +47,8 @@ analysed on Windows.
 
 ## Wi-Fi Analyzer
 
-Open the top-level **Wi-Fi Analyzer** tab, then select **Open Wi-Fi Analyzer**.
+Open the top-level **Wi-Fi Analyzer** tab. The complete analyzer appears in the
+main application; it does not open a second window.
 Nearby-network scanning and adapter status are
 read-only and use the Windows WLAN service. Signal history retains and horizontally
 scrolls through up to two hours of measured dBm samples at a selected 1–5 second

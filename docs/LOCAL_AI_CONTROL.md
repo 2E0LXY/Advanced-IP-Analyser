@@ -7,7 +7,7 @@ integration must be able to open and operate the local dashboard.
 
 ## Start
 
-**Windows installer:** open Advanced IP Analyser, choose **Tools → Local AI**, approve the initial session, then select **Open local dashboard**. Copy the session token into the dashboard. **Revoke access** stops the service. The packaged Windows installer uses this graphical entry point rather than the Python CLI.
+**Windows installer:** open Advanced IP Analyser and choose the top-level **Local AI** tab. The session address, masked token, pairing state and controls are embedded in the main application. Select **Enable local access**, approve the private listener, then use **Open dashboard** or pair Android with the displayed address and token. **Revoke access** stops the service, rotates the token and removes pairing.
 
 From a Python CLI installation:
 

@@ -16,13 +16,11 @@ from .windows_wifi import (NearbyWifiNetwork, SavedWifiProfile,
 from .wifi_tools import spreadsheet_safe_cell
 
 
-class WindowsWifiAnalyzer(tk.Toplevel):
+class WindowsWifiAnalyzer(ttk.Frame):
+    """Windows Wi-Fi workspace that can be embedded in the main application."""
+
     def __init__(self, parent: tk.Misc):
         super().__init__(parent)
-        self.title("Wi-Fi Analyzer · Advanced IP Analyser")
-        self.geometry("1080x680")
-        self.minsize(780, 500)
-        self.protocol("WM_DELETE_WINDOW", self.close)
         self.events: queue.Queue = queue.Queue()
         self.nearby: list[NearbyWifiNetwork] = []
         self.profiles: list[SavedWifiProfile] = []
@@ -40,8 +38,12 @@ class WindowsWifiAnalyzer(tk.Toplevel):
     def _build(self) -> None:
         header = ttk.Frame(self, padding=14)
         header.pack(fill="x")
-        ttk.Label(header, text="Wi-Fi Analyzer",
-                  font=("TkDefaultFont", 16, "bold")).pack(side="left")
+        title = ttk.Frame(header)
+        title.pack(side="left", fill="x", expand=True)
+        ttk.Label(title, text="Wi-Fi Analyzer",
+                  font=("Segoe UI", 20, "bold")).pack(anchor="w")
+        ttk.Label(title, text="Nearby networks, channel use, signal history and saved profiles",
+                  foreground="#90abc4").pack(anchor="w", pady=(2, 0))
         ttk.Button(header, text="Refresh", command=self.refresh,
                    style="Accent.TButton").pack(side="right")
         ttk.Button(header, text="Export scan…", command=self.export_scan).pack(side="right", padx=(0, 8))
@@ -493,4 +495,3 @@ class WindowsWifiAnalyzer(tk.Toplevel):
         if self.monitor_after:
             self.after_cancel(self.monitor_after)
         self.hide_passwords()
-        self.destroy()
