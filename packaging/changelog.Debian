@@ -1,3 +1,11 @@
+advanced-ip-analyser (2.9.13) stable; urgency=medium
+
+  * Add searchable, contextual help for every main desktop workspace.
+  * Explain operation, interpretation, permissions, privacy and limitations.
+  * Add direct tab-to-guide navigation and copyable offline instructions.
+
+ -- Advanced IP Analyser Maintainers <maintainers@example.invalid>  Thu, 12 Nov 2026 21:00:00 +0000
+
 advanced-ip-analyser (2.9.12) stable; urgency=medium
 
   * Scan entered IPv4 targets and local IPv6 neighbours concurrently.

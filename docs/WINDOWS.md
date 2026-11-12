@@ -37,6 +37,22 @@ This also covers processes that remain active after the visible window closes.
 - bounded PCAP, PCAPNG, and compressed capture-file analysis and display filters;
 - platform-specific verified update download, silent replacement, and relaunch.
 
+## Contextual Help Centre
+
+Every main workspace has a `? Help` button at the top. It opens the Help Centre
+directly at the guide for the current tab. The header **Help** button opens the
+complete reference, where **Find help** searches guide titles, summaries and full
+article text. Select any topic in the left navigation to read it, or use **Copy
+this guide** to place the displayed instructions on the clipboard.
+
+Each guide explains the feature's purpose, the local or remote data it uses, how
+to operate every major control, why and when the tool is useful, how to interpret
+its results, and the important accuracy, permission, privacy and safety limits.
+The guides cover Dashboard, Network Scan, Smart Home, System, Disk Usage, DNS
+Benchmark, Connections, Intelligence, Security Posture, Diagnostics, Favorites,
+Wi-Fi Analyzer, Packet Analysis, Web Security, Local AI, and settings/updates.
+Help is available without an internet connection.
+
 ## Deliberately Debian-only
 
 Live packet capture, Network Security Monitor live capture, and passive

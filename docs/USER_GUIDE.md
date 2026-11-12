@@ -1,4 +1,4 @@
-# Advanced IP Analyser 2.9.12 Instruction Book
+# Advanced IP Analyser 2.9.13 Instruction Book
 
 Windows 10/11 and Debian 13 edition
 
@@ -64,7 +64,7 @@ service, disconnect Wi-Fi clients, inject frames, or recover passwords.
 
 ### Install on Windows
 
-Download `Advanced-IP-Analyser-Setup-2.9.12.exe` from the project release page
+Download `Advanced-IP-Analyser-Setup-2.9.13.exe` from the project release page
 and run it. The per-user installer normally needs no administrator rights and
 offers Start-menu and desktop shortcuts. Windows supports network scanning,
 inventory, Wi-Fi adapter/nearby-network scanning, selected saved-profile key
@@ -74,12 +74,12 @@ visibly disabled because the project does not bundle a Windows capture driver.
 
 ### Install on Debian 13
 
-Download `advanced-ip-analyser_2.9.12_all.deb` from the project release page.
+Download `advanced-ip-analyser_2.9.13_all.deb` from the project release page.
 In a terminal:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.9.12_all.deb
+sudo apt install ./advanced-ip-analyser_2.9.13_all.deb
 ```
 
 Use `apt install ./file.deb`, not `dpkg -i`, because APT resolves dependencies.
@@ -180,6 +180,21 @@ The Network Scan page is arranged from setup to action:
   Packet Analysis, Web Security, and Local AI. Settings and Help remain in the header.
 - **Footer:** status, centered green progress, version, and Update.
 - **Header:** application identity and status on the left, with Settings and Help on the right. Available updates appear in the footer without replacing a feature control.
+
+### Use the Help Centre
+
+Every main tab has a `? Help` control in its top strip. Select it to open the
+Help Centre directly at the guide for that workspace. Select **Help** in the main
+header to open the complete reference. **Find help** searches section names,
+summaries and the full text of every guide as you type; choosing a result opens
+the complete article. **Copy this guide** copies the current article for use in
+an incident note, support message or offline checklist.
+
+The guides do more than name the controls. They explain what the feature does,
+how it obtains and processes its information, why and when to use it, what each
+result means, and which permissions, platform constraints, uncertainty, privacy
+and safety limits apply. All 15 workspaces plus settings and updates are covered,
+and the reference is packaged with the app so it works without internet access.
 
 **Scan all networks** covers normal LAN, VLAN, and VPN adapters when the operating
 system exposes a usable IPv4 subnet. For Tailscale, the app reads the local

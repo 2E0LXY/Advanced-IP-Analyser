@@ -46,6 +46,7 @@ from .diagnostics import run_diagnostic
 from .disk_usage import DiskUsageView
 from .dns_benchmark_gui import DNSBenchmarkView
 from .endpoint_posture_gui import EndpointPostureView
+from .help_content import HELP_BY_KEY, HELP_SECTIONS, TAB_HELP
 from .models import Host
 from .network import (
     active_ipv4_networks,
@@ -350,6 +351,10 @@ class Application(tk.Tk):
         style.configure("Accent.TButton", background="#1688e7", foreground="#ffffff",
                         font=("Segoe UI", 9, "bold"))
         style.map("Accent.TButton", background=[("active", "#329cf0"), ("disabled", "#35526c")])
+        style.configure("ContextHelp.TButton", background="#10263a", foreground="#79c5ff",
+                        bordercolor="#315a78", padding=(10, 5), font=("Segoe UI", 9, "bold"))
+        style.map("ContextHelp.TButton", background=[("active", "#1b4665")],
+                  foreground=[("active", "#ffffff")])
         style.configure("Danger.TButton", background="#f3c7c7", foreground="#6e1717")
         style.map("Danger.TButton", background=[("active", "#efa9a9")])
         style.configure("Update.TButton", background="#ffd34f", foreground="#3f2b00",
@@ -627,6 +632,7 @@ class Application(tk.Tk):
         self._build_endpoint_posture()
         self._build_diagnostics()
         self._build_specialist_tools()
+        self._install_context_help_buttons()
         self.notebook.bind("<<NotebookTabChanged>>", self._on_main_tab_changed, add="+")
         self._on_main_tab_changed()
 
@@ -849,6 +855,40 @@ class Application(tk.Tk):
         entry.delete(0, "end")
         entry.insert(0, value)
         entry.configure(state="readonly")
+
+    def _install_context_help_buttons(self) -> None:
+        """Put a direct, consistently placed help entry point in every main tab."""
+        pages = (
+            (self.dashboard_page, "dashboard", "Dashboard"),
+            (self.scan_page, "network_scan", "Network Scan"),
+            (self.smart_home_page, "smart_home", "Smart Home"),
+            (self.system_monitor_page, "system", "System"),
+            (self.disk_usage_page, "disk_usage", "Disk Usage"),
+            (self.dns_benchmark_page, "dns_benchmark", "DNS Benchmark"),
+            (self.connections_page, "connections", "Connections"),
+            (self.intelligence_page, "intelligence", "Intelligence"),
+            (self.posture_page, "security_posture", "Security Posture"),
+            (self.diagnostic_page, "diagnostics", "Diagnostics"),
+            (self.favorites_page, "favorites", "Favorites"),
+            (self.wifi_analyzer_page, "wifi_analyzer", "Wi-Fi Analyzer"),
+            (self.packet_analysis_page, "packet_analysis", "Packet Analysis"),
+            (self.web_security_page, "web_security", "Web Security"),
+            (self.local_ai_page, "local_ai", "Local AI"),
+        )
+        self.context_help_buttons = {}
+        for page, page_key, label in pages:
+            first = page.winfo_children()[0] if page.winfo_children() else None
+            bar = ttk.Frame(page, padding=(8, 4, 8, 2))
+            options = {"fill": "x"}
+            if first is not None:
+                options["before"] = first
+            bar.pack(**options)
+            ttk.Label(bar, text=f"{label} workspace", foreground="#7894ad").pack(side="left")
+            button = ttk.Button(
+                bar, text="?  Help", style="ContextHelp.TButton",
+                command=lambda key=TAB_HELP[page_key]: self.show_help(key))
+            button.pack(side="right")
+            self.context_help_buttons[page_key] = button
 
     def _open_port_scan(self) -> None:
         self._navigate(self.scan_page)
@@ -1455,7 +1495,173 @@ class Application(tk.Tk):
                    style="Danger.TButton").pack(side="left")
         update_provider()
 
-    def show_help(self) -> None:
+    def show_help(self, section_key: str = "dashboard") -> None:
+        """Open the searchable help centre at the requested contextual section."""
+        existing = getattr(self, "help_window", None)
+        if existing is not None and existing.winfo_exists():
+            self._select_help_section(section_key)
+            existing.deiconify()
+            existing.lift()
+            existing.focus_force()
+            return
+
+        window = tk.Toplevel(self)
+        self.help_window = window
+        window.title(f"Advanced IP Analyser Help Centre · {__version__}")
+        window.geometry("1120x820")
+        window.minsize(820, 600)
+        window.transient(self)
+
+        heading = ttk.Frame(window, padding=(18, 14, 18, 10))
+        heading.pack(fill="x")
+        title_box = ttk.Frame(heading)
+        title_box.pack(side="left", fill="x", expand=True)
+        ttk.Label(title_box, text="Help Centre", font=("Segoe UI", 18, "bold")).pack(anchor="w")
+        ttk.Label(title_box, text="Purpose · operation · controls · interpretation · limits · privacy",
+                  foreground="#90abc4").pack(anchor="w", pady=(2, 0))
+        ttk.Button(heading, text="Close", command=window.destroy).pack(side="right", padx=(8, 0))
+        ttk.Button(heading, text="Check for updates",
+                   command=lambda: self.check_updates(manual=True)).pack(side="right", padx=(8, 0))
+        ttk.Label(heading, text=f"Version {__version__}").pack(side="right", padx=10)
+
+        body = ttk.Panedwindow(window, orient="horizontal")
+        body.pack(fill="both", expand=True, padx=18, pady=(0, 10))
+        navigation = ttk.Frame(body, padding=(0, 0, 10, 0))
+        article = ttk.Frame(body)
+        body.add(navigation, weight=1)
+        body.add(article, weight=4)
+
+        ttk.Label(navigation, text="Find help", font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        search_text = tk.StringVar()
+        search = ttk.Entry(navigation, textvariable=search_text)
+        search.pack(fill="x", pady=(6, 8))
+        section_list = tk.Listbox(
+            navigation, width=27, relief="flat", bd=0, exportselection=False,
+            bg="#132538", fg="#c9d9e8", selectbackground="#246398",
+            selectforeground="#ffffff", activestyle="none", font=("Segoe UI", 10))
+        section_scroll = ttk.Scrollbar(navigation, orient="vertical", command=section_list.yview)
+        section_list.configure(yscrollcommand=section_scroll.set)
+        section_list.pack(side="left", fill="both", expand=True)
+        section_scroll.pack(side="right", fill="y")
+
+        article_heading = ttk.Frame(article, padding=(14, 10, 14, 8))
+        article_heading.pack(fill="x")
+        article_title = ttk.Label(article_heading, font=("Segoe UI", 18, "bold"))
+        article_title.pack(anchor="w")
+        article_summary = ttk.Label(article_heading, foreground="#86bde9", wraplength=760,
+                                    font=("Segoe UI", 10))
+        article_summary.pack(anchor="w", fill="x", pady=(3, 0))
+        text_frame = ttk.Frame(article)
+        text_frame.pack(fill="both", expand=True, padx=(14, 0))
+        article_text = tk.Text(
+            text_frame, wrap="word", state="disabled", relief="flat", bd=0,
+            bg="#0b1825", fg="#d8e5f3", insertbackground="#ffffff",
+            selectbackground="#246398", font=("Segoe UI", 10), padx=18, pady=14,
+            spacing1=2, spacing3=7)
+        article_scroll = ttk.Scrollbar(text_frame, orient="vertical", command=article_text.yview)
+        article_text.configure(yscrollcommand=article_scroll.set)
+        article_text.pack(side="left", fill="both", expand=True)
+        article_scroll.pack(side="right", fill="y")
+        article_text.tag_configure("heading", foreground="#67bfff",
+                                   font=("Segoe UI", 11, "bold"), spacing1=12, spacing3=5)
+        article_text.tag_configure("body", lmargin1=2, lmargin2=2)
+
+        footer = ttk.Frame(window, padding=(18, 0, 18, 12))
+        footer.pack(fill="x")
+        help_status = ttk.Label(footer, foreground="#90abc4")
+        help_status.pack(side="left")
+        ttk.Button(footer, text="Copy this guide", command=lambda: self._copy_help_section()).pack(side="right")
+
+        window.help_search = search_text
+        window.help_list = section_list
+        window.help_title = article_title
+        window.help_summary = article_summary
+        window.help_text = article_text
+        window.help_status = help_status
+        window.help_keys = []
+        window.current_help_key = ""
+
+        def refresh_sections(*_args) -> None:
+            query = search_text.get().strip().casefold()
+            matches = [section for section in HELP_SECTIONS if not query or query in (
+                section.title + " " + section.summary + " " + section.body).casefold()]
+            section_list.delete(0, "end")
+            window.help_keys = [section.key for section in matches]
+            for section in matches:
+                section_list.insert("end", section.title)
+            help_status.configure(text=f"{len(matches)} of {len(HELP_SECTIONS)} guides")
+            if matches:
+                preferred = window.current_help_key if window.current_help_key in window.help_keys else matches[0].key
+                self._select_help_section(preferred)
+            else:
+                article_title.configure(text="No matching help")
+                article_summary.configure(text="Try a feature, control, result name or protocol.")
+                article_text.configure(state="normal")
+                article_text.delete("1.0", "end")
+                article_text.configure(state="disabled")
+
+        def selected(_event=None) -> None:
+            selection = section_list.curselection()
+            if selection:
+                self._display_help_section(window.help_keys[selection[0]])
+
+        window.refresh_help_sections = refresh_sections
+        search_text.trace_add("write", refresh_sections)
+        section_list.bind("<<ListboxSelect>>", selected)
+        window.protocol("WM_DELETE_WINDOW", window.destroy)
+        refresh_sections()
+        self._select_help_section(section_key)
+        search.focus_set()
+
+    def _display_help_section(self, section_key: str) -> None:
+        window = getattr(self, "help_window", None)
+        section = HELP_BY_KEY.get(section_key)
+        if window is None or not window.winfo_exists() or section is None:
+            return
+        window.current_help_key = section.key
+        window.help_title.configure(text=section.title)
+        window.help_summary.configure(text=section.summary)
+        text_widget = window.help_text
+        text_widget.configure(state="normal")
+        text_widget.delete("1.0", "end")
+        for block in section.body.split("\n\n"):
+            value = block.strip()
+            if not value:
+                continue
+            tag = "heading" if value.isupper() and "\n" not in value else "body"
+            text_widget.insert("end", value + "\n\n", tag)
+        text_widget.configure(state="disabled")
+        text_widget.yview_moveto(0)
+
+    def _select_help_section(self, section_key: str) -> None:
+        window = getattr(self, "help_window", None)
+        if window is None or not window.winfo_exists():
+            return
+        if section_key not in window.help_keys:
+            window.help_search.set("")
+        if section_key not in window.help_keys:
+            section_key = window.help_keys[0] if window.help_keys else ""
+        if not section_key:
+            return
+        index = window.help_keys.index(section_key)
+        window.help_list.selection_clear(0, "end")
+        window.help_list.selection_set(index)
+        window.help_list.activate(index)
+        window.help_list.see(index)
+        self._display_help_section(section_key)
+
+    def _copy_help_section(self) -> None:
+        window = getattr(self, "help_window", None)
+        if window is None or not window.winfo_exists():
+            return
+        section = HELP_BY_KEY.get(window.current_help_key)
+        if section is None:
+            return
+        self.clipboard_clear()
+        self.clipboard_append(f"{section.title}\n{section.summary}\n\n{section.body}")
+        window.help_status.configure(text=f"Copied {section.title} guide")
+
+    def _show_help_legacy(self) -> None:
         window = tk.Toplevel(self)
         window.title(f"Advanced IP Analyser Help · {__version__}")
         window.geometry("1000x820")

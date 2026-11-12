@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.9.13 - 2026-11-12
+
+- Added a comprehensive, searchable Help Centre covering every desktop workspace.
+- Added a consistent contextual `? Help` button to all 15 main tabs, deep-linked to the relevant guide.
+- Documented what each tool does, how its data is collected, why and when to use it, and how to interpret results.
+- Added permission, accuracy, privacy, safety and platform-limit guidance alongside operational instructions.
+- Added guide filtering, one-click copying, update access and offline availability.
+
 ## 2.9.12 - 2026-11-12
 
 - Added a default-enabled **Include local IPv6** option to the normal network scan.

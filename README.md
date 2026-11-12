@@ -15,13 +15,13 @@ Wireshark.
 ## Download
 
 [![Download Android APK](https://img.shields.io/badge/ANDROID-DOWNLOAD_APK_1.2.7-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.7/Advanced-IP-Analyser-Android-1.2.7.apk)
-[![Download Windows](https://img.shields.io/badge/WINDOWS-DOWNLOAD_2.9.12-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.12/Advanced-IP-Analyser-Setup-2.9.12.exe)
+[![Download Windows](https://img.shields.io/badge/WINDOWS-DOWNLOAD_2.9.13-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.13/Advanced-IP-Analyser-Setup-2.9.13.exe)
 
 | Platform | Current version | Download | Installation help |
 | --- | ---: | --- | --- |
 | **Android phone/tablet** | **1.2.7** | **[Download the signed APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.7/Advanced-IP-Analyser-Android-1.2.7.apk)** | **[Android installation instructions](docs/ANDROID-INSTALL.md)** |
-| Windows 10/11 | 2.9.12 | [Download the Windows installer](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.12/Advanced-IP-Analyser-Setup-2.9.12.exe) | Run the downloaded `.exe`; the installer closes and upgrades running copies |
-| Debian 13 | 2.9.12 | [Download the Debian package](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.12/advanced-ip-analyser_2.9.12_all.deb) | Install with `sudo apt install ./advanced-ip-analyser_2.9.12_all.deb` |
+| Windows 10/11 | 2.9.13 | [Download the Windows installer](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.13/Advanced-IP-Analyser-Setup-2.9.13.exe) | Run the downloaded `.exe`; the installer closes and upgrades running copies |
+| Debian 13 | 2.9.13 | [Download the Debian package](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v2.9.13/advanced-ip-analyser_2.9.13_all.deb) | Install with `sudo apt install ./advanced-ip-analyser_2.9.13_all.deb` |
 
 > **Looking for Android?** The signed Android APK is included on the main
 > **Latest** release page alongside Windows and Debian. Android also retains a
@@ -67,6 +67,7 @@ live progress, expandable service results, inventory exchange, and remote action
 | Web Security Audit | Same-host bounded crawler, path exclusions, extra allowed hosts, custom headers, page/form/technology inventory, TLS fingerprint, security-header, cookie, cleartext, mixed-content, directory-listing, CORS, and password-form observations, HTML/JSON reports |
 | AI intelligence | Separate OpenAI, Gemini, and OpenRouter keys in Debian Secret Service or Windows Credential Manager; supplier-native live model lists; exact outbound preview; redaction; explicit consent; evidence-backed advisory analysis |
 | Updates | Automatic GitHub release check, flashing button, platform-specific asset selection, trusted release URL, SHA-256 verification, package/installer checks, close/install/restart workflow |
+| Help Centre | A contextual `? Help` control in every main workspace, direct links to the relevant guide, full-text search across all guides, interpretation and limitation notes, safe-use guidance, and copyable instructions |
 | Debian packaging | Reproducible `.deb`, Lintian/AppStream/desktop validation, install/GUI/remove smoke test, release checksum, optional signed GitHub Pages APT feed |
 | Windows packaging | Self-contained x64 application, per-user Inno Setup installer, native launcher adaptations, smoke test, checksum, and GitHub build-provenance attestation |
 | Android companion | Native Kotlin/Compose dashboard, bounded LAN discovery, common-service checks, nearby Wi-Fi list plus channel-bandwidth graph and scrollable two-hour dBm history, real UDP DNS resolver benchmark, ping/reachability, DNS, port and HTTP diagnostics |
@@ -129,7 +130,7 @@ then run:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_2.9.12_all.deb
+sudo apt install ./advanced-ip-analyser_2.9.13_all.deb
 ```
 
 Launch it from the desktop application menu or run:
