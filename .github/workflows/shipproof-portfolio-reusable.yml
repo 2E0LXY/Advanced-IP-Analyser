@@ -1,0 +1,90 @@
+name: ShipProof Portfolio Baseline
+on:
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout only the calling repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Read-only project and credential inventory
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import datetime
+          import hashlib
+          import json
+          import os
+          import re
+          import subprocess
+
+          root = Path.cwd().resolve()
+          out = root / ".shipproof-portfolio"
+          out.mkdir(exist_ok=True)
+          files = [s for s in subprocess.check_output(["git","ls-files","-z"]).decode("utf-8","replace").split("\0") if s]
+          names = set(files)
+          tech = []
+          for label, paths in {
+              "Python":["pyproject.toml","requirements.txt","setup.py"],
+              "Node":["package.json"],"Go":["go.mod"],
+              "Gradle":["build.gradle.kts","android/gradlew","gradlew"],
+              "PlatformIO":["platformio.ini"],"CMake":["CMakeLists.txt"]
+          }.items():
+              if any(p in names for p in paths):tech.append(label)
+          if any(f.endswith((".sln",".slnx",".csproj")) for f in files):tech.append(".NET")
+          native_ci = [f for f in files if f.startswith(".github/workflows/")
+                       and f.endswith((".yml",".yaml")) and "shipproof" not in f.lower()]
+          test_files = [f for f in files if re.search(
+              r"(^|/)(test_[^/]+\.py|[^/]+_test\.go|[^/]+\.test\.(js|jsx|ts|tsx|cjs|mjs)|[^/]+Tests?\.(kt|java))$", f,re.I)
+              or f.startswith(("tests/","test/","app/src/test/","android/app/src/test/"))]
+          findings = []
+          pattern = re.compile(
+              r"(?<![A-Za-z0-9_])(?:gh[pousr]_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{60,}|sk-proj-[A-Za-z0-9_-]{40,}|AKIA[A-Z0-9]{16})(?![A-Za-z0-9_])")
+          allowed = {".py",".js",".jsx",".ts",".tsx",".go",".kt",".java",".json",".toml",".yml",".yaml",".ini",".txt",".md",".sh",".ps1"}
+          for f in files[:20000]:
+              path = root/f
+              if not path.is_file() or path.is_symlink():continue
+              if path.name==".env" or path.suffix.lower() in (".p12",".pfx",".pem",".key"):
+                  findings.append({"path":f,"kind":"tracked-sensitive-file"})
+                  continue
+              if path.suffix.lower() not in allowed or path.stat().st_size>350000:continue
+              try:
+                  data = path.read_text(encoding="utf-8")
+              except (UnicodeDecodeError,OSError):continue
+              if pattern.search(data):findings.append({"path":f,"kind":"possible-credential"})
+          report = {
+            "schema_version":1,"kind":"inventory-not-functional-test",
+            "commit":subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip(),
+            "timestamp_utc":datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "status":"UNVERIFIED","functionality_verified":False,"tests_executed":0,
+            "technology":tech,"existing_native_ci":native_ci[:100],
+            "test_source_count":len(test_files),"sensitive_file_findings":findings,
+            "note":"Only repository structure was audited; project tests and real-device tests were NOT executed."
+          }
+          (out/"report.json").write_text(json.dumps(report,indent=2)+"\n")
+          summary=("# ShipProof Portfolio\n\n**Functionality: UNVERIFIED** — this is a read-only inventory, not a successful test-suite result.\n\n"
+            + f"Tech: {', '.join(tech) or 'Unclassified'}\n\n"
+            + f"Native CI workflows: {len(native_ci)}; test files: {len(test_files)}\n\n"
+            + f"Potential credential findings: {len(findings)} (values not logged)\n")
+          (out/"report.md").write_text(summary)
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf-8") as handle:handle.write(summary)
+          print(f"Read-only inventory complete: {len(files)} tracked files, {len(findings)} credential review finding(s). Functionality UNVERIFIED.")
+          if not files:
+              raise SystemExit("No tracked project files — cannot establish inventory")
+          PY
+      - name: Upload inventory evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shipproof-portfolio-evidence
+          path: .shipproof-portfolio/
+          include-hidden-files: true
+          if-no-files-found: warn
