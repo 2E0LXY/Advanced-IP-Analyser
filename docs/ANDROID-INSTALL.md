@@ -10,7 +10,7 @@ and signing history.
 
 File name: `Advanced-IP-Analyser-Android-1.2.7.apk`
 
-Main download page: [Advanced IP Analyser 3.0.1 — all platforms](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/tag/v3.0.1)
+Main download page: [Advanced IP Analyser 3.0.2 — all platforms](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/tag/v3.0.2)
 
 ## Install it
 

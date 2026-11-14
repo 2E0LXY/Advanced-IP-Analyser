@@ -1,4 +1,4 @@
-# Advanced IP Analyser 3.0.1 Instruction Book
+# Advanced IP Analyser 3.0.2 Instruction Book
 
 Windows 10/11 and Debian 13 edition
 
@@ -64,7 +64,7 @@ service, disconnect Wi-Fi clients, inject frames, or recover passwords.
 
 ### Install on Windows
 
-Download `Advanced-IP-Analyser-Setup-3.0.1.exe` from the project release page
+Download `Advanced-IP-Analyser-Setup-3.0.2.exe` from the project release page
 and run it. The per-user installer normally needs no administrator rights and
 offers Start-menu and desktop shortcuts. Windows supports network scanning,
 inventory, Wi-Fi adapter/nearby-network scanning, selected saved-profile key
@@ -74,12 +74,12 @@ long sessions and passive monitor-mode Wi-Fi remain Debian-only.
 
 ### Install on Debian 13
 
-Download `advanced-ip-analyser_3.0.1_all.deb` from the project release page.
+Download `advanced-ip-analyser_3.0.2_all.deb` from the project release page.
 In a terminal:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_3.0.1_all.deb
+sudo apt install ./advanced-ip-analyser_3.0.2_all.deb
 ```
 
 Use `apt install ./file.deb`, not `dpkg -i`, because APT resolves dependencies.
@@ -433,6 +433,10 @@ Expand a host to see detected ports. Expand a port to see metadata such as:
 - HTTP status, server/powered-by, content type, title, redirect, and realm;
 - TLS protocol and cipher; or
 - a bounded safe SSH, FTP, SMTP, POP3, or IMAP greeting.
+
+Use **Topology PNG…** after a scan to save a lossless image of the discovered
+hosts and their connection layout. Large scans automatically add rows while
+keeping connection lines outside the host cards.
 
 After metadata discovery, the main table also shows a conservative device type
 and operating system/version when enough service or banner evidence is

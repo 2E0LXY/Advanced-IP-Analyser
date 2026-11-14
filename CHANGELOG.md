@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.2 - 2026-11-14
+
+- Replaced the Network Scan SVG topology export with a directly rendered, lossless PNG image.
+- Improved multi-row topology routing so connection lines remain visible and do not pass behind host cards.
+- Added an explicit Pillow runtime dependency and Debian `python3-pil` package requirement for consistent Windows and Linux export support.
+
 ## 3.0.1 - 2026-11-14
 
 - Replaced completed `Not resolved` hostname placeholders with clean blank cells.

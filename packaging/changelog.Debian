@@ -1,3 +1,11 @@
+advanced-ip-analyser (3.0.2) stable; urgency=medium
+
+  * Export the Network Scan topology directly as a lossless PNG image.
+  * Improve connection routing across multi-row topology diagrams.
+  * Add the Pillow image-rendering runtime dependency.
+
+ -- Advanced IP Analyser Maintainers <maintainers@example.invalid>  Sat, 14 Nov 2026 14:00:00 +0000
+
 advanced-ip-analyser (3.0.1) stable; urgency=medium
 
   * Clean unresolved hostname cells and hide Tailscale tailnet suffixes.

@@ -492,7 +492,7 @@ class Application(tk.Tk):
         self.cancel_button = ttk.Button(header, text="Cancel", command=self.cancel_current_scan, state="disabled")
         self.cancel_button.pack(side="left", padx=(8, 0))
         ttk.Button(header, text="Export…", command=self.save_export).pack(side="left", padx=(8, 0))
-        ttk.Button(header, text="Topology SVG…", command=self.save_topology).pack(side="left", padx=(8, 0))
+        ttk.Button(header, text="Topology PNG…", command=self.save_topology).pack(side="left", padx=(8, 0))
         ttk.Button(header, text="Import…", command=self.load_inventory).pack(side="left", padx=(8, 0))
 
         settings = ttk.Frame(self.scan_page, padding=(12, 0, 12, 8))
@@ -2871,8 +2871,8 @@ class Application(tk.Tk):
             messagebox.showinfo("No results", "Scan a network before exporting its topology.", parent=self)
             return
         selected = filedialog.asksaveasfilename(parent=self, title="Export network topology",
-                                                defaultextension=".svg",
-                                                filetypes=[("SVG image", "*.svg")])
+                                                defaultextension=".png",
+                                                filetypes=[("PNG image", "*.png")])
         if not selected:
             return
         try:
