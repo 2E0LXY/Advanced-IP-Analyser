@@ -109,6 +109,15 @@ WEB_APP_PORTS = "80,443,3000,5000,8000,8080,8081,8443,8888,9000,9090"
 GUI_PACKET_LIMIT = 20_000
 
 
+def display_hostname(hostname: str) -> str:
+    """Return a compact UI label without a Tailscale MagicDNS tailnet suffix."""
+    name = hostname.strip().rstrip(".")
+    labels = name.split(".")
+    if len(labels) >= 4 and [label.casefold() for label in labels[-2:]] == ["ts", "net"]:
+        return ".".join(labels[:-3])
+    return name
+
+
 def merge_scan_targets(*groups: list[str]) -> list[str]:
     """Merge IPv4/IPv6 target groups while preserving order and scope identifiers."""
     merged: list[str] = []
@@ -585,11 +594,11 @@ class Application(tk.Tk):
         results_page.pack(fill="both", expand=True, padx=12)
 
         columns = ("address", "state", "hostname", "latency", "mac", "manufacturer",
-                   "device_type", "operating_system", "model", "services")
+                   "device_type", "operating_system", "services")
         self.table = ttk.Treeview(results_page, columns=columns, show="tree headings", selectmode="extended")
         self.table.heading("#0", text="Ports")
         self.table.column("#0", width=70, minwidth=55, stretch=False, anchor="w")
-        widths = (130, 55, 170, 75, 135, 170, 140, 150, 130, 260)
+        widths = (130, 55, 170, 75, 135, 170, 140, 150, 260)
         for column, width in zip(columns, widths):
             heading = "Connect / ping ms" if column == "latency" else column.replace("_", " ").title()
             self.table.heading(column, text=heading,
@@ -2225,14 +2234,15 @@ class Application(tk.Tk):
                         for port, service in zip(host.ports, host.services)]
         stripe = "even" if len(self.table.get_children("")) % 2 == 0 else "odd"
         address_family = "ipv6" if ipaddress.ip_address(host.address.split("%", 1)[0]).version == 6 else "ipv4"
-        hostname = host.hostname or ("Not resolved" if host.profile_confidence else "Resolving…")
+        hostname = display_hostname(host.hostname) if host.hostname else (
+            "" if host.profile_confidence else "Resolving…")
         manufacturer = host.manufacturer or ("Not found" if host.profile_confidence else "Looking up…")
         operating_system = " ".join(value for value in (host.operating_system, host.os_version) if value)
         operating_system = operating_system or ("Not identified" if host.profile_confidence else "Inspecting…")
         item = self.table.insert("", index, text=f"{len(host.ports)} port{'s' if len(host.ports) != 1 else ''}",
             values=(host.address, "Up", hostname, host.latency_ms or "", host.mac,
                     manufacturer, host.device_type, operating_system,
-                    host.model, ", ".join(web_services)), tags=(f"{address_family}_{stripe}",))
+                    ", ".join(web_services)), tags=(f"{address_family}_{stripe}",))
         self.hosts_by_item[item] = host
         for port, service in zip(host.ports, host.services):
             detail = service_url(service, host.address, port) if service in {"http", "https", "ftp"} else f"TCP {port} · {service}"
@@ -2242,12 +2252,12 @@ class Application(tk.Tk):
             summary = info.get("Page title") or info.get("Status") or detail
             clickable = service in OPENABLE_SERVICES
             child = self.table.insert(item, "end", text=str(port),
-                                      values=("", "Open", service_label, "", "", "", "", "", "", summary),
+                                      values=("", "Open", service_label, "", "", "", "", "", summary),
                                       tags=(("detail_click" if clickable else "detail"),))
             self.services_by_item[child] = (host, service, port)
             for label, value in info.items():
                 metadata = self.table.insert(child, "end", text="",
-                    values=("", "Detail", label, "", "", "", "", "", "", value), tags=("metadata",))
+                    values=("", "Detail", label, "", "", "", "", "", value), tags=("metadata",))
                 self.metadata_by_item[metadata] = (label, value)
 
     def _update_host_row(self, host: Host) -> None:
@@ -2574,7 +2584,7 @@ class Application(tk.Tk):
         self.favorite_hosts_by_item.clear()
         for host in favorites:
             item = self.favorites_table.insert("", "end", values=(
-                host.address, host.hostname, host.mac, host.manufacturer,
+                host.address, display_hostname(host.hostname), host.mac, host.manufacturer,
                 host.device_type, " ".join(value for value in (
                     host.operating_system, host.os_version) if value), host.model,
                 ", ".join(host.services), host.seen_at, host.note))

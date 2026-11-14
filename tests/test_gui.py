@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from ip_analyser.gui import Application, merge_scan_targets
+from ip_analyser.gui import Application, display_hostname, merge_scan_targets
 from ip_analyser.models import Host
 
 
@@ -76,6 +76,28 @@ class HostAddressColourTests(unittest.TestCase):
 
     def test_ipv6_host_row_uses_dark_green_colour_tag(self):
         self.assertEqual(self._insert_host("fe80::20%18"), ("ipv6_even",))
+
+    def test_completed_unresolved_hostname_is_blank(self):
+        app = object.__new__(Application)
+        app.table = _InsertTable()
+        app.hosts_by_item = {}
+        app.services_by_item = {}
+        app.metadata_by_item = {}
+
+        app._insert_host(Host("192.0.2.20", reachable=True, profile_confidence="Low"))
+
+        self.assertEqual(app.table.rows[0][2]["values"][2], "")
+        self.assertEqual(len(app.table.rows[0][2]["values"]), 9)
+
+
+class HostnameDisplayTests(unittest.TestCase):
+    def test_tailscale_tailnet_suffix_is_hidden(self):
+        self.assertEqual(display_hostname("debian.fennec-pinecone.ts.net"), "debian")
+        self.assertEqual(display_hostname("Google-Home.fennec-pinecone.ts.net."), "Google-Home")
+        self.assertEqual(display_hostname("printer.tailnet.TS.NET"), "printer")
+
+    def test_normal_dns_names_are_preserved(self):
+        self.assertEqual(display_hostname("printer.office.example"), "printer.office.example")
 
 
 class CombinedAddressFamilyTests(unittest.TestCase):

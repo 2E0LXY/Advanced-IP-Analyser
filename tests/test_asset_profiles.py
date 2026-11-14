@@ -27,6 +27,13 @@ class AssetProfileTests(unittest.TestCase):
         self.assertFalse(profile.operating_system)
         self.assertEqual(profile.confidence, "Low")
 
+    def test_descriptive_hostname_is_not_treated_as_os_evidence(self):
+        profile = infer_asset_profile(Host(
+            address="192.0.2.31", reachable=True,
+            hostname="Debian13.fennec-pinecone.ts.net"))
+        self.assertFalse(profile.operating_system)
+        self.assertFalse(profile.os_version)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.0.1 - 2026-11-14
+
+- Replaced completed `Not resolved` hostname placeholders with clean blank cells.
+- Hid Tailscale MagicDNS tailnet suffixes such as `fennec-pinecone.ts.net` in scan and favourite hostname displays while retaining the resolved hostname.
+- Stopped descriptive DNS hostnames from being misread as operating-system evidence or OS versions.
+- Removed the sparsely populated Model column from the primary scan table while retaining model data in inventory, favourites and exports.
+
 ## 3.0.0 - 2026-11-12
 
 - Added a unified Network Operations workspace for changes, infrastructure, traffic, performance, lifecycle review and automation.

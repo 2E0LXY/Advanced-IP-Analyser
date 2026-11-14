@@ -1,4 +1,4 @@
-# Advanced IP Analyser 3.0.0 Instruction Book
+# Advanced IP Analyser 3.0.1 Instruction Book
 
 Windows 10/11 and Debian 13 edition
 
@@ -64,7 +64,7 @@ service, disconnect Wi-Fi clients, inject frames, or recover passwords.
 
 ### Install on Windows
 
-Download `Advanced-IP-Analyser-Setup-3.0.0.exe` from the project release page
+Download `Advanced-IP-Analyser-Setup-3.0.1.exe` from the project release page
 and run it. The per-user installer normally needs no administrator rights and
 offers Start-menu and desktop shortcuts. Windows supports network scanning,
 inventory, Wi-Fi adapter/nearby-network scanning, selected saved-profile key
@@ -74,12 +74,12 @@ long sessions and passive monitor-mode Wi-Fi remain Debian-only.
 
 ### Install on Debian 13
 
-Download `advanced-ip-analyser_3.0.0_all.deb` from the project release page.
+Download `advanced-ip-analyser_3.0.1_all.deb` from the project release page.
 In a terminal:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_3.0.0_all.deb
+sudo apt install ./advanced-ip-analyser_3.0.1_all.deb
 ```
 
 Use `apt install ./file.deb`, not `dpkg -i`, because APT resolves dependencies.
@@ -422,8 +422,11 @@ Press **Cancel** or `Escape` to retain partial results and stop pending work.
 
 ## 6. Understand and use results
 
-The host row shows address, state, hostname, latency, MAC, manufacturer, and
-services. Click a heading to sort ascending; click again for descending.
+The host row shows address, state, hostname, latency, MAC, manufacturer, device
+type, operating system, and services. A blank completed hostname means no
+trustworthy unique name was resolved. Tailscale MagicDNS tailnet suffixes are
+hidden in the display for readability. Click a heading to sort ascending; click
+again for descending.
 
 Expand a host to see detected ports. Expand a port to see metadata such as:
 
@@ -431,11 +434,13 @@ Expand a host to see detected ports. Expand a port to see metadata such as:
 - TLS protocol and cipher; or
 - a bounded safe SSH, FTP, SMTP, POP3, or IMAP greeting.
 
-After metadata discovery, the main table also shows a conservative device type,
-operating system/version, and model when enough evidence is available. These are
-heuristic inventory hints derived from manufacturer, ports, HTTP metadata, and
-protocol banners. Exports include the values and confidence level; do not treat
-them as authenticated hardware or software evidence.
+After metadata discovery, the main table also shows a conservative device type
+and operating system/version when enough service or banner evidence is
+available. Model evidence is retained in inventory, favourites and exports when
+discovered, but does not occupy a mostly empty scan column. These are heuristic
+inventory hints derived from manufacturer, ports, HTTP metadata, and protocol
+banners. Exports include the values and confidence level; do not treat them as
+authenticated hardware or software evidence.
 
 Use the Filter field to search all visible host/service metadata. This is a table
 search; packet display filters are a separate language described in chapter 11.

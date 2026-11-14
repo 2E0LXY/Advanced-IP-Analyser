@@ -23,6 +23,14 @@ def _metadata(host: Host) -> str:
     return " ".join(values)
 
 
+def _service_metadata(host: Host) -> str:
+    """Return OS evidence without descriptive DNS names or manufacturer text."""
+    values = list(host.services)
+    for details in host.service_info.values():
+        values.extend(details.values())
+    return " ".join(values)
+
+
 def infer_asset_profile(host: Host) -> AssetProfile:
     """Infer a conservative, explainable device profile from discovered facts.
 
@@ -31,6 +39,7 @@ def infer_asset_profile(host: Host) -> AssetProfile:
     """
     text = _metadata(host)
     lower = text.casefold()
+    os_lower = _service_metadata(host).casefold()
     services = set(host.services)
 
     device_type = "Unknown device"
@@ -63,17 +72,17 @@ def infer_asset_profile(host: Host) -> AssetProfile:
         (r"macos|mac os x|darwin", "macOS"),
     )
     for pattern, name in patterns:
-        match = re.search(pattern, lower)
+        match = re.search(pattern, os_lower)
         if match:
             operating_system = name
             if match.lastindex and match.group(1):
                 os_version = match.group(1).strip("-_/.")[:64]
             break
-    if not operating_system and "dropbear" in lower:
+    if not operating_system and "dropbear" in os_lower:
         operating_system = "Embedded Linux"
-    if not operating_system and "openssh" in lower and services & {"smb", "rdp", "rpc"}:
+    if not operating_system and "openssh" in os_lower and services & {"smb", "rdp", "rpc"}:
         operating_system = "Windows"
-    elif not operating_system and "openssh" in lower:
+    elif not operating_system and "openssh" in os_lower:
         operating_system = "Linux / Unix"
 
     model = ""

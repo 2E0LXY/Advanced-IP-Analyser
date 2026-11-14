@@ -1,3 +1,11 @@
+advanced-ip-analyser (3.0.1) stable; urgency=medium
+
+  * Clean unresolved hostname cells and hide Tailscale tailnet suffixes.
+  * Prevent DNS names from contaminating operating-system identification.
+  * Remove the low-value Model column from the primary scan table.
+
+ -- Advanced IP Analyser Maintainers <maintainers@example.invalid>  Sat, 14 Nov 2026 12:00:00 +0000
+
 advanced-ip-analyser (3.0.0) stable; urgency=medium
 
   * Add integrated Network Operations monitoring and infrastructure workspace.
