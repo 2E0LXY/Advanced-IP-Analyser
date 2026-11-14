@@ -36,8 +36,18 @@
         "merge"
       ],
       "timeout_seconds": 600,
-      "required": true
+      "required": true,
+      "min_tests": 1
     }
   ],
-  "required_artifacts": []
+  "required_artifacts": [],
+  "acceptance": [
+    {
+      "id": "desktop-test-coverage",
+      "checks": [
+        "desktop-unit-tests"
+      ]
+    }
+  ],
+  "require_acceptance": true
 }

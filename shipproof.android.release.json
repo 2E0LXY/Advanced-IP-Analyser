@@ -19,7 +19,8 @@
         "release"
       ],
       "timeout_seconds": 90,
-      "required": true
+      "required": true,
+      "min_tests": 9
     }
   ],
   "required_artifacts": [
