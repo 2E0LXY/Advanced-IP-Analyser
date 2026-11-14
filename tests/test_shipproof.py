@@ -70,4 +70,20 @@ class ShipProofTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_config({'schema_version':1,'checks':[check,check]},'pr')
 
+    def test_invalid_test_count_pattern_rejected(self):
+        for pattern in ['(', r'Ran \d+ tests', '', 5]:
+            check={'id':'c','argv':[sys.executable,'-c','print(1)'],'stages':['pr'],'min_tests':1,'test_count_pattern':pattern}
+            with self.subTest(pattern=pattern), self.assertRaises(ValueError):
+                validate_config({'schema_version':1,'checks':[check]},'pr')
+
+    def test_unparseable_test_count_fails_closed(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            cfg=self.config(root,[{'id':'words','argv':[sys.executable,'-c','print("Ran many tests")'],'stages':['pr'],
+                                   'min_tests':1,'test_count_pattern':r'Ran (\w+) tests'}])
+            self.assertEqual(run('pr',cfg,Path('.shipproof')),1)
+            report=json.loads((root/'.shipproof/report.json').read_text())
+            self.assertEqual(report['checks'][0]['status'],'FAIL')
+            self.assertIsNone(report['checks'][0]['tests_observed'])
+
 if __name__ == '__main__': unittest.main()
