@@ -53,6 +53,8 @@ jobs:
           path: .shipproof/
           if-no-files-found: warn
 
+          include-hidden-files: true
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: advanced-ip-analyser-android-debug
@@ -121,6 +123,8 @@ jobs:
           name: shipproof-ip-android-release
           path: .shipproof/
           if-no-files-found: warn
+
+          include-hidden-files: true
 
       - name: Publish Android release
         uses: softprops/action-gh-release@5113cdc90fd4d541c801c55356214017bf5ae34b # v3

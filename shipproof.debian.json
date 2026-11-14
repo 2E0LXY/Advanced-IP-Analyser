@@ -5,7 +5,7 @@
     {
       "id": "shipproof-self-tests",
       "argv": [
-        "python",
+        "python3",
         "-m",
         "unittest",
         "discover",

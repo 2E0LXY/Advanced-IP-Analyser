@@ -32,3 +32,5 @@ jobs:
           name: shipproof-ip-evidence
           path: .shipproof/
           if-no-files-found: warn
+
+          include-hidden-files: true

@@ -106,6 +106,8 @@ jobs:
           path: .shipproof/
           if-no-files-found: warn
 
+          include-hidden-files: true
+
       - name: Attest Windows installer provenance
         if: github.event_name != 'pull_request'
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
