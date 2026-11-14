@@ -65,6 +65,16 @@ def validate_config(config: dict, stage: str) -> None:
             raise ValueError(f"invalid timeout for {ident}")
         if "min_tests" in check and (type(check["min_tests"]) is not int or check["min_tests"] < 1):
             raise ValueError(f"invalid min_tests for {ident}")
+        if "test_count_pattern" in check:
+            pattern = check["test_count_pattern"]
+            if "min_tests" not in check:
+                raise ValueError(f"test_count_pattern requires min_tests for {ident}")
+            try:
+                compiled = re.compile(pattern) if isinstance(pattern, str) and pattern else None
+            except re.error:
+                compiled = None
+            if compiled is None or compiled.groups < 1:
+                raise ValueError(f"invalid test_count_pattern for {ident}: must be a valid regex with a capture group")
     patterns = config.get("required_artifacts", [])
     if not isinstance(patterns, list):
         raise ValueError("required_artifacts must be an array")
@@ -108,9 +118,14 @@ def _check_result(check: dict, root: Path) -> dict:
         if "min_tests" in check:
             # For unittest, require a non-zero test count. For other runners use a custom evidence regex.
             regex = check.get("test_count_pattern", r"Ran (\d+) tests?")
-            match = re.search(regex, output)
-            observed = int(match.group(1)) if match else 0
-            if observed < check["min_tests"]:
+            try:
+                match = re.search(regex, output)
+                observed = int(match.group(1)) if match else 0
+            except (re.error, IndexError, ValueError, TypeError):
+                # Fail closed: an unreadable test count never satisfies min_tests.
+                status, observed = "FAIL", None
+                detail = "Test count could not be parsed with test_count_pattern. " + detail
+            if observed is not None and observed < check["min_tests"]:
                 status = "FAIL"
                 detail = f"Only {observed} tests observed; minimum {check['min_tests']}. " + detail
     except subprocess.TimeoutExpired:
