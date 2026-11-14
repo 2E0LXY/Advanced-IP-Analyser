@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "project": "Advanced IP Analyser",
+  "checks": [
+    {
+      "id": "python-compile",
+      "argv": [
+        "python",
+        "-m",
+        "compileall",
+        "-q",
+        "src",
+        "tests"
+      ],
+      "stages": [
+        "change",
+        "pr",
+        "merge"
+      ],
+      "timeout_seconds": 90,
+      "required": true
+    },
+    {
+      "id": "desktop-unit-tests",
+      "argv": [
+        "python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-q"
+      ],
+      "stages": [
+        "pr",
+        "merge"
+      ],
+      "timeout_seconds": 600,
+      "required": true,
+      "min_tests": 1
+    }
+  ],
+  "required_artifacts": [],
+  "acceptance": [
+    {
+      "id": "desktop-test-coverage",
+      "checks": [
+        "desktop-unit-tests"
+      ]
+    }
+  ],
+  "require_acceptance": true
+}

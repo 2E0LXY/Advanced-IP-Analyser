@@ -1,0 +1,17 @@
+name: ShipProof Portfolio Pilot
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/shipproof-portfolio-*.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/shipproof-portfolio-*.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  baseline:
+    uses: ./.github/workflows/shipproof-portfolio-reusable.yml
+    permissions:
+      contents: read
