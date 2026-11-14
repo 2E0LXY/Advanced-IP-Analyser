@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "project": "Advanced IP Analyser / Debian",
+  "checks": [
+    {
+      "id": "shipproof-self-tests",
+      "argv": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_shipproof.py",
+        "-q"
+      ],
+      "stages": [
+        "release"
+      ],
+      "timeout_seconds": 90,
+      "required": true
+    }
+  ],
+  "required_artifacts": [
+    "dist/advanced-ip-analyser_*_all.deb"
+  ]
+}
