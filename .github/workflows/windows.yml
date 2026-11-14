@@ -96,6 +96,16 @@ jobs:
           if (-not $mcpProcess.WaitForExit(5000)) { throw "Uninstaller did not stop the MCP process" }
           if (Test-Path -LiteralPath $installedExe) { throw "Uninstaller left the application executable behind" }
 
+      - name: ShipProof Windows installer evidence
+        run: python scripts/shipproof.py --stage release --config shipproof.windows.json
+      - name: Preserve ShipProof Windows evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: shipproof-ip-windows
+          path: .shipproof/
+          if-no-files-found: warn
+
       - name: Attest Windows installer provenance
         if: github.event_name != 'pull_request'
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4

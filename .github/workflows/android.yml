@@ -43,6 +43,16 @@ jobs:
             "dist/android/Advanced-IP-Analyser-Android-$version-debug.apk"
           (cd dist/android && sha256sum *.apk > SHA256SUMS-ANDROID.txt)
 
+      - name: ShipProof debug APK evidence
+        run: python3 scripts/shipproof.py --stage release --config shipproof.android.debug.json
+      - name: Preserve ShipProof debug evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: shipproof-ip-android-debug
+          path: .shipproof/
+          if-no-files-found: warn
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: advanced-ip-analyser-android-debug
@@ -101,6 +111,16 @@ jobs:
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose \
             "dist/android/Advanced-IP-Analyser-Android-$version.apk"
           (cd dist/android && sha256sum *.apk > SHA256SUMS-ANDROID.txt)
+
+      - name: ShipProof signed APK evidence
+        run: python3 scripts/shipproof.py --stage release --config shipproof.android.release.json
+      - name: Preserve ShipProof signed APK evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: shipproof-ip-android-release
+          path: .shipproof/
+          if-no-files-found: warn
 
       - name: Publish Android release
         uses: softprops/action-gh-release@5113cdc90fd4d541c801c55356214017bf5ae34b # v3
