@@ -113,7 +113,7 @@ import uk.co.twoe0lxy.ipanalyser.theme.Orange400
 import uk.co.twoe0lxy.ipanalyser.theme.Purple400
 
 private enum class AppPage(val label: String, val icon: ImageVector) {
-  Dashboard("Dashboard", Icons.Outlined.Dashboard),
+  Dashboard("Cyber", Icons.Outlined.Security),
   Lan("LAN scan", Icons.Outlined.Search),
   Wifi("Wi-Fi", Icons.Outlined.Wifi),
   DnsBench("DNS test", Icons.Outlined.Speed),
@@ -129,6 +129,7 @@ fun MainScreen(
   val dnsEvents by DnsMonitorRepository.events.collectAsStateWithLifecycle()
   val dnsRunning by DnsMonitorRepository.running.collectAsStateWithLifecycle()
   var selectedPage by rememberSaveable { mutableIntStateOf(0) }
+  var showNetworkDashboard by rememberSaveable { mutableStateOf(false) }
   val pages = AppPage.entries
 
   Scaffold(
@@ -172,7 +173,40 @@ fun MainScreen(
   ) { padding ->
     Box(Modifier.padding(padding).fillMaxSize()) {
       when (pages[selectedPage]) {
-        AppPage.Dashboard -> DashboardPage(state)
+        AppPage.Dashboard -> Column {
+          Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 3.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+          ) {
+            if (showNetworkDashboard) {
+              OutlinedButton(onClick = { showNetworkDashboard = false }, modifier = Modifier.weight(1f)) {
+                Text("Cyber Platform", fontSize = 12.sp)
+              }
+              Button(onClick = { showNetworkDashboard = true }, modifier = Modifier.weight(1f)) {
+                Text("Network Dashboard", fontSize = 12.sp)
+              }
+            } else {
+              Button(onClick = { showNetworkDashboard = false }, modifier = Modifier.weight(1f)) {
+                Text("Cyber Platform", fontSize = 12.sp)
+              }
+              OutlinedButton(onClick = { showNetworkDashboard = true }, modifier = Modifier.weight(1f)) {
+                Text("Network Dashboard", fontSize = 12.sp)
+              }
+            }
+          }
+          Box(modifier = Modifier.weight(1f)) {
+            if (showNetworkDashboard) {
+              DashboardPage(state)
+            } else {
+              CyberPlatformPage(state,
+                onScan = {
+                  selectedPage = AppPage.entries.indexOf(AppPage.Lan)
+                  viewModel.scanLan()
+                },
+                onOpenLan = { selectedPage = AppPage.entries.indexOf(AppPage.Lan) })
+            }
+          }
+        }
         AppPage.Lan -> LanPage(state, viewModel::scanLan, viewModel::refreshNetwork, viewModel::toggleFavorite)
         AppPage.Wifi -> WifiPage(state, viewModel::scanWifi, viewModel::toggleWifiMonitor,
           viewModel::clearWifiHistory, viewModel::connectWifi)

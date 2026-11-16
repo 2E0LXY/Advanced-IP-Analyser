@@ -10,8 +10,8 @@ android {
         applicationId = "uk.co.twoe0lxy.ipanalyser"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10207
-        versionName = "1.2.7"
+        versionCode = 10208
+        versionName = "1.2.8"
     }
 
     signingConfigs {

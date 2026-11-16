@@ -2,7 +2,14 @@
 
 Native Android companion for Advanced IP Analyser, built with Kotlin and Jetpack Compose.
 
-## Included in Android 1.2.7
+## Included in Android 1.2.8
+
+- New Cyber Platform home dashboard: local-first severity counts, LAN TCP service exposure, device review queue and historical asset trends.
+- Switch between Cyber Platform and the previous Network Dashboard without losing any existing tools.
+- Reuses local inventory history; flags older results as saved snapshots rather than live measurements.
+- No CVE or Internet-exposure claims without supporting evidence; no automatic uploads, network modifications or router changes.
+
+## Features retained from Android 1.2.7
 
 - modern dashboard matching the desktop application's dark network-tool interface;
 - current local IPv4 address, gateway, interface, Wi-Fi name and network prefix;
