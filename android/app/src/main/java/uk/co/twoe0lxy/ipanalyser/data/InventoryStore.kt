@@ -28,6 +28,39 @@ class InventoryStore(context: Context) {
 
   fun historyCount(): Int = runCatching { JSONArray(preferences.getString("history", "[]")).length() }.getOrDefault(0)
 
+  /**
+   * Read at most twenty previously saved LAN inventories. This never performs a
+   * scan or transmits data; invalid legacy entries are safely skipped.
+   */
+  fun recentScans(limit: Int = 20): List<SavedNetworkScan> {
+    val history = runCatching { JSONArray(preferences.getString("history", "[]")) }
+      .getOrDefault(JSONArray())
+    return (0 until minOf(history.length(), limit.coerceIn(0, 20))).mapNotNull { index ->
+      val saved = history.optJSONObject(index) ?: return@mapNotNull null
+      val timestamp = saved.optLong("time", 0L)
+      val rows = saved.optJSONArray("hosts") ?: return@mapNotNull null
+      val hosts = (0 until minOf(rows.length(), 1024)).mapNotNull { hostIndex ->
+        val obj = rows.optJSONObject(hostIndex) ?: return@mapNotNull null
+        val address = obj.optString("address").take(128)
+        val octets = address.split('.').mapNotNull { it.toIntOrNull() }
+        if (octets.size != 4 || octets.any { it !in 0..255 }) return@mapNotNull null
+        val rawPorts = obj.optJSONArray("open_ports") ?: JSONArray()
+        val ports = (0 until minOf(rawPorts.length(), 64)).mapNotNull { portIndex ->
+          val port = rawPorts.optInt(portIndex, -1)
+          port.takeIf { it in 1..65535 }
+        }
+        HostResult(
+          address = address,
+          hostname = obj.optString("hostname").take(255),
+          macAddress = obj.optString("mac").take(32),
+          latencyMs = obj.optLong("latency_ms", 0L).coerceAtLeast(0L),
+          openPorts = ports,
+        )
+      }
+      SavedNetworkScan(timestamp, hosts)
+    }
+  }
+
   companion object {
     fun json(hosts: List<HostResult>): String = JSONArray().apply { hosts.forEach { put(hostJson(it)) } }.toString(2)
 
