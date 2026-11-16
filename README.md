@@ -16,13 +16,13 @@ Wireshark.
 ## Download
 
 [![Download Android APK](https://img.shields.io/badge/ANDROID-DOWNLOAD_APK_1.2.7-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.7/Advanced-IP-Analyser-Android-1.2.7.apk)
-[![Download Windows](https://img.shields.io/badge/WINDOWS-DOWNLOAD_3.0.2-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v3.0.2/Advanced-IP-Analyser-Setup-3.0.2.exe)
+[![Download Windows](https://img.shields.io/badge/WINDOWS-DOWNLOAD_3.0.3-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v3.0.3/Advanced-IP-Analyser-Setup-3.0.3.exe)
 
 | Platform | Current version | Download | Installation help |
 | --- | ---: | --- | --- |
 | **Android phone/tablet** | **1.2.7** | **[Download the signed APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.7/Advanced-IP-Analyser-Android-1.2.7.apk)** | **[Android installation instructions](docs/ANDROID-INSTALL.md)** |
-| Windows 10/11 | 3.0.2 | [Download the Windows installer](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v3.0.2/Advanced-IP-Analyser-Setup-3.0.2.exe) | Run the downloaded `.exe`; the installer closes and upgrades running copies |
-| Debian 13 | 3.0.2 | [Download the Debian package](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v3.0.2/advanced-ip-analyser_3.0.2_all.deb) | Install with `sudo apt install ./advanced-ip-analyser_3.0.2_all.deb` |
+| Windows 10/11 | 3.0.3 | [Download the Windows installer](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v3.0.3/Advanced-IP-Analyser-Setup-3.0.3.exe) | Run the downloaded `.exe`; the installer closes and upgrades running copies |
+| Debian 13 | 3.0.3 | [Download the Debian package](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v3.0.3/advanced-ip-analyser_3.0.3_all.deb) | Install with `sudo apt install ./advanced-ip-analyser_3.0.3_all.deb` |
 
 > **Looking for Android?** The signed Android APK is included on the main
 > **Latest** release page alongside Windows and Debian. Android also retains a
@@ -33,6 +33,9 @@ Wireshark.
 · [Report a problem](https://github.com/2E0LXY/Advanced-IP-Analyser/issues)
 
 ## Application overview
+
+**New in v3.0.3:** The Cyber Platform opening dashboard brings local device inventory, LAN port observations, exposure-priority indicators, recent device changes and discovery history into one view. It does not claim verified CVEs or Internet exposure without independent evidence. The original Dashboard and specialist workspaces remain available.
+
 
 ![Scanner overview](docs/images/scanner-overview.png)
 
@@ -134,7 +137,7 @@ then run:
 
 ```sh
 cd ~/Downloads
-sudo apt install ./advanced-ip-analyser_3.0.2_all.deb
+sudo apt install ./advanced-ip-analyser_3.0.3_all.deb
 ```
 
 Launch it from the desktop application menu or run:

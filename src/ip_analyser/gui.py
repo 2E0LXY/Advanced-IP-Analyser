@@ -44,6 +44,7 @@ from .ai_settings import (
 from .config import parse_ports
 from .connections_gui import ConnectionMonitorView
 from .dashboard import DashboardView
+from .cyber_platform_gui import CyberPlatformView
 from .diagnostics import run_diagnostic
 from .disk_usage import DiskUsageView
 from .dns_benchmark_gui import DNSBenchmarkView
@@ -436,6 +437,7 @@ class Application(tk.Tk):
                  font=("Segoe UI", 9)).pack(side="right", padx=(0, 12))
         self.notebook = ttk.Notebook(content, style="Dark.TNotebook")
         self.notebook.pack(fill="both", expand=True, padx=16, pady=(8, 0))
+        self.cyber_page = ttk.Frame(self.notebook)
         self.dashboard_page = ttk.Frame(self.notebook)
         self.scan_page = ttk.Frame(self.notebook)
         self.smart_home_page = ttk.Frame(self.notebook)
@@ -452,6 +454,7 @@ class Application(tk.Tk):
         self.packet_analysis_page = ttk.Frame(self.notebook)
         self.web_security_page = ttk.Frame(self.notebook)
         self.local_ai_page = ttk.Frame(self.notebook)
+        self.notebook.add(self.cyber_page, text="Cyber Platform")
         self.notebook.add(self.dashboard_page, text="Dashboard")
         self.notebook.add(self.scan_page, text="Network Scan")
         self.notebook.add(self.smart_home_page, text="Smart Home")
@@ -468,7 +471,7 @@ class Application(tk.Tk):
         self.notebook.add(self.packet_analysis_page, text="Packet Analysis")
         self.notebook.add(self.web_security_page, text="Web Security")
         self.notebook.add(self.local_ai_page, text="Local AI")
-        self._navigate(self.dashboard_page)
+        self._navigate(self.cyber_page)
 
         header = ttk.Frame(self.scan_page, padding=12)
         header.pack(fill="x")
@@ -648,6 +651,7 @@ class Application(tk.Tk):
         ttk.Button(favorite_actions, text="Refresh devices", command=self.refresh_favorites).pack(side="left", padx=(8, 0))
         self._refresh_favorites_table()
         self._build_dashboard()
+        self._build_cyber_platform()
         self._build_smart_home()
         self._build_system_monitor()
         self._build_disk_usage()
@@ -712,6 +716,17 @@ class Application(tk.Tk):
             return
         selected = self.notebook.select()
         self.system_monitor.set_active(selected == str(self.system_monitor_page))
+        if selected == str(self.cyber_page) and hasattr(self, "cyber_platform"):
+            self.cyber_platform.refresh()
+
+    def _build_cyber_platform(self) -> None:
+        self.cyber_platform = CyberPlatformView(
+            self.cyber_page,
+            open_scan=lambda: self._navigate(self.scan_page),
+            open_intelligence=lambda: self._navigate(self.intelligence_page),
+            open_posture=lambda: self._navigate(self.posture_page),
+        )
+        self.cyber_platform.pack(fill="both", expand=True)
 
     def _build_dashboard(self) -> None:
         holder = tk.Frame(self.dashboard_page, bg="#0d1b29")
