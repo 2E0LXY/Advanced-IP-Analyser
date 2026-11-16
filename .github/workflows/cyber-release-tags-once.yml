@@ -1,0 +1,64 @@
+name: Publish Cyber Platform release tags (one time)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cyber-release-tags-once.yml'
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Create verified release tags and start release workflows
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $repository = $env:GITHUB_REPOSITORY
+          $desktopCommit = 'f3aa238cffc5db7e5e68a13fc607f6f92e7214fc'
+          $androidCommit = 'c693f6722e474c78e8b191287e73792748e56a6f'
+
+          git merge-base --is-ancestor $desktopCommit HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Desktop commit not on main' }
+          git merge-base --is-ancestor $androidCommit HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Android commit not on main' }
+
+          gh api -X POST "repos/$repository/git/refs" -f 'ref=refs/tags/v3.0.3' -f "sha=$desktopCommit"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not create desktop release tag' }
+          gh workflow run debian.yml --repo $repository --ref v3.0.3
+          if ($LASTEXITCODE -ne 0) { throw 'Could not dispatch Debian release' }
+          gh workflow run windows.yml --repo $repository --ref v3.0.3
+          if ($LASTEXITCODE -ne 0) { throw 'Could not dispatch Windows release' }
+
+          # The Android release attaches its APK to the latest desktop release.
+          # Never run it while the latest published release is still v3.0.2.
+          $ready = $false
+          for ($attempt = 0; $attempt -lt 120; $attempt++) {
+            Start-Sleep -Seconds 10
+            $latest = gh release view --repo $repository --json tagName --jq .tagName 2>$null
+            if ($LASTEXITCODE -ne 0 -or $latest -ne 'v3.0.3') { continue }
+            $names = @(gh release view v3.0.3 --repo $repository --json assets --jq '.assets[].name' 2>$null)
+            if ($LASTEXITCODE -ne 0) { continue }
+            if (($names -contains 'Advanced-IP-Analyser-Setup-3.0.3.exe') -and
+                ($names -contains 'advanced-ip-analyser_3.0.3_all.deb')) {
+              $ready = $true
+              break
+            }
+          }
+          if (-not $ready) { throw 'Desktop release not ready; Android release was not started' }
+
+          gh api -X POST "repos/$repository/git/refs" -f 'ref=refs/tags/android-v1.2.8' -f "sha=$androidCommit"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not create Android release tag' }
+          gh workflow run android.yml --repo $repository --ref android-v1.2.8
+          if ($LASTEXITCODE -ne 0) { throw 'Could not dispatch Android signed release' }
