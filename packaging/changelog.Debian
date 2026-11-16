@@ -1,3 +1,11 @@
+advanced-ip-analyser (3.0.3) stable; urgency=medium
+
+  * Add native Cyber Platform overview using local scan evidence.
+  * Display prioritised LAN exposure indicators, device history and risk factors.
+  * Retain existing scanner, intelligence, posture and local-only safeguards.
+
+ -- Advanced IP Analyser Maintainers <maintainers@example.invalid>  Mon, 16 Nov 2026 21:30:00 +0000
+
 advanced-ip-analyser (3.0.2) stable; urgency=medium
 
   * Export the Network Scan topology directly as a lossless PNG image.
