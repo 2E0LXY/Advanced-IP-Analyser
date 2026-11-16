@@ -22,6 +22,7 @@ import uk.co.twoe0lxy.ipanalyser.data.NetworkScanner
 import uk.co.twoe0lxy.ipanalyser.data.SmartDevice
 import uk.co.twoe0lxy.ipanalyser.data.PeerPairing
 import uk.co.twoe0lxy.ipanalyser.data.InventoryStore
+import uk.co.twoe0lxy.ipanalyser.data.SavedNetworkScan
 import uk.co.twoe0lxy.ipanalyser.data.WifiNetwork
 
 data class WifiSignalSnapshot(
@@ -49,6 +50,7 @@ data class MainScreenUiState(
   val peerListening: Boolean = false,
   val favorites: Set<String> = emptySet(),
   val savedScans: Int = 0,
+  val scanHistory: List<SavedNetworkScan> = emptyList(),
   val dnsBenchmark: List<DnsBenchmarkRow> = emptyList(),
   val dnsBenchmarkRound: Int = 0,
   val dnsBenchmarkRunning: Boolean = false,
@@ -68,6 +70,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
     pairedDesktop = pairing.load()?.desktopAddress.orEmpty(),
     favorites = inventory.favorites(),
     savedScans = inventory.historyCount(),
+    scanHistory = inventory.recentScans(),
     storageTotalBytes = storage.first,
     storageFreeBytes = storage.second,
   ))
@@ -98,7 +101,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
         }
         inventory.saveScan(hosts)
         mutableState.update { it.copy(hosts = hosts, scanningLan = false, status = "Scan complete · ${hosts.size} devices responded") }
-        mutableState.update { it.copy(savedScans = inventory.historyCount()) }
+        mutableState.update { it.copy(savedScans = inventory.historyCount(), scanHistory = inventory.recentScans()) }
         record("LAN scan · ${hosts.size} devices")
       } catch (_: CancellationException) {
         mutableState.update { it.copy(scanningLan = false, status = "Scan stopped") }
