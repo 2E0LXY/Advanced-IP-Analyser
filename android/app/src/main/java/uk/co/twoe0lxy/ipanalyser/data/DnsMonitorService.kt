@@ -33,7 +33,6 @@ import java.util.Locale
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -120,9 +119,7 @@ class DnsMonitorService : VpnService() {
       .establish()
     if (descriptor == null) { stopSelf(); return }
     active = true
-    queryWorkers = Executors.newFixedThreadPool(8) { runnable ->
-      Thread(runnable, "dns-vpn-worker").apply { isDaemon = true }
-    }
+    queryWorkers = boundedQueryPool(QUERY_THREADS, QUERY_QUEUE)
     DnsMonitorRepository.running.value = true
     Thread({ packetLoop(resolver) }, "dns-vpn-monitor").apply { isDaemon = true }.start()
   }
@@ -154,7 +151,9 @@ class DnsMonitorService : VpnService() {
             // One slow or unreachable resolver must not stall every other DNS query.
             workers.execute { forwardQuery(parsed, resolver, output) }
           } catch (_: RejectedExecutionException) {
-            break
+            // Queue full (or the monitor is stopping). Drop this query: the calling app times out
+            // and retries, and the packet loop keeps draining the VPN interface.
+            if (!active) break
           }
         }
       }
@@ -269,8 +268,17 @@ class DnsMonitorService : VpnService() {
     private const val CHANNEL_ID = "dns-monitor"
     private const val NOTIFICATION_ID = 18798
     private const val MAX_GEO_CACHE = 512
+    private const val QUERY_THREADS = 8
+    private const val QUERY_QUEUE = 64
   }
 }
+
+/** Fixed worker pool whose queue is bounded; excess work is rejected rather than retained. */
+internal fun boundedQueryPool(threads: Int, queueCapacity: Int): ThreadPoolExecutor = ThreadPoolExecutor(
+  threads, threads, 0L, TimeUnit.MILLISECONDS, ArrayBlockingQueue(queueCapacity),
+  { runnable -> Thread(runnable, "dns-vpn-worker").apply { isDaemon = true } },
+  ThreadPoolExecutor.AbortPolicy(),
+)
 
 internal object DnsGeoLookup {
   fun url(address: String): String =
