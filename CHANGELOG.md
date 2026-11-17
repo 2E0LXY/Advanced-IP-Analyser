@@ -1,5 +1,9 @@
 # Changelog
 
+## Android 1.2.10 - 2026-11-17
+
+- Bounded the DNS monitor's forwarding queue. When a resolver is unreachable, excess queries are now dropped so apps retry, instead of queuing without limit and returning stale answers or exhausting memory.
+
 ## 3.0.4 - 2026-11-17
 
 - Limited display-filter `matches` expressions to two repetition operators and 1,024 characters, preventing polynomial backtracking from freezing the interface.
