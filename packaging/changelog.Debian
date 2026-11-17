@@ -1,3 +1,12 @@
+advanced-ip-analyser (3.0.4) stable; urgency=medium
+
+  * Fix catastrophic backtracking in display-filter regular expressions.
+  * Neutralise spreadsheet formulas in Wi-Fi and connection CSV exports.
+  * Refuse non-HTTPS redirects for webhooks and update downloads.
+  * Add timeouts to the update helper.
+
+ -- Advanced IP Analyser Maintainers <maintainers@example.invalid>  Tue, 17 Nov 2026 09:30:00 +0000
+
 advanced-ip-analyser (3.0.3) stable; urgency=medium
 
   * Add native Cyber Platform overview using local scan evidence.
