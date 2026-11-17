@@ -223,7 +223,7 @@ def _safe_regex(pattern: str) -> re.Pattern[str]:
     if len(pattern) > 128:
         raise FilterSyntaxError("regular expression is limited to 128 characters")
     if (re.search(r"\\[1-9]", pattern) or any(character in pattern for character in "(){}") or
-            len(re.findall(r"(?<!\\)[*+?]", pattern)) > 8 or
+            len(re.findall(r"(?<!\\)[*+?]", pattern)) > 2 or
             re.search(r"(?<!\\)[*+?]{2}", pattern)):
         raise FilterSyntaxError("grouped, counted, or heavily repeating regular expressions are not supported")
     try:
@@ -258,7 +258,7 @@ def _comparison(field: str, operator: str, expected: object) -> Callable[[tuple[
         if operator == "contains":
             return str(expected).casefold() in str(actual)[:4_096].casefold()
         if operator == "matches":
-            return bool(regex and regex.search(str(actual)[:4_096]))
+            return bool(regex and regex.search(str(actual)[:1_024]))
         try:
             left, right = float(actual), float(expected)
         except (TypeError, ValueError):

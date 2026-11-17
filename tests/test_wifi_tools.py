@@ -98,6 +98,13 @@ class WifiToolTests(unittest.TestCase):
         self.assertEqual(wifi_channel_width({192: [bytes((2,))]}), 160)
         self.assertIsNone(wifi_channel_width({}))
 
+    def test_spreadsheet_cell_guard_covers_leading_whitespace(self):
+        from ip_analyser.wifi_tools import spreadsheet_safe_cell
+        for value in ("=1+1", "+1", "-1", "@SUM(A1)", "\t=1+1", " =1+1", "\r@x"):
+            with self.subTest(value=value):
+                self.assertTrue(spreadsheet_safe_cell(value).startswith("'"))
+        self.assertEqual(spreadsheet_safe_cell("Home WiFi"), "Home WiFi")
+
     def test_wifi_history_reports_new_missing_and_security_changes(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "history.jsonl"

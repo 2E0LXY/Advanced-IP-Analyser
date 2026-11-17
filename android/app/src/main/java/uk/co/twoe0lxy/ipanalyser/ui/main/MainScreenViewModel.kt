@@ -267,10 +267,10 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 
   fun setPeerListener(enabled: Boolean) {
     try {
-      if (enabled) pairing.startBridge { message ->
+      if (enabled) pairing.startBridge({ message ->
         mutableState.update { it.copy(status = message) }
         record(message)
-      } else pairing.stopBridge()
+      }, { mutableState.update { it.copy(peerListening = false) } }) else pairing.stopBridge()
       mutableState.update { it.copy(peerListening = enabled, status = if (enabled) "Desktop can request Android LAN scans" else "Android peer listener stopped") }
     } catch (error: Exception) {
       mutableState.update { it.copy(peerListening = false, status = error.message ?: "Could not start peer listener") }

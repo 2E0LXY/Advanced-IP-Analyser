@@ -39,6 +39,13 @@ def _installer_pattern(kind: str) -> re.Pattern[str]:
     raise ValueError("unsupported update installer kind")
 
 
+def _require_https(response: object) -> None:
+    """Reject a response reached through a redirect that left HTTPS."""
+    final = getattr(response, "url", "")
+    if isinstance(final, str) and final and not final.lower().startswith("https://"):
+        raise ValueError("update server redirected away from HTTPS")
+
+
 def version_key(value: str) -> tuple[tuple[int, int | str], ...]:
     """Create a dependency-free comparison key for this project's release versions."""
     value = value.strip().removeprefix("v")
@@ -57,6 +64,7 @@ def check_for_update(current_version: str, timeout: float = 5.0,
     })
     # RELEASE_API is a fixed HTTPS GitHub API endpoint.
     with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec B310
+        _require_https(response)
         encoded = response.read(MAX_RELEASE_METADATA_BYTES + 1)
     if len(encoded) > MAX_RELEASE_METADATA_BYTES:
         raise ValueError("GitHub release metadata exceeds the 1 MiB safety limit")
@@ -119,6 +127,7 @@ def download_update(update: Update, cache_dir: Path | None = None, timeout: floa
     try:
         # The URL was matched exactly against this project's fixed HTTPS release prefix above.
         with urllib.request.urlopen(request, timeout=timeout) as response, os.fdopen(descriptor, "wb") as stream:  # nosec B310
+            _require_https(response)
             length = response.headers.get("Content-Length")
             if length:
                 try:

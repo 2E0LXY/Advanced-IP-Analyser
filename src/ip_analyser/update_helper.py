@@ -94,7 +94,7 @@ def _install_as_root(package: Path, version: str, expected_digest: str,
                 metadata.get("Version", "").strip() != version):
             raise ValueError("update package failed its identity or integrity check")
         result = subprocess.run(
-            ["/usr/bin/apt-get", "install", "-y", str(staged)], check=False)
+            ["/usr/bin/apt-get", "install", "-y", str(staged)], check=False, timeout=1_800)
         return result.returncode
 
 
@@ -147,7 +147,7 @@ def main(argv: list[str] | None = None) -> int:
         helper = _trusted_helper_path()
         result = subprocess.run(
             [pkexec, "/usr/bin/python3", "-I", str(helper), "--install", str(package),
-             version, expected_digest], check=False)
+             version, expected_digest], check=False, timeout=1_800)
         time.sleep(0.5)
         _relaunch()
         return result.returncode

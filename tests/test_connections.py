@@ -55,3 +55,18 @@ class ConnectionMonitorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ConnectionExportTests(unittest.TestCase):
+    def test_csv_export_neutralises_spreadsheet_formulas(self):
+        import tempfile
+        from pathlib import Path
+        from ip_analyser.connections import ConnectionRecord, export_connections
+        record = ConnectionRecord("2026-01-01T00:00:00", "outbound", "tcp", "10.0.0.2", 1234,
+                                  "93.184.216.34", 443, "ESTABLISHED", 1, "=cmd|' /c calc'!A1", "/bin/x")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "out.csv"
+            export_connections(path, [record], {})
+            text = path.read_text(encoding="utf-8")
+        self.assertIn("'=cmd", text)
+        self.assertNotIn(",=cmd", text)

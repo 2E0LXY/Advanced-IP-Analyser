@@ -106,6 +106,12 @@ class AdvancedNetworkTools(private val context: Context) {
     val socket = SSLSocketFactory.getDefault().createSocket() as javax.net.ssl.SSLSocket
     try {
       socket.soTimeout = 7_000
+      socket.sslParameters = socket.sslParameters.apply {
+        // Without SNI, virtual-hosted servers return their default certificate.
+        if (host.isNotBlank() && !host.all { it.isDigit() || it == '.' || it == ':' }) {
+          serverNames = listOf(javax.net.ssl.SNIHostName(host))
+        }
+      }
       socket.connect(InetSocketAddress(host, port), 7_000)
       socket.startHandshake()
       val session = socket.session
@@ -158,7 +164,7 @@ class AdvancedNetworkTools(private val context: Context) {
     val (host, port) = splitHostPort(hostInput, 22)
     require(username.isNotBlank()) { "Enter the SSH username." }
     require(command.isNotBlank()) { "Enter a command." }
-    val session = JSch().getSession(username, host, port).apply {
+    val session = newJsch().getSession(username, host, port).apply {
       setPassword(password)
       setConfig("StrictHostKeyChecking", "ask")
       setConfig("PreferredAuthentications", "password,keyboard-interactive")
@@ -174,7 +180,14 @@ class AdvancedNetworkTools(private val context: Context) {
       channel.outputStream = output
       channel.setErrStream(errors)
       channel.connect(8_000)
-      while (!channel.isClosed) Thread.sleep(40)
+      val deadline = SystemClock.elapsedRealtime() + 60_000
+      while (!channel.isClosed) {
+        if (SystemClock.elapsedRealtime() > deadline) {
+          channel.disconnect()
+          throw java.util.concurrent.TimeoutException("The SSH command did not finish within 60 seconds.")
+        }
+        Thread.sleep(40)
+      }
       val text = output.toString(Charsets.UTF_8.name()).trim()
       val error = errors.toString(Charsets.UTF_8.name()).trim()
       channel.disconnect()
@@ -184,11 +197,12 @@ class AdvancedNetworkTools(private val context: Context) {
 
   suspend fun sftpList(hostInput: String, username: String, password: String, path: String): String = withContext(Dispatchers.IO) {
     val (host, port) = splitHostPort(hostInput, 22)
-    val session = JSch().getSession(username, host, port).apply {
+    val session = newJsch().getSession(username, host, port).apply {
       setPassword(password)
       setConfig("StrictHostKeyChecking", "ask")
       setConfig("PreferredAuthentications", "password,keyboard-interactive")
       setUserInfo(ConfirmingUserInfo(password))
+      timeout = 10_000
     }
     try {
       session.connect(10_000)
@@ -241,6 +255,16 @@ class AdvancedNetworkTools(private val context: Context) {
     "${device.name} turned ${if (enabled) "on" else "off"}."
   }
 
+  /**
+   * Host keys are remembered after first contact (trust on first use). A later key change is
+   * refused by [ConfirmingUserInfo], so a man-in-the-middle cannot capture the password.
+   */
+  private fun newJsch(): JSch = JSch().apply {
+    val known = java.io.File(context.filesDir, "ssh_known_hosts")
+    if (!known.exists()) known.createNewFile()
+    setKnownHosts(known.path)
+  }
+
   private fun cleanHost(value: String): String = value.trim().removePrefix("http://").removePrefix("https://")
     .substringBefore('/').substringBefore(':').ifBlank { throw IllegalArgumentException("Enter a host or IP address.") }
 
@@ -283,7 +307,9 @@ class AdvancedNetworkTools(private val context: Context) {
     val id = (System.nanoTime() and 0xffff).toInt()
     val output = ByteArrayOutputStream()
     output.write(byteArrayOf((id shr 8).toByte(), id.toByte(), 1, 0, 0, 1, 0, 0, 0, 0, 0, 0))
-    name.split('.').forEach { label -> output.write(label.length); output.write(label.toByteArray()) }
+    val labels = name.trim('.').split('.')
+    require(labels.isNotEmpty() && labels.all { it.length in 1..63 }) { "Enter a valid domain name." }
+    labels.forEach { label -> output.write(label.length); output.write(label.toByteArray()) }
     output.write(0); output.write(type shr 8); output.write(type); output.write(0); output.write(1)
     val response = ByteArray(4096)
     val length = DatagramSocket().use { socket ->
@@ -298,8 +324,9 @@ class AdvancedNetworkTools(private val context: Context) {
     var offset = 12
     val questions = readU16(response, 4)
     val answers = readU16(response, 6)
-    repeat(questions) { offset = skipDnsName(response, offset); offset += 4 }
     val result = mutableListOf<String>()
+    try {
+    repeat(questions) { offset = skipDnsName(response, offset); offset += 4 }
     repeat(answers) {
       offset = skipDnsName(response, offset)
       if (offset + 10 > length) return@repeat
@@ -323,6 +350,9 @@ class AdvancedNetworkTools(private val context: Context) {
       }
       offset = end
     }
+    } catch (_: IndexOutOfBoundsException) {
+      // A truncated or malformed reply from the resolver: keep the records parsed so far.
+    }
     return result
   }
 
@@ -337,10 +367,12 @@ class AdvancedNetworkTools(private val context: Context) {
       val length = data[cursor].toInt() and 0xff
       if (length == 0) { cursor++; break }
       if (length and 0xC0 == 0xC0) {
+        if (cursor + 1 >= data.size) break
         if (next < 0) next = cursor + 2
         cursor = ((length and 0x3f) shl 8) or (data[cursor + 1].toInt() and 0xff)
       } else {
         cursor++
+        if (cursor + length > data.size) break
         labels += String(data, cursor, length, Charsets.UTF_8)
         cursor += length
       }
@@ -364,7 +396,9 @@ class AdvancedNetworkTools(private val context: Context) {
 
 private class ConfirmingUserInfo(private val password: String) : com.jcraft.jsch.UserInfo, com.jcraft.jsch.UIKeyboardInteractive {
   override fun getPassword() = password
-  override fun promptYesNo(message: String) = true
+  // JSch asks this for unknown hosts ("The authenticity of host ... can't be established") and for
+  // changed keys. Accept only the first; a changed or otherwise unexpected prompt is refused.
+  override fun promptYesNo(message: String) = message.startsWith("The authenticity of host")
   override fun getPassphrase(): String? = null
   override fun promptPassphrase(message: String) = false
   override fun promptPassword(message: String) = true

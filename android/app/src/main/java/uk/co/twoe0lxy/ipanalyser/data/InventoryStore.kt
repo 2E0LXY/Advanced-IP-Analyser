@@ -86,7 +86,11 @@ class InventoryStore(context: Context) {
     private fun hostJson(host: HostResult) = JSONObject().put("address", host.address).put("hostname", host.hostname)
       .put("mac", host.macAddress).put("latency_ms", host.latencyMs).put("open_ports", JSONArray(host.openPorts))
 
-    private fun csvCell(value: String) = "\"${value.replace("\"", "\"\"")}\""
+    private fun csvCell(value: String): String {
+      // Hostnames and MACs come from the network; stop spreadsheets treating them as formulas.
+      val safe = if (value.isNotEmpty() && value.trimStart().firstOrNull() in setOf('=', '+', '-', '@')) "'" + value else value
+      return "\"${safe.replace("\"", "\"\"")}\""
+    }
     private fun xml(value: String) = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
   }
 }

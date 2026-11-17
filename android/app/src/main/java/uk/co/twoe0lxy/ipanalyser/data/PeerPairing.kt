@@ -11,6 +11,7 @@ import org.json.JSONObject
 import java.io.BufferedReader
 import java.net.HttpURLConnection
 import java.net.Inet4Address
+import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.URL
@@ -20,6 +21,7 @@ import java.security.SecureRandom
 import java.util.Base64
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.Mac
@@ -46,7 +48,7 @@ class PeerPairing(private val context: Context) {
   }
 
   suspend fun pair(desktopInput: String, token: String): PeerConfig = withContext(Dispatchers.IO) {
-    require(token.length >= 32) { "Enter the private pairing token shown on the desktop." }
+    require(token.trim().length >= 32) { "Enter the private pairing token shown on the desktop." }
     val existing = load()
     val config = PeerConfig(normalizeDesktop(desktopInput), token.trim(), existing?.deviceId ?: UUID.randomUUID().toString())
     val localIp = NetworkScanner(context).networkInfo().localIp
@@ -71,10 +73,11 @@ class PeerPairing(private val context: Context) {
     result ?: "Pairing removed from Android. Use Revoke access on the desktop if it was offline."
   }
 
-  fun startBridge(onStatus: (String) -> Unit) {
+  fun startBridge(onStatus: (String) -> Unit, onStopped: () -> Unit = {}) {
     val config = load() ?: throw IllegalStateException("Pair with the desktop first.")
-    if (bridge != null) return
-    bridge = PeerBridge(context, config, onStatus).also { it.start() }
+    if (bridge?.isAlive == true) return
+    bridge?.close()
+    bridge = PeerBridge(context, config, onStatus, onStopped).also { it.start() }
   }
 
   fun stopBridge() {
@@ -128,9 +131,13 @@ class PeerPairing(private val context: Context) {
     connection.setRequestProperty("X-Peer-Signature", signature)
     connection.outputStream.use { it.write(bytes) }
     val code = connection.responseCode
-    val response = (if (code < 400) connection.inputStream else connection.errorStream).bufferedReader().use { it.readText() }
+    val stream = if (code < 400) connection.inputStream else connection.errorStream
+    val response = stream?.bufferedReader()?.use { it.readText().take(1_000_000) }.orEmpty()
     connection.disconnect()
-    if (code >= 400) throw IllegalStateException(runCatching { JSONObject(response).optString("error") }.getOrDefault(response))
+    if (code >= 400) {
+      val message = runCatching { JSONObject(response).optString("error") }.getOrDefault("")
+      throw IllegalStateException(message.ifBlank { "Desktop returned HTTP $code" })
+    }
     return response
   }
 
@@ -153,19 +160,37 @@ private class PeerBridge(
   private val context: Context,
   private val config: PeerConfig,
   private val status: (String) -> Unit,
+  private val stopped: () -> Unit = {},
 ) {
   @Volatile private var running = true
+  @Volatile private var failed = false
   private var server: ServerSocket? = null
   private val nonces = ConcurrentHashMap<String, Long>()
+  private val activeRequests = AtomicInteger(0)
+
+  val isAlive: Boolean get() = running && !failed
 
   fun start() {
     Thread({
       try {
-        server = ServerSocket(18797)
+        val listener = ServerSocket().apply { reuseAddress = true; bind(InetSocketAddress(18797)) }
+        server = listener
         status("Android peer listener ready on port 18797")
-        while (running) server?.accept()?.let { socket -> Thread({ handle(socket) }, "peer-request").start() }
+        while (running) {
+          val socket = listener.accept()
+          if (activeRequests.incrementAndGet() > MAX_CONCURRENT_REQUESTS) {
+            activeRequests.decrementAndGet()
+            runCatching { socket.close() }
+            continue
+          }
+          Thread({ try { handle(socket) } finally { activeRequests.decrementAndGet() } }, "peer-request").start()
+        }
       } catch (error: Exception) {
-        if (running) status(error.message ?: "Android peer listener stopped")
+        if (running) {
+          failed = true
+          status(error.message ?: "Android peer listener stopped")
+          stopped()
+        }
       }
     }, "android-peer-bridge").apply { isDaemon = true }.start()
   }
@@ -176,14 +201,16 @@ private class PeerBridge(
     socket.use { client ->
       client.soTimeout = 10_000
       if (!client.inetAddress.isSiteLocalAddress) return
-      val reader = client.getInputStream().bufferedReader()
-      val requestLine = reader.readLine() ?: return
+      // ISO-8859-1 keeps one character per byte so Content-Length matches the signed body.
+      val reader = client.getInputStream().bufferedReader(Charsets.ISO_8859_1)
+      val requestLine = readBoundedLine(reader) ?: return
       val parts = requestLine.split(' ')
       if (parts.size < 2) return
       val headers = mutableMapOf<String, String>()
       while (true) {
-        val line = reader.readLine() ?: return
+        val line = readBoundedLine(reader) ?: return
         if (line.isEmpty()) break
+        if (headers.size >= MAX_HEADERS) return
         val index = line.indexOf(':')
         if (index > 0) headers[line.substring(0, index).trim().lowercase()] = line.substring(index + 1).trim()
       }
@@ -195,7 +222,7 @@ private class PeerBridge(
         if (count < 0) break
         read += count
       }
-      val body = String(chars, 0, read).toByteArray()
+      val body = String(chars, 0, read).toByteArray(Charsets.ISO_8859_1)
       val timestamp = headers["x-peer-timestamp"].orEmpty()
       val nonce = headers["x-peer-nonce"].orEmpty()
       val signature = headers["x-peer-signature"].orEmpty()
@@ -222,6 +249,23 @@ private class PeerBridge(
         respond(client, 500, JSONObject().put("error", error.message ?: "scan failed").toString())
       }
     }
+  }
+
+  private fun readBoundedLine(reader: BufferedReader): String? {
+    val line = StringBuilder()
+    while (true) {
+      val next = reader.read()
+      if (next < 0) return if (line.isEmpty()) null else line.toString()
+      if (next == '\n'.code) return line.toString().trimEnd('\r')
+      if (line.length >= MAX_LINE) return null
+      line.append(next.toChar())
+    }
+  }
+
+  private companion object {
+    const val MAX_LINE = 8_192
+    const val MAX_HEADERS = 64
+    const val MAX_CONCURRENT_REQUESTS = 4
   }
 
   private fun respond(socket: Socket, code: Int, body: String) {

@@ -6,7 +6,7 @@ tested, used by the CLI, and reused by a future Android/desktop peer API.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 import ipaddress
 import json
@@ -20,7 +20,8 @@ import statistics
 import subprocess
 import time
 from typing import Iterable
-from urllib.request import Request, urlopen
+from urllib.error import HTTPError
+from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
 from .scan_history import latest_evidence, latest_network_watch_evidence
 
@@ -123,7 +124,7 @@ def load_monitor_policy(path: Path | None = None) -> MonitorPolicy:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
         raise ValueError("monitor policy must be an object")
-    allowed = {field.name for field in MonitorPolicy.__dataclass_fields__.values()}
+    allowed = set(MonitorPolicy.__dataclass_fields__)
     policy = MonitorPolicy(**{key: item for key, item in value.items() if key in allowed})
     policy.validate()
     return policy
@@ -166,6 +167,18 @@ def selected_policy_changes(policy: MonitorPolicy, summary: dict[str, object]) -
     return selected
 
 
+class _HttpsOnlyRedirects(HTTPRedirectHandler):
+    """Refuse redirects that would downgrade an HTTPS request to another scheme."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D401
+        if not newurl.lower().startswith("https://"):
+            raise HTTPError(req.full_url, code, "redirect leaves HTTPS", headers, fp)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_HTTPS_ONLY_OPENER = build_opener(_HttpsOnlyRedirects)
+
+
 def dispatch_policy_webhook(policy: MonitorPolicy, changes: dict[str, object], timeout: float = 8.0) -> None:
     """Send a user-configured change notification without exposing stored credentials."""
     policy.validate()
@@ -178,7 +191,7 @@ def dispatch_policy_webhook(policy: MonitorPolicy, changes: dict[str, object], t
         raise ValueError("change notification exceeds the webhook safety limit")
     request = Request(policy.webhook_url, data=body, method="POST",
                       headers={"Content-Type": "application/json", "User-Agent": "Advanced-IP-Analyser/3.0"})
-    with urlopen(request, timeout=max(1.0, min(timeout, 30.0))) as response:
+    with _HTTPS_ONLY_OPENER.open(request, timeout=max(1.0, min(timeout, 30.0))) as response:
         if not 200 <= response.status < 300:
             raise OSError(f"webhook returned HTTP {response.status}")
 

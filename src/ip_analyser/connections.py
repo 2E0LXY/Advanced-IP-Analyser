@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import ipaddress
 import json
+import re
 import socket
 import urllib.parse
 import urllib.request
@@ -158,6 +159,13 @@ def locate_address(address: str, timeout: float = 4.0) -> GeoLocation:
     )
 
 
+def _csv_safe(value: Any) -> Any:
+    """Neutralise spreadsheet formulas in process names or other untrusted text."""
+    if isinstance(value, str) and re.match(r"^\s*[=+\-@]", value):
+        return "'" + value
+    return value
+
+
 def export_connections(path: Path, records: list[ConnectionRecord],
                        locations: dict[str, GeoLocation]) -> None:
     rows = []
@@ -180,4 +188,4 @@ def export_connections(path: Path, records: list[ConnectionRecord],
             "destination_location", "latitude", "longitude",
         ])
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows([{key: _csv_safe(value) for key, value in row.items()} for row in rows])

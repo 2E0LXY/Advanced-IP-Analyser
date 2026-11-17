@@ -362,7 +362,7 @@ def _ap_value(ap: AccessPoint, include_clients: bool = True) -> dict:
 
 def spreadsheet_safe_cell(value) -> str:
     text = str(value if value is not None else "")
-    return "'" + text if text.startswith(("=", "+", "-", "@")) else text
+    return "'" + text if re.match(r"^\s*[=+\-@]", text) else text
 
 
 def save_wifi_report(path: Path, aps: list[AccessPoint], unlinked: list[WifiClient]) -> None:
