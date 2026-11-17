@@ -82,6 +82,14 @@ class PacketFilterTests(unittest.TestCase):
         with self.assertRaises(FilterSyntaxError):
             compile_filter("tcp " * 1_000)
 
+    def test_regex_guard_rejects_polynomial_backtracking_patterns(self):
+        import time
+        with self.assertRaises(FilterSyntaxError):
+            compile_filter('http.host matches "a*a*a*a*a*a*a*a*b"')
+        start = time.monotonic()
+        compile_filter('http.host matches "a*a*b"')
+        self.assertLess(time.monotonic() - start, 1.0)
+
     def test_saved_filters_are_atomic_bounded_and_validated(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "filters.json"

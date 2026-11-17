@@ -14,6 +14,7 @@ import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import org.json.JSONObject
 import uk.co.twoe0lxy.ipanalyser.MainActivity
 import uk.co.twoe0lxy.ipanalyser.R
@@ -29,7 +30,13 @@ import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 data class DnsEvent(
   val id: Long,
@@ -56,12 +63,14 @@ object DnsMonitorRepository {
   val events: StateFlow<List<DnsEvent>> = mutableEvents.asStateFlow()
   val running = MutableStateFlow(false)
 
-  fun add(event: DnsEvent) { mutableEvents.value = (listOf(event) + mutableEvents.value).take(300) }
+  fun add(event: DnsEvent) { mutableEvents.update { (listOf(event) + it).take(300) } }
   fun locate(id: Long, location: String, latitude: Double? = null,
              longitude: Double? = null, organisation: String = "") {
-    mutableEvents.value = mutableEvents.value.map {
-      if (it.id == id) it.copy(location = location, latitude = latitude,
-        longitude = longitude, organisation = organisation) else it
+    mutableEvents.update { events ->
+      events.map {
+        if (it.id == id) it.copy(location = location, latitude = latitude,
+          longitude = longitude, organisation = organisation) else it
+      }
     }
   }
   fun clear() { mutableEvents.value = emptyList() }
@@ -72,6 +81,14 @@ class DnsMonitorService : VpnService() {
   @Volatile private var active = false
   private val geoCache = ConcurrentHashMap<String, DnsGeo>()
   private lateinit var connectivity: ConnectivityManager
+  private val writeLock = Any()
+  @Volatile private var queryWorkers: ExecutorService? = null
+  // Bounded so a flood of unique DNS answers cannot create unbounded threads or lookups.
+  private val geoWorkers = ThreadPoolExecutor(
+    1, 2, 30, TimeUnit.SECONDS, ArrayBlockingQueue(64),
+    { runnable -> Thread(runnable, "dns-geo").apply { isDaemon = true } },
+    ThreadPoolExecutor.AbortPolicy(),
+  )
 
   override fun onCreate() {
     super.onCreate()
@@ -86,7 +103,7 @@ class DnsMonitorService : VpnService() {
     return Service.START_STICKY
   }
 
-  override fun onDestroy() { stopMonitor(); super.onDestroy() }
+  override fun onDestroy() { stopMonitor(); geoWorkers.shutdownNow(); super.onDestroy() }
 
   private fun startMonitor() {
     val resolver = connectivity.getLinkProperties(connectivity.activeNetwork)?.dnsServers
@@ -103,6 +120,9 @@ class DnsMonitorService : VpnService() {
       .establish()
     if (descriptor == null) { stopSelf(); return }
     active = true
+    queryWorkers = Executors.newFixedThreadPool(8) { runnable ->
+      Thread(runnable, "dns-vpn-worker").apply { isDaemon = true }
+    }
     DnsMonitorRepository.running.value = true
     Thread({ packetLoop(resolver) }, "dns-vpn-monitor").apply { isDaemon = true }.start()
   }
@@ -110,6 +130,8 @@ class DnsMonitorService : VpnService() {
   private fun stopMonitor() {
     active = false
     DnsMonitorRepository.running.value = false
+    queryWorkers?.shutdownNow()
+    queryWorkers = null
     runCatching { descriptor?.close() }
     descriptor = null
     stopForeground(STOP_FOREGROUND_REMOVE)
@@ -127,40 +149,50 @@ class DnsMonitorService : VpnService() {
           val parsed = DnsPacket.parseIpv4Udp(buffer, count) ?: continue
           if (parsed.destinationPort != 53) continue
           val resolver = runCatching { InetAddress.getByAddress(parsed.destinationAddress) }.getOrDefault(defaultResolver)
-          val app = ownerApp(parsed, resolver)
+          val workers = queryWorkers ?: break
           try {
-            DatagramSocket().use { socket ->
-              protect(socket)
-              socket.soTimeout = 4_000
-              socket.send(DatagramPacket(parsed.payload, parsed.payload.size, resolver, 53))
-              val responseBuffer = ByteArray(8192)
-              val response = DatagramPacket(responseBuffer, responseBuffer.size)
-              socket.receive(response)
-              val dnsResponse = response.data.copyOf(response.length)
-              val answers = DnsPacket.answerAddresses(dnsResponse)
-              output.write(DnsPacket.ipv4UdpResponse(parsed, dnsResponse))
-              val query = DnsPacket.queryName(parsed.payload).ifBlank { "Unknown query" }
-              val event = DnsEvent(
-                id = System.nanoTime(),
-                time = SimpleDateFormat("HH:mm:ss", Locale.UK).format(Date()),
-                query = query,
-                appName = app,
-                resolver = resolver.hostAddress ?: "Unknown resolver",
-                answers = answers,
-                location = when {
-                  answers.isEmpty() -> "No address returned"
-                  query.endsWith("ipwho.is") -> "Geolocation service"
-                  else -> "Locating…"
-                },
-              )
-              DnsMonitorRepository.add(event)
-              if (answers.isNotEmpty() && !query.endsWith("ipwho.is")) locateAsync(event.id, answers.first())
-            }
-          } catch (_: Exception) {
-            // A timeout appears in the calling app normally; the monitor continues.
+            // One slow or unreachable resolver must not stall every other DNS query.
+            workers.execute { forwardQuery(parsed, resolver, output) }
+          } catch (_: RejectedExecutionException) {
+            break
           }
         }
       }
+    }
+  }
+
+  private fun forwardQuery(parsed: ParsedDnsPacket, resolver: InetAddress, output: FileOutputStream) {
+    val app = ownerApp(parsed, resolver)
+    try {
+      DatagramSocket().use { socket ->
+        protect(socket)
+        socket.soTimeout = 4_000
+        socket.send(DatagramPacket(parsed.payload, parsed.payload.size, resolver, 53))
+        val responseBuffer = ByteArray(8192)
+        val response = DatagramPacket(responseBuffer, responseBuffer.size)
+        socket.receive(response)
+        val dnsResponse = response.data.copyOf(response.length)
+        val answers = DnsPacket.answerAddresses(dnsResponse)
+        synchronized(writeLock) { output.write(DnsPacket.ipv4UdpResponse(parsed, dnsResponse)) }
+        val query = DnsPacket.queryName(parsed.payload).ifBlank { "Unknown query" }
+        val event = DnsEvent(
+          id = System.nanoTime(),
+          time = SimpleDateFormat("HH:mm:ss", Locale.UK).format(Date()),
+          query = query,
+          appName = app,
+          resolver = resolver.hostAddress ?: "Unknown resolver",
+          answers = answers,
+          location = when {
+            answers.isEmpty() -> "No address returned"
+            query.endsWith("ipwho.is") -> "Geolocation service"
+            else -> "Locating…"
+          },
+        )
+        DnsMonitorRepository.add(event)
+        if (answers.isNotEmpty() && !query.endsWith("ipwho.is")) locateAsync(event.id, answers.first())
+      }
+    } catch (_: Exception) {
+      // A timeout appears in the calling app normally; the monitor continues.
     }
   }
 
@@ -185,7 +217,8 @@ class DnsMonitorService : VpnService() {
       DnsMonitorRepository.locate(eventId, it.label, it.latitude, it.longitude, it.organisation)
       return
     }
-    Thread({
+    try {
+      geoWorkers.execute {
       var latitude: Double? = null
       var longitude: Double? = null
       var organisation = ""
@@ -194,8 +227,9 @@ class DnsMonitorService : VpnService() {
         if (ip.isSiteLocalAddress || ip.isLoopbackAddress || ip.isLinkLocalAddress) return@runCatching "Private/local destination"
         val connection = URL(DnsGeoLookup.url(address)).openConnection() as HttpURLConnection
         connection.connectTimeout = 3_000; connection.readTimeout = 3_000
-        val json = connection.inputStream.bufferedReader().use { JSONObject(it.readText()) }
-        connection.disconnect()
+        val json = try {
+          connection.inputStream.bufferedReader().use { JSONObject(it.readText().take(65_536)) }
+        } finally { connection.disconnect() }
         if (!json.optBoolean("success")) "Location unavailable" else buildList {
           latitude = json.optDouble("latitude").takeUnless(Double::isNaN)
           longitude = json.optDouble("longitude").takeUnless(Double::isNaN)
@@ -206,9 +240,13 @@ class DnsMonitorService : VpnService() {
           json.optJSONObject("connection")?.optString("isp")?.takeIf(String::isNotBlank)?.let(::add)
         }.joinToString(", ").ifBlank { "Location unavailable" }
       }.getOrDefault("Location unavailable")
+      if (geoCache.size >= MAX_GEO_CACHE) geoCache.clear()
       geoCache[address] = DnsGeo(location, latitude, longitude, organisation)
       DnsMonitorRepository.locate(eventId, location, latitude, longitude, organisation)
-    }, "dns-geo").apply { isDaemon = true }.start()
+      }
+    } catch (_: RejectedExecutionException) {
+      DnsMonitorRepository.locate(eventId, "Location unavailable")
+    }
   }
 
   private fun notification() = NotificationCompat.Builder(this, CHANNEL_ID)
@@ -230,6 +268,7 @@ class DnsMonitorService : VpnService() {
     const val ACTION_STOP = "uk.co.twoe0lxy.ipanalyser.DNS_STOP"
     private const val CHANNEL_ID = "dns-monitor"
     private const val NOTIFICATION_ID = 18798
+    private const val MAX_GEO_CACHE = 512
   }
 }
 

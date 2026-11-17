@@ -1,5 +1,21 @@
 # Changelog
 
+## 3.0.4 - 2026-11-17
+
+- Limited display-filter `matches` expressions to two repetition operators and 1,024 characters, preventing polynomial backtracking from freezing the interface.
+- Prefixed spreadsheet-formula characters, including after leading whitespace, in Wi-Fi and connection CSV exports.
+- Webhooks and update downloads now refuse redirects that leave HTTPS.
+- Added timeouts to the Debian update helper and removed unused imports.
+
+## Android 1.2.9 - 2026-11-17
+
+- SSH and SFTP now remember host keys on first contact and refuse a changed key; previously every key was accepted.
+- Disabled cloud backup of the saved inventory, pairing data and SSH host keys.
+- The SSH password and desktop pairing token are no longer kept in saved instance state.
+- The desktop peer listener now bounds request size and concurrency, reports bind failures and no longer crashes on empty error replies.
+- DNS monitoring answers queries concurrently, so one slow resolver no longer stalls device DNS; event updates are atomic and location lookups are bounded.
+- TLS inspection sends the server name, DNS reply parsing is bounds-checked, SSH commands time out after 60 seconds and inventory CSV exports neutralise spreadsheet formulas.
+
 ## 3.0.2 - 2026-11-14
 
 - Replaced the Network Scan SVG topology export with a directly rendered, lossless PNG image.

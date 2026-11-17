@@ -78,3 +78,14 @@ class NetworkOperationsTests(TestCase):
         matches = match_kev(catalogue, ["example", "router"])
         self.assertEqual([item["cveID"] for item in matches], ["CVE-2026-0001"])
         self.assertEqual(match_kev(catalogue, ["unknown"]), [])
+
+
+class WebhookRedirectTests(TestCase):
+    def test_https_webhook_refuses_downgrade_redirect(self):
+        from urllib.error import HTTPError
+        from urllib.request import Request
+        from ip_analyser.network_operations import _HttpsOnlyRedirects
+        handler = _HttpsOnlyRedirects()
+        request = Request("https://example.test/hook", data=b"{}", method="POST")
+        with self.assertRaises(HTTPError):
+            handler.redirect_request(request, None, 302, "Found", {}, "http://example.test/hook")

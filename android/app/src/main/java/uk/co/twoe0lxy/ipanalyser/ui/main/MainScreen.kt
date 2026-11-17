@@ -930,11 +930,11 @@ private fun ToolsPage(
   var options by rememberSaveable { mutableStateOf("22,53,80,443,8080-8090") }
   var sshHost by rememberSaveable { mutableStateOf("") }
   var sshUser by rememberSaveable { mutableStateOf("") }
-  var sshPassword by rememberSaveable { mutableStateOf("") }
+  var sshPassword by remember { mutableStateOf("") }
   var sshCommand by rememberSaveable { mutableStateOf("uname -a") }
   var sftpPath by rememberSaveable { mutableStateOf(".") }
   var desktopAddress by rememberSaveable { mutableStateOf(state.pairedDesktop) }
-  var pairingToken by rememberSaveable { mutableStateOf("") }
+  var pairingToken by remember { mutableStateOf("") }
   fun startDnsService() {
     ContextCompat.startForegroundService(context, Intent(context, DnsMonitorService::class.java).setAction(DnsMonitorService.ACTION_START))
   }
