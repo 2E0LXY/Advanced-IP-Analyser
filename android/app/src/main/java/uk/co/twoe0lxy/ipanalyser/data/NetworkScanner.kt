@@ -25,6 +25,7 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.DatagramPacket
 import java.net.DatagramSocket
+import java.net.ConnectException
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -170,6 +171,11 @@ object ScannerUtils {
   ).joinToString(".")
 }
 
+private data class ProbeTimeouts(val icmpMs: Int, val tcpMs: Int)
+
+private val PROBE_FAST = ProbeTimeouts(icmpMs = 180, tcpMs = 140)
+private val PROBE_SLOW = ProbeTimeouts(icmpMs = 900, tcpMs = 350)
+
 class NetworkScanner(context: Context) {
   private val appContext = context.applicationContext
   private val connectivity = appContext.getSystemService(ConnectivityManager::class.java)
@@ -214,15 +220,30 @@ class NetworkScanner(context: Context) {
     val semaphore = Semaphore(64)
     val finished = AtomicInteger(0)
     progress(0, targets.size)
-    targets.map { address ->
-      async(Dispatchers.IO) {
+    val firstPass = targets.map { address ->
+      address to async(Dispatchers.IO) {
         semaphore.withPermit {
-          val result = inspectHost(address, address in alwaysInclude)
+          val result = inspectHost(address, address in alwaysInclude, PROBE_FAST)
           progress(finished.incrementAndGet(), targets.size)
           result
         }
       }
-    }.awaitAll().filterNotNull().sortedBy { ipSortKey(it.address) }
+    }.map { (address, job) -> address to job.await() }
+    // Wi-Fi clients in power-save can take well over 200 ms to answer. Re-probe every
+    // silent address with longer timeouts so sleeping devices are not omitted.
+    val missed = firstPass.filter { it.second == null }.map { it.first }
+    val total = targets.size + missed.size
+    progress(finished.get(), total)
+    val secondPass = missed.map { address ->
+      async(Dispatchers.IO) {
+        semaphore.withPermit {
+          val result = inspectHost(address, false, PROBE_SLOW)
+          progress(finished.incrementAndGet(), total)
+          result
+        }
+      }
+    }.awaitAll()
+    (firstPass.mapNotNull { it.second } + secondPass.filterNotNull()).sortedBy { ipSortKey(it.address) }
   }
 
   private suspend fun stimulateNeighbours(targets: List<String>) = coroutineScope {
@@ -273,12 +294,12 @@ class NetworkScanner(context: Context) {
     return arp + ipNeighbours
   }
 
-  private fun inspectHost(address: String, knownNeighbour: Boolean = false): HostResult? {
+  private fun inspectHost(address: String, knownNeighbour: Boolean, timeouts: ProbeTimeouts): HostResult? {
     var reachable = false
     var latency = Long.MAX_VALUE
     try {
       val started = SystemClock.elapsedRealtime()
-      reachable = InetAddress.getByName(address).isReachable(180)
+      reachable = InetAddress.getByName(address).isReachable(timeouts.icmpMs)
       if (reachable) latency = SystemClock.elapsedRealtime() - started
     } catch (_: Exception) {
       // TCP checks can still identify a host when ICMP echo is blocked.
@@ -287,11 +308,17 @@ class NetworkScanner(context: Context) {
     commonPorts.forEach { port ->
       val started = SystemClock.elapsedRealtime()
       try {
-        Socket().use { socket -> socket.connect(InetSocketAddress(address, port), 140) }
+        Socket().use { socket -> socket.connect(InetSocketAddress(address, port), timeouts.tcpMs) }
         open += port
         latency = minOf(latency, SystemClock.elapsedRealtime() - started)
+      } catch (error: ConnectException) {
+        // A refusal (RST) proves the host is alive even though the port is closed.
+        if (error.message?.contains("refused", ignoreCase = true) == true) {
+          reachable = true
+          latency = minOf(latency, SystemClock.elapsedRealtime() - started)
+        }
       } catch (_: Exception) {
-        // Closed or filtered is expected during discovery.
+        // Filtered or timed out is expected during discovery.
       }
     }
     if (!knownNeighbour && !reachable && open.isEmpty()) return null
