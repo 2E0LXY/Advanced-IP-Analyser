@@ -232,8 +232,16 @@ class NetworkScanner(context: Context) {
     // Wi-Fi clients in power-save can take well over 200 ms to answer. Re-probe every
     // silent address with longer timeouts so sleeping devices are not omitted.
     val missed = firstPass.filter { it.second == null }.map { it.first }
+    val total = targets.size + missed.size
+    progress(finished.get(), total)
     val secondPass = missed.map { address ->
-      async(Dispatchers.IO) { semaphore.withPermit { inspectHost(address, false, PROBE_SLOW) } }
+      async(Dispatchers.IO) {
+        semaphore.withPermit {
+          val result = inspectHost(address, false, PROBE_SLOW)
+          progress(finished.incrementAndGet(), total)
+          result
+        }
+      }
     }.awaitAll()
     (firstPass.mapNotNull { it.second } + secondPass.filterNotNull()).sortedBy { ipSortKey(it.address) }
   }
