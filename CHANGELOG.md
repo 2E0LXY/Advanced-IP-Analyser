@@ -1,5 +1,9 @@
 # Changelog
 
+## Android 1.2.12 - 2026-11-17
+
+- Fixed the LAN scan progress counter jumping from full to a larger total. Silent addresses are now retried inside the same scan step, so progress counts addresses once from 0 to the total.
+
 ## Android 1.2.11 - 2026-11-17
 
 - Improved LAN discovery so fewer devices are missed. A refused TCP connection now counts as proof a host is alive, and every silent address is re-probed with longer ICMP and TCP timeouts to catch Wi-Fi devices in power-save. Android 10+ blocks ARP and neighbour-table reads, so discovery no longer depends on them.

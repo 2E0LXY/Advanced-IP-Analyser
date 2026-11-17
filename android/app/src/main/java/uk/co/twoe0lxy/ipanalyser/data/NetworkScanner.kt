@@ -220,30 +220,18 @@ class NetworkScanner(context: Context) {
     val semaphore = Semaphore(64)
     val finished = AtomicInteger(0)
     progress(0, targets.size)
-    val firstPass = targets.map { address ->
-      address to async(Dispatchers.IO) {
+    targets.map { address ->
+      async(Dispatchers.IO) {
         semaphore.withPermit {
+          // Silent hosts are retried with longer timeouts inside the same task so progress
+          // stays within one 0..N scale; Wi-Fi clients in power-save can need >200 ms.
           val result = inspectHost(address, address in alwaysInclude, PROBE_FAST)
+            ?: inspectHost(address, false, PROBE_SLOW)
           progress(finished.incrementAndGet(), targets.size)
           result
         }
       }
-    }.map { (address, job) -> address to job.await() }
-    // Wi-Fi clients in power-save can take well over 200 ms to answer. Re-probe every
-    // silent address with longer timeouts so sleeping devices are not omitted.
-    val missed = firstPass.filter { it.second == null }.map { it.first }
-    val total = targets.size + missed.size
-    progress(finished.get(), total)
-    val secondPass = missed.map { address ->
-      async(Dispatchers.IO) {
-        semaphore.withPermit {
-          val result = inspectHost(address, false, PROBE_SLOW)
-          progress(finished.incrementAndGet(), total)
-          result
-        }
-      }
-    }.awaitAll()
-    (firstPass.mapNotNull { it.second } + secondPass.filterNotNull()).sortedBy { ipSortKey(it.address) }
+    }.awaitAll().filterNotNull().sortedBy { ipSortKey(it.address) }
   }
 
   private suspend fun stimulateNeighbours(targets: List<String>) = coroutineScope {
