@@ -1,3 +1,4 @@
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -23,6 +24,7 @@ def device(root: Path, name: str, vendor: str, product: str, interfaces, manufac
 
 
 class UsbAuditTests(unittest.TestCase):
+    @unittest.skipIf(os.name == "nt", "sysfs interface names contain ':', invalid on Windows")
     def test_plain_keyboard_is_not_flagged_but_composite_gadget_is(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
