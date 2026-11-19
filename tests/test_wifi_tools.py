@@ -153,6 +153,34 @@ class WifiToolTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             _pkexec_command("hop", "wlan0;rm", [1], 300)
 
+    def _beacon(self, capabilities: bytes) -> bytes:
+        fixed = b"\x00" * 8 + struct.pack("<HH", 100, 0x10)
+        rsn = (b"\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x04\x01\x00\x00\x0f\xac\x02"
+               + capabilities)
+        tags = b"\x00\x04Home\x03\x01\x01" + bytes((48, len(rsn))) + rsn
+        return wifi_header(0x0080, BROADCAST, AP, AP) + fixed + tags
+
+    def test_deauthentication_flood_is_flagged_with_pmf_advice(self):
+        deauth = wifi_header(0x00C0, CLIENT, AP, AP) + b"\x07\x00"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "flood.pcap"
+            path.write_bytes(capture_bytes([radiotap(self._beacon(b"\x00\x00"))] +
+                                           [radiotap(deauth)] * 12))
+            aps, _ = analyze_wifi_capture(path)
+            path.write_bytes(capture_bytes([radiotap(self._beacon(b"\xc0\x00"))] +
+                                           [radiotap(deauth)] * 12))
+            protected, _ = analyze_wifi_capture(path)
+            path.write_bytes(capture_bytes([radiotap(self._beacon(b"\x00\x00"))] +
+                                           [radiotap(deauth)] * 3))
+            quiet, _ = analyze_wifi_capture(path)
+        self.assertEqual(aps[0].pmf, "off")
+        self.assertEqual(aps[0].deauth_frames, 12)
+        self.assertTrue(any("Deauthentication flood" in item and "Enable 802.11w" in item
+                            for item in aps[0].indicators))
+        self.assertEqual(protected[0].pmf, "required")
+        self.assertTrue(any("ignored" in item for item in protected[0].indicators))
+        self.assertEqual(quiet[0].indicators, [])
+
 
 if __name__ == "__main__":
     unittest.main()

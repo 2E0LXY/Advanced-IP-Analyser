@@ -21,6 +21,8 @@ MAX_WIFI_PACKETS = 100_000
 MAX_WIFI_HISTORY_BYTES = 5 * 1024 * 1024
 MAX_WIFI_HISTORY_ENTRIES = 365
 MAX_WIFI_HISTORY_APS = 4_096
+DEAUTH_FLOOD_FRAMES = 10
+DEAUTH_FLOOD_WINDOW_SECONDS = 10.0
 _INTERFACE = re.compile(r"[A-Za-z0-9_.:@-]{1,15}")
 _MONITOR = re.compile(r"aia[0-9]{1,6}mon")
 
@@ -51,6 +53,8 @@ class AccessPoint:
     last_seen: float = 0
     handshake_seen: bool = False
     wps_advertised: bool = False
+    pmf: str = "unknown"
+    deauth_frames: int = 0
     manufacturer: str = ""
     risk_level: str = "No obvious issue"
     risk_reasons: list[str] = field(default_factory=list)
@@ -181,6 +185,22 @@ def _security(capabilities: int, tags: dict[int, list[bytes]]) -> str:
     return "WEP" if capabilities & 0x10 else "Open"
 
 
+def wifi_pmf(tags: dict[int, list[bytes]]) -> str:
+    """Return 802.11w state from the RSN capabilities: required, capable, off or unknown."""
+    for rsn in tags.get(48, []):
+        try:
+            offset = 2 + 4
+            offset += 2 + 4 * struct.unpack_from("<H", rsn, offset)[0]
+            offset += 2 + 4 * struct.unpack_from("<H", rsn, offset)[0]
+            capabilities = struct.unpack_from("<H", rsn, offset)[0]
+        except struct.error:
+            continue
+        if capabilities & 0x40:
+            return "required"
+        return "capable" if capabilities & 0x80 else "off"
+    return "unknown"
+
+
 def wifi_channel_width(tags: dict[int, list[bytes]]) -> int | None:
     """Return the width advertised by HT/VHT operation tags, if present."""
     width = None
@@ -244,6 +264,7 @@ def _pcap_records(path: Path):
 def analyze_wifi_capture(path: Path) -> tuple[list[AccessPoint], list[WifiClient]]:
     aps: dict[str, AccessPoint] = {}
     unlinked: dict[str, WifiClient] = {}
+    deauth_times: dict[str, list[float]] = {}
     for timestamp, raw, _original in _pcap_records(path.expanduser().resolve()):
         try:
             offset, signal, frequency = _radiotap(raw)
@@ -270,11 +291,22 @@ def analyze_wifi_capture(path: Path) -> tuple[list[AccessPoint], list[WifiClient
             ap.frequency_mhz = frequency or ap.frequency_mhz
             ap.signal_dbm = signal if signal is not None else ap.signal_dbm
             ap.security = _security(capabilities, tags)
+            ap.pmf = wifi_pmf(tags)
             ap.wps_advertised = any(value.startswith(b"\x00\x50\xf2\x04")
                                     for value in tags.get(221, []))
             ap.risk_level, ap.risk_reasons = wifi_security_assessment(
                 ap.security, ap.wps_advertised)
             ap.beacons += int(subtype == 8)
+            ap.last_seen = timestamp
+        elif frame_type == 0 and subtype in {10, 12}:
+            # Disassociation/deauthentication. Floods force clients off a network so a
+            # handshake can be captured or a rogue access point can take over.
+            times = deauth_times.setdefault(address3, [])
+            if len(times) < 100_000:
+                times.append(timestamp)
+            ap = aps.setdefault(address3, AccessPoint(address3, first_seen=timestamp,
+                                                      last_seen=timestamp))
+            ap.deauth_frames += 1
             ap.last_seen = timestamp
         elif frame_type == 0 and subtype == 4:
             tags = _tags(frame[24:])
@@ -312,8 +344,34 @@ def analyze_wifi_capture(path: Path) -> tuple[list[AccessPoint], list[WifiClient
             if b"\xaa\xaa\x03\x00\x00\x00\x88\x8e" in payload[:32]:
                 ap.handshake_seen = True
     rogue_wifi_indicators(aps.values())
+    deauth_flood_indicators(aps, deauth_times)
     return (sorted(aps.values(), key=lambda ap: (ap.signal_dbm or -999), reverse=True),
             sorted(unlinked.values(), key=lambda client: client.packets, reverse=True))
+
+
+def deauth_flood_indicators(access_points: dict[str, AccessPoint],
+                            deauth_times: dict[str, list[float]]) -> int:
+    """Flag bursts of deauthentication/disassociation frames per BSSID."""
+    count = 0
+    for bssid, times in deauth_times.items():
+        times.sort()
+        burst = any(times[index + DEAUTH_FLOOD_FRAMES - 1] - times[index] <= DEAUTH_FLOOD_WINDOW_SECONDS
+                    for index in range(len(times) - DEAUTH_FLOOD_FRAMES + 1))
+        ap = access_points.get(bssid)
+        if not burst or ap is None:
+            continue
+        detail = (f"Deauthentication flood: {len(times)} deauthentication/disassociation frames "
+                  f"({DEAUTH_FLOOD_FRAMES}+ within {DEAUTH_FLOOD_WINDOW_SECONDS:.0f} s). This is the "
+                  "technique used to force clients off a network for handshake capture or "
+                  "evil-twin attacks. ")
+        detail += ("Protected management frames are required, so spoofed frames are ignored."
+                   if ap.pmf == "required" else
+                   "Enable 802.11w protected management frames (WPA3 or WPA2 PMF required) on "
+                   "this access point.")
+        if detail not in ap.indicators:
+            ap.indicators.append(detail)
+            count += 1
+    return count
 
 
 def rogue_wifi_indicators(access_points) -> int:
@@ -376,7 +434,7 @@ def save_wifi_report(path: Path, aps: list[AccessPoint], unlinked: list[WifiClie
     rows = [_ap_value(ap, include_clients=False) for ap in aps]
     columns = ("name", "bssid", "manufacturer", "channel", "channel_width_mhz",
                "frequency_mhz", "signal_dbm", "security",
-               "wps_advertised", "risk_level", "risk_reasons", "beacons", "data_packets",
+               "wps_advertised", "pmf", "deauth_frames", "risk_level", "risk_reasons", "beacons", "data_packets",
                "client_count", "handshake_seen", "indicators")
     if suffix == ".csv":
         with path.open("w", encoding="utf-8", newline="") as stream:

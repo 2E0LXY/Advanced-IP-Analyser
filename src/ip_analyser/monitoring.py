@@ -30,6 +30,11 @@ SUSPICIOUS_DNS_COUNT = 3
 HIGH_DNS_VARIETY = 50
 UNCOMMON_OUTBOUND_PORTS = {4444, 5555, 6667, 31337}
 CLEARTEXT_REMOTE_PORTS = {21: "FTP", 23: "Telnet", 110: "POP3", 143: "IMAP"}
+CREDENTIAL_SERVICE_PORTS = {
+    21: "FTP", 22: "SSH", 23: "Telnet", 110: "POP3", 143: "IMAP", 445: "SMB",
+    1433: "SQL Server", 3306: "MySQL", 3389: "RDP", 5432: "PostgreSQL", 5900: "VNC",
+}
+CREDENTIAL_GUESS_ATTEMPTS = 15
 
 
 def _secure_private_path(path: Path, *, directory: bool = False) -> None:
@@ -378,6 +383,7 @@ class MonitorAnalyzer:
         services: Counter = Counter()
         arp_owners: dict[str, set[str]] = defaultdict(set)
         syn_attempts: dict[str, set[tuple[str, int]]] = defaultdict(set)
+        login_attempts: Counter = Counter()
         inbound_attempts: dict[str, set[tuple[str, int]]] = defaultdict(set)
         external_bytes_sent: Counter = Counter()
         uncommon_outbound: Counter = Counter()
@@ -427,6 +433,8 @@ class MonitorAnalyzer:
                 destination_port = record.destination_port or 0
                 if record.protocol == "TCP" and flags & 0x02 and not flags & 0x10:
                     syn_attempts[record.source].add((record.destination, destination_port))
+                    if destination_port in CREDENTIAL_SERVICE_PORTS:
+                        login_attempts[(record.source, record.destination, destination_port)] += 1
                     if source_ip.is_global and destination_ip.is_private:
                         inbound_attempts[record.destination].add((record.source, destination_port))
                 if source_ip.is_private and destination_ip.is_global:
@@ -502,7 +510,7 @@ class MonitorAnalyzer:
         findings = self._findings(
             list(flows.values()), list(devices.values()), dns_events, arp_owners, dhcp_servers,
             syn_attempts, inbound_attempts, external_bytes_sent, uncommon_outbound,
-            cleartext_outbound)
+            cleartext_outbound, login_attempts)
         return Analysis(min(record.timestamp for record in records),
                         max(record.timestamp for record in records),
                         len(records), sum(max(0, record.length) for record in records),
@@ -518,7 +526,8 @@ class MonitorAnalyzer:
                   inbound_attempts: dict[str, set[tuple[str, int]]],
                   external_bytes_sent: Counter,
                   uncommon_outbound: Counter,
-                  cleartext_outbound: set[tuple[str, str, int]]) -> list[Finding]:
+                  cleartext_outbound: set[tuple[str, str, int]],
+                  login_attempts: Counter | None = None) -> list[Finding]:
         findings: list[Finding] = []
         now = max((device.last_seen for device in devices), default=time.time())
         dns_failures = Counter(event.device for event in dns if event.response and event.rcode)
@@ -533,6 +542,14 @@ class MonitorAnalyzer:
                 findings.append(Finding(now, "alert", "ARP ownership changed", address,
                                         f"Observed {len(owners)} MAC addresses claiming this IPv4 address: "
                                         + ", ".join(sorted(owners))))
+        for (source, destination, port), attempts in (login_attempts or Counter()).items():
+            if attempts >= CREDENTIAL_GUESS_ATTEMPTS:
+                findings.append(Finding(
+                    now, "alert", "Credential-guessing pattern", source,
+                    f"Observed {attempts} new {CREDENTIAL_SERVICE_PORTS[port]} connections to "
+                    f"{destination}:{port}. Repeated logins from one source can indicate a "
+                    "password-guessing tool; confirm the source, enable lockout or key-only "
+                    "authentication, and restrict the service to trusted addresses."))
         for source, targets in syn_attempts.items():
             ports = {port for _address, port in targets if port}
             hosts = {address for address, _port in targets}

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Wi-Fi capture analysis flags deauthentication/disassociation floods and reports 802.11w protected-management-frame status per access point, with advice to require PMF.
+- Network monitor flags credential-guessing patterns: repeated new connections from one source to an SSH, RDP, SMB, FTP, Telnet, VNC or database port.
+- New read-only `usb-audit` command (Linux) flags keyboard-plus-storage, keyboard-plus-network and gadget-vendor USB devices, the layout used by keystroke-injection tools.
+
 ## Android 1.2.11 - 2026-11-17
 
 - Improved LAN discovery so fewer devices are missed. A refused TCP connection now counts as proof a host is alive, and every silent address is re-probed with longer ICMP and TCP timeouts to catch Wi-Fi devices in power-save. Android 10+ blocks ARP and neighbour-table reads, so discovery no longer depends on them.
