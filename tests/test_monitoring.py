@@ -110,6 +110,20 @@ class MonitoringTests(unittest.TestCase):
         self.assertIn("Uncommon outbound port", categories)
         self.assertIn("Large outbound transfer", categories)
 
+    def test_repeated_logins_to_one_service_are_flagged_as_credential_guessing(self):
+        started = 1_700_000_000.0
+        attempts = [tcp_record(index, started + index, source_port=40_000 + index,
+                               destination_port=22) for index in range(15)]
+        few = [tcp_record(100 + index, started + index, source="192.168.1.77",
+                          source_port=41_000 + index, destination_port=22) for index in range(5)]
+        retransmitted = [tcp_record(500 + index, started + index, source="192.168.1.88",
+                                    source_port=42_000 + index // 6, destination_port=22,
+                                    sequence=900 + index // 6) for index in range(18)]
+        analysis = MonitorAnalyzer().analyze(attempts + few + retransmitted)
+        guesses = [item for item in analysis.findings if item.category == "Credential-guessing pattern"]
+        self.assertEqual(len(guesses), 1)
+        self.assertIn("SSH", guesses[0].explanation)
+
     def test_security_monitor_flags_repeated_long_dns_queries(self):
         label = b"a" * 55
         analysis = MonitorAnalyzer().analyze([

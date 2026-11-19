@@ -63,6 +63,7 @@ def build_parser() -> argparse.ArgumentParser:
     watch.add_argument("--duration", type=int, default=300, help="seconds, up to 86400")
     watch.add_argument("--snaplen", type=int, default=128, help="bytes retained per packet")
     watch.add_argument("--report", type=Path)
+    commands.add_parser("usb-audit", help="read-only check of attached USB devices for keystroke-injection indicators")
     analyse = commands.add_parser("analyse-capture", help="create a deep-analysis report")
     analyse.add_argument("file", type=Path)
     analyse.add_argument("--report", type=Path, required=True)
@@ -169,6 +170,15 @@ def main(argv: list[str] | None = None) -> int:
             export_analysis(args.report, analysis)
         print(f"Analysed {analysis.packet_count} packets, {len(analysis.flows)} conversations, "
               f"and {len(analysis.findings)} findings")
+        return 0
+    if args.command == "usb-audit":
+        from .usb_audit import read_usb_devices, usb_audit_report
+        try:
+            devices = read_usb_devices()
+        except OSError as error:
+            print(f"USB inspection was not performed: {error}. This command reads Linux sysfs.")
+            return 1
+        print(usb_audit_report(devices))
         return 0
     if args.command == "analyse-capture":
         analysis = MonitorAnalyzer().analyze(read_capture(args.file, limit=100_000))
