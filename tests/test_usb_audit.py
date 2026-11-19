@@ -39,8 +39,9 @@ class UsbAuditTests(unittest.TestCase):
         self.assertIn("gadget vendor", reasons)
         self.assertIn("Indicators for review: 2", usb_audit_report(list(devices.values())))
 
-    def test_missing_sysfs_returns_empty_list(self):
-        self.assertEqual(read_usb_devices(Path("/nonexistent/usb")), [])
+    def test_unreadable_sysfs_raises_instead_of_reporting_clean(self):
+        with self.assertRaises(OSError):
+            read_usb_devices(Path("/nonexistent/usb"))
 
 
 if __name__ == "__main__":

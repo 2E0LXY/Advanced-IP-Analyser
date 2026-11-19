@@ -116,7 +116,10 @@ class MonitoringTests(unittest.TestCase):
                                destination_port=22) for index in range(15)]
         few = [tcp_record(100 + index, started + index, source="192.168.1.77",
                           source_port=41_000 + index, destination_port=22) for index in range(5)]
-        analysis = MonitorAnalyzer().analyze(attempts + few)
+        retransmitted = [tcp_record(500 + index, started + index, source="192.168.1.88",
+                                    source_port=42_000 + index // 6, destination_port=22,
+                                    sequence=900 + index // 6) for index in range(18)]
+        analysis = MonitorAnalyzer().analyze(attempts + few + retransmitted)
         guesses = [item for item in analysis.findings if item.category == "Credential-guessing pattern"]
         self.assertEqual(len(guesses), 1)
         self.assertIn("SSH", guesses[0].explanation)

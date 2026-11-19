@@ -383,7 +383,7 @@ class MonitorAnalyzer:
         services: Counter = Counter()
         arp_owners: dict[str, set[str]] = defaultdict(set)
         syn_attempts: dict[str, set[tuple[str, int]]] = defaultdict(set)
-        login_attempts: Counter = Counter()
+        login_attempts: dict[tuple[str, str, int], set[tuple[int, int | None]]] = defaultdict(set)
         inbound_attempts: dict[str, set[tuple[str, int]]] = defaultdict(set)
         external_bytes_sent: Counter = Counter()
         uncommon_outbound: Counter = Counter()
@@ -434,7 +434,9 @@ class MonitorAnalyzer:
                 if record.protocol == "TCP" and flags & 0x02 and not flags & 0x10:
                     syn_attempts[record.source].add((record.destination, destination_port))
                     if destination_port in CREDENTIAL_SERVICE_PORTS:
-                        login_attempts[(record.source, record.destination, destination_port)] += 1
+                        # A retransmitted SYN repeats its source port and sequence number.
+                        login_attempts[(record.source, record.destination, destination_port)].add(
+                            (record.source_port or 0, metadata["sequence"]))
                     if source_ip.is_global and destination_ip.is_private:
                         inbound_attempts[record.destination].add((record.source, destination_port))
                 if source_ip.is_private and destination_ip.is_global:
@@ -527,7 +529,7 @@ class MonitorAnalyzer:
                   external_bytes_sent: Counter,
                   uncommon_outbound: Counter,
                   cleartext_outbound: set[tuple[str, str, int]],
-                  login_attempts: Counter | None = None) -> list[Finding]:
+                  login_attempts: dict[tuple[str, str, int], set] | None = None) -> list[Finding]:
         findings: list[Finding] = []
         now = max((device.last_seen for device in devices), default=time.time())
         dns_failures = Counter(event.device for event in dns if event.response and event.rcode)
@@ -542,7 +544,8 @@ class MonitorAnalyzer:
                 findings.append(Finding(now, "alert", "ARP ownership changed", address,
                                         f"Observed {len(owners)} MAC addresses claiming this IPv4 address: "
                                         + ", ".join(sorted(owners))))
-        for (source, destination, port), attempts in (login_attempts or Counter()).items():
+        for (source, destination, port), starts in (login_attempts or {}).items():
+            attempts = len(starts)
             if attempts >= CREDENTIAL_GUESS_ATTEMPTS:
                 findings.append(Finding(
                     now, "alert", "Credential-guessing pattern", source,

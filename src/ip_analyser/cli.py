@@ -173,7 +173,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "usb-audit":
         from .usb_audit import read_usb_devices, usb_audit_report
-        print(usb_audit_report(read_usb_devices()))
+        try:
+            devices = read_usb_devices()
+        except OSError as error:
+            print(f"USB inspection was not performed: {error}. This command reads Linux sysfs.")
+            return 1
+        print(usb_audit_report(devices))
         return 0
     if args.command == "analyse-capture":
         analysis = MonitorAnalyzer().analyze(read_capture(args.file, limit=100_000))

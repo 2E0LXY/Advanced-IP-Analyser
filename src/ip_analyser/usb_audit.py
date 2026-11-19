@@ -67,11 +67,9 @@ def assess_usb_device(device: UsbDevice) -> list[str]:
 
 
 def read_usb_devices(root: Path = SYSFS_USB) -> list[UsbDevice]:
+    """Raise OSError when the USB tree cannot be read, so callers never report a clean audit."""
     devices: list[UsbDevice] = []
-    try:
-        entries = sorted(root.iterdir())[:MAX_USB_DEVICES * 8]
-    except OSError:
-        return []
+    entries = sorted(root.iterdir())[:MAX_USB_DEVICES * 8]
     by_name: dict[str, UsbDevice] = {}
     for entry in entries:
         if ":" in entry.name:
