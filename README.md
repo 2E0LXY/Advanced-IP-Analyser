@@ -15,12 +15,12 @@ Wireshark.
 
 ## Download
 
-[![Download Android APK](https://img.shields.io/badge/ANDROID-DOWNLOAD_APK_1.2.11-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.11/Advanced-IP-Analyser-Android-1.2.11.apk)
+[![Download Android APK](https://img.shields.io/badge/ANDROID-DOWNLOAD_APK_1.2.12-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.12/Advanced-IP-Analyser-Android-1.2.12.apk)
 [![Download Windows](https://img.shields.io/badge/WINDOWS-DOWNLOAD_3.0.4-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v3.0.4/Advanced-IP-Analyser-Setup-3.0.4.exe)
 
 | Platform | Current version | Download | Installation help |
 | --- | ---: | --- | --- |
-| **Android phone/tablet** | **1.2.11** | **[Download the signed APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.11/Advanced-IP-Analyser-Android-1.2.11.apk)** | **[Android installation instructions](docs/ANDROID-INSTALL.md)** |
+| **Android phone/tablet** | **1.2.12** | **[Download the signed APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.12/Advanced-IP-Analyser-Android-1.2.12.apk)** | **[Android installation instructions](docs/ANDROID-INSTALL.md)** |
 | Windows 10/11 | 3.0.4 | [Download the Windows installer](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v3.0.4/Advanced-IP-Analyser-Setup-3.0.4.exe) | Run the downloaded `.exe`; the installer closes and upgrades running copies |
 | Debian 13 | 3.0.4 | [Download the Debian package](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/v3.0.4/advanced-ip-analyser_3.0.4_all.deb) | Install with `sudo apt install ./advanced-ip-analyser_3.0.4_all.deb` |
 
@@ -98,7 +98,7 @@ See [Windows edition details](docs/WINDOWS.md).
 
 ## Android installation
 
-**[Download the current signed Android APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.11/Advanced-IP-Analyser-Android-1.2.11.apk)**
+**[Download the current signed Android APK](https://github.com/2E0LXY/Advanced-IP-Analyser/releases/download/android-v1.2.12/Advanced-IP-Analyser-Android-1.2.12.apk)**
 and open it on a phone or tablet running Android 8.0 or later. Android may ask
 you to allow installation from the browser or file manager used to open the APK.
 See the **[step-by-step Android installation guide](docs/ANDROID-INSTALL.md)** for

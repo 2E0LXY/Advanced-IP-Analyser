@@ -1,0 +1,35 @@
+name: Publish Android 1.2.12 release tag (one time)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/release-android-1-2-12-once.yml'
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Create the Android release tag on this main commit and start the release workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          android=1.2.12
+          grep -Fq "versionName = \"$android\"" android/app/build.gradle.kts
+
+          if gh release view "android-v$android" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "android-v$android is already released; nothing to do."
+            exit 0
+          fi
+
+          gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f "ref=refs/tags/android-v$android" -f "sha=$GITHUB_SHA"
+          gh workflow run android.yml --repo "$GITHUB_REPOSITORY" --ref "android-v$android"
