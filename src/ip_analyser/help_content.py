@@ -243,21 +243,18 @@ High, Medium, Low and Info prioritise observable configuration risk; they are no
 SAFETY AND LIMITS
 Use only on sites you own or have explicit permission to test. Authentication, JavaScript execution and business logic are outside this crawler. Rate limits, CDNs, bot controls and dynamic applications can change results. Validate findings manually before remediation.
 """),
-    _section("local_ai", "Local AI", "Pair trusted local clients through a private, revocable LAN session.", """
+    _section("local_ai", "Assistant", "Chat with an AI that can propose scans and router changes for your approval.", """
 WHAT IT DOES
-Local AI Control exposes a bounded local dashboard and scanner operations to this computer's browser or a paired Android app on the same private LAN. It uses a persistent revocable session token and shows pairing and peer-scan state.
+The Assistant tab is a plain chat. Ask about your network, devices or router, or tell it what to change. It can read the latest local scan summary, run a bounded LAN scan, start or stop monitoring, and run single commands on your OpenWrt or GL.iNet router over SSH.
 
 HOW IT WORKS
-Enable local access starts an HTTP listener on the selected private LAN address. A high-entropy token authorises requests and is stored in the operating-system credential store. The Android identity is paired to that token. Revoke rotates the token, removes pairing and stops the listener. Router-changing operations still require separate desktop approval.
+It uses the provider, model and API key saved under Settings. The assistant only proposes actions; each one opens an approval prompt showing the exact scan target or router command. Router commands are limited to an allowlist (uci, ubus, wifi, logread, cat, ip, iwinfo, opkg, ping, nslookup, ps, uptime, reboot and /etc/init.d services) with no pipes, redirects or chaining. Results are fed back to the model so it can continue.
 
 HOW TO USE IT
-Select Enable local access and review the confirmation. Use the displayed desktop address from a trusted same-LAN client. Show or Copy token only when pairing; treat it like a password. Open dashboard launches the local page. Scan from Android asks the paired device for its LAN view. Revoke immediately if a token is exposed or a device is lost.
-
-WHAT THE STATES MEAN
-Disabled means no listener is running. Active means the local service is accepting authorised requests. No Android device paired means the token exists but no mobile identity is linked. Scan failures can mean pairing, reachability, Android background restrictions or changed LAN addressing.
+Set the router address, type a request and press Enter. Read the approval prompt before choosing Yes. Router login uses SSH keys only; if the host key is unknown the command fails and the assistant will say so. Tick Share device IPs/MACs only when you want the AI to see addresses.
 
 PRIVACY AND SAFETY
-No public tunnel, VPN or automatic cloud upload is created. Anyone with the token and LAN reachability may use authorised endpoints, so do not share it. Closing the app stops the listener; persistent pairing remains until revoked. Use trusted private networks, local firewalls and device lock screens.
+Chat text, scan summaries and action results are sent to your chosen AI provider. Device identifiers are omitted unless you tick the box. VPNs, tunnels, firmware flashing and password changes are blocked. Replies are advice from a language model and can be wrong: check commands before approving, and note scans and router changes are not proven by Python tests.
 """),
     _section("operations", "Network Operations", "Monitor change, infrastructure, traffic, performance, exposure and automation.", """
 WHAT IT DOES

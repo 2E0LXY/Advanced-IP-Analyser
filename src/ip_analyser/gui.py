@@ -345,8 +345,6 @@ class Application(tk.Tk):
         self.cancel_scan = threading.Event()
         self.network_presets = []
         self.favorites_path = Path.home() / ".config" / "advanced-ip-analyser" / "favorites.json"
-        self.local_control_server = None
-        self.local_control_state = None
         try:
             self.app_icon = tk.PhotoImage(file=Path(__file__).with_name("assets") / "advanced-ip-analyser.png")
             self.iconphoto(True, self.app_icon)
@@ -470,7 +468,7 @@ class Application(tk.Tk):
         self.notebook.add(self.wifi_analyzer_page, text="Wi-Fi Analyzer")
         self.notebook.add(self.packet_analysis_page, text="Packet Analysis")
         self.notebook.add(self.web_security_page, text="Web Security")
-        self.notebook.add(self.local_ai_page, text="Local AI")
+        self.notebook.add(self.local_ai_page, text="Assistant")
         self._navigate(self.cyber_page)
 
         header = ttk.Frame(self.scan_page, padding=12)
@@ -854,52 +852,140 @@ class Application(tk.Tk):
         self._navigate(self.packet_analysis_page)
 
     def _build_local_ai_workspace(self) -> None:
+        """Plain chat: ask questions, approve proposed LAN/router actions one by one."""
         page = self.local_ai_page
-        heading = ttk.Frame(page, padding=(18, 18, 18, 8))
-        heading.pack(fill="x")
-        ttk.Label(heading, text="Local AI Control", font=("Segoe UI", 20, "bold")).pack(anchor="w")
-        ttk.Label(heading, text="Private, revocable access for this computer and a paired Android device",
-                  foreground="#90abc4").pack(anchor="w", pady=(2, 0))
+        self.chat_assistant = None
+        self.chat_busy = False
+        top = ttk.Frame(page, padding=(18, 14, 18, 6))
+        top.pack(fill="x")
+        ttk.Label(top, text="Assistant", font=("Segoe UI", 18, "bold")).pack(side="left")
+        ttk.Label(top, text="Router").pack(side="left", padx=(24, 4))
+        self.chat_router = ttk.Entry(top, width=16)
+        self.chat_router.insert(0, "192.168.1.1")
+        self.chat_router.pack(side="left")
+        self.chat_share = tk.BooleanVar(value=False)
+        ttk.Checkbutton(top, text="Share device IPs/MACs with AI", variable=self.chat_share).pack(
+            side="left", padx=(16, 0))
+        ttk.Button(top, text="Clear", command=self._chat_clear).pack(side="right")
+        self.chat_log = tk.Text(page, bg="#101f30", fg="#dceaf8", insertbackground="#ffffff",
+                                font=("Segoe UI", 10), relief="flat", wrap="word", padx=14, pady=12,
+                                state="disabled")
+        self.chat_log.pack(fill="both", expand=True, padx=18, pady=(0, 8))
+        self.chat_log.tag_configure("you", foreground="#8ec9ff", font=("Segoe UI", 10, "bold"))
+        self.chat_log.tag_configure("ai", foreground="#dceaf8")
+        self.chat_log.tag_configure("sys", foreground="#91abc4", font=("Consolas", 9))
+        bar = ttk.Frame(page, padding=(18, 0, 18, 14))
+        bar.pack(fill="x")
+        self.chat_input = ttk.Entry(bar)
+        self.chat_input.pack(side="left", fill="x", expand=True)
+        self.chat_input.bind("<Return>", lambda _e: self._chat_send())
+        self.chat_send = ttk.Button(bar, text="Send", command=self._chat_send, style="Accent.TButton")
+        self.chat_send.pack(side="left", padx=(8, 0))
+        self._chat_write("Ask about your network, or tell me what to change. Every scan, monitor or router "
+                         "command needs your approval first.\n", "sys")
 
-        card = ttk.LabelFrame(page, text="Authorised local session", padding=18)
-        card.pack(fill="x", padx=18, pady=(6, 12))
-        self.local_ai_state_text = tk.StringVar(value="Disabled · no local listener is running")
-        ttk.Label(card, textvariable=self.local_ai_state_text,
-                  font=("Segoe UI", 11, "bold")).grid(row=0, column=0, columnspan=4, sticky="w")
-        ttk.Label(card, text="Desktop address").grid(row=1, column=0, sticky="w", pady=(14, 4))
-        self.local_ai_address = ttk.Entry(card, state="readonly")
-        self.local_ai_address.grid(row=1, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=(14, 4))
-        ttk.Label(card, text="Private session token").grid(row=2, column=0, sticky="w", pady=4)
-        self.local_ai_token = ttk.Entry(card, show="•", state="readonly")
-        self.local_ai_token.grid(row=2, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4)
-        card.columnconfigure(1, weight=1)
-        controls = ttk.Frame(card)
-        controls.grid(row=3, column=0, columnspan=4, sticky="w", pady=(14, 0))
-        self.local_ai_enable = ttk.Button(controls, text="Enable local access",
-                                          command=self.show_local_ai_control, style="Accent.TButton")
-        self.local_ai_enable.pack(side="left")
-        self.local_ai_reveal = ttk.Button(controls, text="Show token", command=self._toggle_local_ai_token,
-                                          state="disabled")
-        self.local_ai_reveal.pack(side="left", padx=(8, 0))
-        self.local_ai_copy = ttk.Button(controls, text="Copy token", command=self._copy_local_ai_token,
-                                        state="disabled")
-        self.local_ai_copy.pack(side="left", padx=(8, 0))
-        self.local_ai_dashboard = ttk.Button(controls, text="Open dashboard", command=self._open_local_dashboard,
-                                             state="disabled")
-        self.local_ai_dashboard.pack(side="left", padx=(8, 0))
-        self.local_ai_scan = ttk.Button(controls, text="Scan from Android", command=self._scan_from_android,
-                                        state="disabled")
-        self.local_ai_scan.pack(side="left", padx=(8, 0))
-        self.local_ai_revoke = ttk.Button(controls, text="Revoke access", command=self._revoke_local_ai,
-                                          state="disabled", style="Danger.TButton")
-        self.local_ai_revoke.pack(side="left", padx=(8, 0))
+    def _chat_write(self, text: str, tag: str = "ai") -> None:
+        self.chat_log.configure(state="normal")
+        self.chat_log.insert("end", text + "\n", tag)
+        self.chat_log.configure(state="disabled")
+        self.chat_log.see("end")
 
-        privacy = ttk.LabelFrame(page, text="Privacy and pairing", padding=18)
-        privacy.pack(fill="x", padx=18)
-        ttk.Label(privacy, wraplength=940, justify="left", text=(
-            "The listener runs only on your private LAN. The session token is stored in the operating-system "
-            "credential store and can be revoked at any time. Router changes always require separate approval. "
-            "No cloud service, public tunnel or VPN is created.")).pack(anchor="w")
+    def _chat_clear(self) -> None:
+        self.chat_assistant = None
+        self.chat_log.configure(state="normal")
+        self.chat_log.delete("1.0", "end")
+        self.chat_log.configure(state="disabled")
+
+    def _chat_send(self) -> None:
+        text = self.chat_input.get().strip()
+        if not text or self.chat_busy:
+            return
+        try:
+            router = ipaddress.ip_address(self.chat_router.get().strip())
+            if not router.is_private:
+                raise ValueError("router must be a private LAN address")
+            settings = load_ai_settings()
+        except (OSError, ValueError) as error:
+            self._chat_write(f"Cannot start: {error}", "sys")
+            return
+        if not settings.selected_model():
+            self._chat_write("No AI model selected. Use Settings (top right): pick a provider, refresh "
+                             "models, save a model and API key.", "sys")
+            return
+        from .chat_assistant import Assistant
+        if self.chat_assistant is None:
+            self.chat_assistant = Assistant(settings)
+        assistant = self.chat_assistant
+        assistant.settings, assistant.router = settings, str(router)
+        assistant.share_identifiers = bool(self.chat_share.get())
+        self.chat_input.delete(0, "end")
+        self._chat_write("You: " + text, "you")
+        self._chat_run(lambda: assistant.ask(text))
+
+    def _chat_run(self, call) -> None:
+        self.chat_busy = True
+        self.chat_send.configure(state="disabled")
+        self._chat_write("…", "sys")
+
+        def worker() -> None:
+            try:
+                result = call()
+            except Exception as error:  # noqa: BLE001 - surfaced to the user
+                self.after(0, lambda e=str(error): self._chat_done(None, e))
+                return
+            self.after(0, lambda: self._chat_done(result, ""))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _chat_done(self, result, error: str) -> None:
+        self.chat_busy = False
+        self.chat_send.configure(state="normal")
+        if error:
+            self._chat_write(f"Error: {error}", "sys")
+            return
+        prose, actions = result
+        if prose:
+            self._chat_write(prose, "ai")
+        if actions:
+            self._chat_run_actions(list(actions), [])
+
+    def _chat_run_actions(self, pending: list, results: list[str]) -> None:
+        """Approve and run actions one at a time, then hand the results back to the model."""
+        assistant = self.chat_assistant
+        if not pending:
+            if results:
+                feedback = "\n".join(results)
+                self._chat_run(lambda: assistant.ask("TOOL_RESULT (untrusted data):\n" + feedback,
+                                                     role="SYSTEM"))
+            return
+        action = pending.pop(0)
+        if action.kind != "report":
+            if not messagebox.askyesno("Approve action", action.describe() +
+                                       ("\n\nThis changes state." if action.changes_things else ""),
+                                       parent=self):
+                self._chat_write(f"Declined: {action.describe()}", "sys")
+                results.append(f"{action.kind}: declined by user")
+                return self._chat_run_actions(pending, results)
+        self._chat_write(f"Running: {action.describe()}", "sys")
+        self.chat_busy = True
+        self.chat_send.configure(state="disabled")
+
+        def worker() -> None:
+            try:
+                out = assistant.execute(action)
+                note = f"{action.kind}: {out}"
+            except Exception as error:  # noqa: BLE001
+                out, note = f"failed: {error}", f"{action.kind}: failed: {error}"
+            self.after(0, lambda: self._chat_action_done(pending, results, out, note))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _chat_action_done(self, pending: list, results: list[str], out: str, note: str) -> None:
+        self.chat_busy = False
+        self.chat_send.configure(state="normal")
+        self._chat_write(out[:1500], "sys")
+        results.append(note)
+        self._chat_run_actions(pending, results)
 
     @staticmethod
     def _set_readonly_entry(entry: ttk.Entry, value: str) -> None:
@@ -926,7 +1012,7 @@ class Application(tk.Tk):
             (self.wifi_analyzer_page, "wifi_analyzer", "Wi-Fi Analyzer"),
             (self.packet_analysis_page, "packet_analysis", "Packet Analysis"),
             (self.web_security_page, "web_security", "Web Security"),
-            (self.local_ai_page, "local_ai", "Local AI"),
+            (self.local_ai_page, "local_ai", "Assistant"),
         )
         self.context_help_buttons = {}
         for page, page_key, label in pages:
@@ -1023,108 +1109,6 @@ class Application(tk.Tk):
         self.diagnostic_output.configure(state="normal")
         self.diagnostic_output.insert("end", output)
         self.diagnostic_output.configure(state="disabled")
-
-    def show_local_ai_control(self) -> None:
-        """Create a user-authorised LAN session and show it in the Local AI tab."""
-        from http.server import ThreadingHTTPServer
-
-        from .local_control import PORT, ControlState, make_handler, private_lan_address
-
-        if self.local_control_server is None:
-            if not messagebox.askyesno(
-                "Enable local AI Control?",
-                "Allow this computer's browser to read LAN reports and run scanner operations "
-                "using a private session token?\n\nRouter changes will still need separate approval. "
-                "No cloud service or VPN will be started.", parent=self,
-            ):
-                return
-            lan_address = private_lan_address()
-            state = ControlState(persistent=True)
-            try:
-                server = ThreadingHTTPServer((lan_address, PORT), make_handler(state))
-            except OSError as exc:
-                messagebox.showerror("Local AI Control", f"Cannot start local control: {exc}", parent=self)
-                return
-            self.local_control_state = state
-            self.local_control_server = server
-            threading.Thread(target=server.serve_forever, kwargs={"poll_interval": .2}, daemon=True).start()
-        self._refresh_local_ai_workspace()
-        self._navigate(self.local_ai_page)
-
-    def _refresh_local_ai_workspace(self) -> None:
-        if self.local_control_server is None or self.local_control_state is None:
-            self.local_ai_state_text.set("Disabled · no local listener is running")
-            self._set_readonly_entry(self.local_ai_address, "")
-            self._set_readonly_entry(self.local_ai_token, "")
-            self.local_ai_enable.configure(state="normal", text="Enable local access")
-            for button in (self.local_ai_reveal, self.local_ai_copy, self.local_ai_dashboard,
-                           self.local_ai_scan, self.local_ai_revoke):
-                button.configure(state="disabled")
-            return
-        lan_address = self.local_control_server.server_address[0]
-        port = self.local_control_server.server_address[1]
-        peer_text = (f"Paired Android: {self.local_control_state.peer_address}"
-                     if self.local_control_state.device_id else "No Android device paired yet")
-        self.local_ai_state_text.set(f"Active · {peer_text}")
-        self._set_readonly_entry(self.local_ai_address, f"http://{lan_address}:{port}/")
-        self._set_readonly_entry(self.local_ai_token, self.local_control_state.token)
-        self.local_ai_enable.configure(state="disabled", text="Local access enabled")
-        for button in (self.local_ai_reveal, self.local_ai_copy, self.local_ai_dashboard,
-                       self.local_ai_scan, self.local_ai_revoke):
-            button.configure(state="normal")
-
-    def _toggle_local_ai_token(self) -> None:
-        hidden = bool(self.local_ai_token.cget("show"))
-        self.local_ai_token.configure(show="" if hidden else "•")
-        self.local_ai_reveal.configure(text="Hide token" if hidden else "Show token")
-
-    def _copy_local_ai_token(self) -> None:
-        if self.local_control_state is None:
-            return
-        self.clipboard_clear()
-        self.clipboard_append(self.local_control_state.token)
-        self.status.configure(text="Private Local AI token copied to the clipboard.")
-
-    def _open_local_dashboard(self) -> None:
-        if self.local_control_server is None:
-            return
-        address, port = self.local_control_server.server_address
-        webbrowser.open(f"http://{address}:{port}/")
-
-    def _revoke_local_ai(self) -> None:
-        if self.local_control_server is None or self.local_control_state is None:
-            return
-        if not messagebox.askyesno(
-                "Revoke Local AI access?",
-                "This rotates the private token, removes Android pairing and stops the local listener.",
-                parent=self):
-            return
-        self.local_control_state.revoke()
-        self.local_control_state.stop()
-        self.local_control_server.shutdown()
-        self.local_control_server.server_close()
-        self.local_control_server = None
-        self.local_control_state = None
-        self.local_ai_token.configure(show="•")
-        self.local_ai_reveal.configure(text="Show token")
-        self._refresh_local_ai_workspace()
-
-    def _scan_from_android(self) -> None:
-        if self.local_control_state is None:
-            return
-        self.local_ai_state_text.set("Requesting a LAN scan from the paired Android device…")
-
-        def worker() -> None:
-            try:
-                result = self.local_control_state.scan_android_peer()
-                count = len(result.get("hosts", [])) if isinstance(result, dict) else 0
-                self.after(0, lambda: self.local_ai_state_text.set(
-                    f"Android scan complete · {count} device(s) found"))
-            except Exception as exc:
-                self.after(0, lambda error=str(exc): self.local_ai_state_text.set(
-                    f"Android scan failed · {error}"))
-
-        threading.Thread(target=worker, daemon=True).start()
 
     def show_local_ai_monitor(self) -> None:
         """Optional foreground-session monitor; all observations remain local."""
