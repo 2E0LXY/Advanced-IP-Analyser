@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -255,7 +256,8 @@ private fun AppHeader(state: MainScreenUiState) {
       }
       Column(horizontalAlignment = Alignment.End) {
         Text("LOCAL IP", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(compactAddress(state.network.localIp), color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
+        Text(if (state.network.localIp == "Unavailable") "Not on Wi-Fi/LAN" else compactAddress(state.network.localIp),
+          color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
       }
     }
     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
@@ -668,9 +670,10 @@ private fun WifiChannelChart(networks: List<WifiNetwork>, band: Int, modifier: M
     1 -> listOf(36, 48, 64, 100, 116, 132, 149, 165).map { it to (5000 + it * 5).toFloat() }
     else -> listOf(1, 33, 65, 97, 129, 161, 193, 225).map { it to (5950 + it * 5).toFloat() }
   }
-  val detailScroll = rememberScrollState()
-  Column(modifier.padding(top = 8.dp).verticalScroll(detailScroll)) {
-    Canvas(Modifier.fillMaxWidth().height(330.dp)) {
+  Column(modifier.padding(top = 8.dp)) {
+    // The plot takes the remaining height so the channel numbers stay on screen;
+    // only the legend below scrolls.
+    Canvas(Modifier.fillMaxWidth().weight(1f).heightIn(min = 200.dp)) {
       val left = 45.dp.toPx()
       val right = size.width - 7.dp.toPx()
       val top = 26.dp.toPx()
@@ -717,10 +720,14 @@ private fun WifiChannelChart(networks: List<WifiNetwork>, band: Int, modifier: M
         drawPath(path, color.copy(alpha = .18f))
         drawPath(path, color, style = androidx.compose.ui.graphics.drawscope.Stroke(2.5f))
       }
-      visible.take(6).forEach { network ->
+      val labelled = mutableListOf<Offset>()
+      visible.take(8).forEach { network ->
         val color = colorByBssid.getValue(network.bssid)
         val peakX = x(network.frequencyMhz.toFloat()).coerceIn(left + 28.dp.toPx(), right - 28.dp.toPx())
         val peakY = y(network.signalDbm)
+        // Skip a label that would sit on top of one already drawn.
+        if (labelled.any { kotlin.math.abs(it.x - peakX) < 62.dp.toPx() && kotlin.math.abs(it.y - peakY) < 28.dp.toPx() }) return@forEach
+        labelled += Offset(peakX, peakY)
         networkPaint.color = color.toArgb()
         val shortName = if (network.name.length > 12) network.name.take(11) + "…" else network.name
         drawContext.canvas.nativeCanvas.drawText(shortName, peakX, (peakY - 13.dp.toPx()).coerceAtLeast(13.dp.toPx()), networkPaint)
@@ -733,7 +740,8 @@ private fun WifiChannelChart(networks: List<WifiNetwork>, band: Int, modifier: M
     Text("Channel number →  ·  curve width = advertised bandwidth  ·  higher dBm = stronger",
       fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 5.dp))
     if (visible.isEmpty()) Text("No access points in this band in the latest scan.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-    else Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+    else Column(Modifier.heightIn(max = 96.dp).verticalScroll(rememberScrollState()),
+      verticalArrangement = Arrangement.spacedBy(3.dp)) {
       visible.forEachIndexed { index, network ->
         val color = WifiChartColors[index % WifiChartColors.size]
         Text("● ${network.name} · channel ${network.channel} · ${network.channelWidthMhz} MHz · ${network.signalDbm} dBm",

@@ -3,6 +3,8 @@
 ## Android 1.2.12 - 2026-11-17
 
 - Fixed the LAN scan progress counter jumping from full to a larger total. Silent addresses are now retried inside the same scan step, so progress counts addresses once from 0 to the total.
+- Wi-Fi channel chart now fits the screen so the channel numbers along the bottom are visible without scrolling; the legend scrolls separately and overlapping network labels are skipped.
+- The header shows "Not on Wi-Fi/LAN" instead of "Unavailable" when there is no local IPv4 address, for example on mobile data.
 
 ## Android 1.2.11 - 2026-11-17
 
