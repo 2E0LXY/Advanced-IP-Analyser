@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.0.5 - 2026-11-20
+
+- Replaced the Local AI token and pairing tab with a plain Assistant chat that uses the AI provider saved in Settings.
+- The Assistant can propose scans, monitoring and single router commands over SSH key login; each action needs separate approval showing the exact command.
+- Router commands are allowlisted and VPN or tunnel changes, firmware flashing, password changes and telemetry are blocked.
+- Device IP and MAC addresses are only shared with the AI provider when explicitly ticked.
+
 ## Android 1.2.11 - 2026-11-17
 
 - Improved LAN discovery so fewer devices are missed. A refused TCP connection now counts as proof a host is alive, and every silent address is re-probed with longer ICMP and TCP timeouts to catch Wi-Fi devices in power-save. Android 10+ blocks ARP and neighbour-table reads, so discovery no longer depends on them.
