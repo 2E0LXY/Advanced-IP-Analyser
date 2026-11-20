@@ -1,3 +1,10 @@
+advanced-ip-analyser (3.0.5) stable; urgency=medium
+
+  * Replace the Local AI token tab with an approval-gated Assistant chat.
+  * Allowlist router commands and block VPN, tunnel and firmware changes.
+
+ -- Advanced IP Analyser Maintainers <maintainers@example.invalid>  Fri, 20 Nov 2026 12:00:00 +0000
+
 advanced-ip-analyser (3.0.4) stable; urgency=medium
 
   * Fix catastrophic backtracking in display-filter regular expressions.
